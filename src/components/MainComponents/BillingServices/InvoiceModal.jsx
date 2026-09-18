@@ -19,7 +19,7 @@ import {
   validateSplitTotal,
   getPaidAndDue,
 } from '../../utils/BillingUtils';
-
+import PhonePeIframe from "../../Constants/RazorPay/PhonePeIframe";
 // ─────────────────────────────────────────────────────────────────────────────
 // REQ 2 helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -430,7 +430,7 @@ export default function InvoiceModal({
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const { clientDetails } = useClient();
   const clientGstNumber = clientDetails?.gst_number || "";
-
+  const [showPhonePeIframe, setShowPhonePeIframe] = useState(false);
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
   const allOrderItems = selectedOrder?.items || [];
@@ -852,7 +852,10 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
       return;
     }
     if (!draftId) return;
-
+    if (method === "phonepe" && !splitPaymentEnabled) {
+      setShowPhonePeIframe(true);
+      return;
+    }
     const requiresRazorpay = needsRazorpay(splitPaymentEnabled, paymentSplits, method);
     if (requiresRazorpay) {
       setShowRazorpayModal(true);
@@ -1314,6 +1317,7 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
                           <option>Cash</option>
                           <option value="razorpay_upi">UPI (Razorpay)</option>
                           <option value="razorpay_card">Card (Razorpay)</option>
+                          <option value="phonepe">PhonePe</option>
                           <option>Due</option>
                         </select>
                         <input
@@ -1442,6 +1446,38 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
           onClose={() => setShowRazorpayModal(false)}
         />
       )}
+      {showPhonePeIframe && (
+  <PhonePeIframe
+    amount={total}
+    documentId={invoiceDraftId}
+    clientId={clientId}
+    token={token}
+    onPaymentSuccess={async (data) => {
+      try {
+        await axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+          { id: selectedOrder.id, status: "served", invoice_status: "paid" },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
+        setPaymentStatus("Paid");
+        setStatus("Issued");  
+        setShowPhonePeIframe(false);
+        toast.success("PhonePe payment verified!");
+        if (onSave) onSave(invoiceDraftId); 
+        onClose();
+      } catch (err) {
+        console.error("Post-payment update failed:", err.response?.data || err.message);
+        toast.error("Payment verified but order update failed");
+      }
+    }}
+    onPaymentFailure={(error) => {
+      console.error('PhonePe payment failed:', error);
+      setShowPhonePeIframe(false);
+      toast.error(error.error || 'Payment failed. Please try again.');
+    }}
+  />
+)}
     </div>
   );
 }
