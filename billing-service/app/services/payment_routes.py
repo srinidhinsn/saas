@@ -10,9 +10,6 @@ from phonepe.sdk.pg.env import Env
 
 router = APIRouter()
 
-razorpay_client = razorpay.Client(
-    auth=(os.getenv("RAZORPAY_KEY_ID"), os.getenv("RAZORPAY_KEY_SECRET"))
-)
 
 class RazorpayVerifyRequest(BaseModel):
     document_id: int
