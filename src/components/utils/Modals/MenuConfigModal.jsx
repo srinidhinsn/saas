@@ -19,6 +19,14 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
   const [unitOptions, setUnitOptions] = useState([]);
   const [unitInput, setUnitInput] = useState("");
 
+  // Price display: the master list (exact/round_up/round_down/...) is
+  // fetched read-only from the same "price_rounding" category as everything
+  // else here. It is NEVER added-to/deleted-from — we don't want the first
+  // save to wipe out unselected options. The actual user choice is a single
+  // value, cached client-side, so it can be freely switched any time.
+  const [priceRoundingOptions, setPriceRoundingOptions] = useState([]);
+  const [selectedPriceRounding, setSelectedPriceRounding] = useState("");
+
   const [saving, setSaving] = useState(false);
 
   const dietaryOriginalRef = useRef([]);
@@ -32,7 +40,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
     try {
       const cachedUnits = menuCache.get('units', clientId);
 
-      const [dietRes, timeRes, unitRes] = await Promise.all([
+      const [dietRes, timeRes, unitRes, priceRoundingRes] = await Promise.all([
         axios.get(`${INV_URL}/${clientId}/inventory/item-types`, {
           params: { category_id: "dietary_type" },
           headers: auth,
@@ -47,21 +55,32 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
               params: { category_id: "units" },
               headers: auth,
             }),
+        axios.get(`${INV_URL}/${clientId}/inventory/item-types`, {
+          params: { category_id: "price_rounding" },
+          headers: auth,
+        }),
       ]);
 
       const freshDietary = dietRes.data?.data || [];
       const freshTimings = timeRes.data?.data || [];
       const freshUnits = cachedUnits || unitRes?.data?.data || [];
+      const freshPriceRounding = priceRoundingRes.data?.data || [];
 
       setDietaryOptions(freshDietary);
       setTimingOptions(freshTimings);
       setUnitOptions(freshUnits);
+      setPriceRoundingOptions(freshPriceRounding);
 
       dietaryOriginalRef.current = freshDietary;
       timingOriginalRef.current = freshTimings;
       unitOriginalRef.current = freshUnits;
 
       if (!cachedUnits) menuCache.set('units', clientId, freshUnits);
+
+      // Selected mode comes from cache (not the server) so it can be
+      // switched freely without ever mutating the DB row's value list.
+      const cachedSelection = menuCache.get('selected_price_rounding', clientId);
+      setSelectedPriceRounding(cachedSelection || freshPriceRounding[0] || "");
     } catch (err) {
       console.error("Fetch masters error", err);
     }
@@ -106,6 +125,11 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
     setter((prev) => prev.filter((v) => v !== value));
   };
 
+  // ================= PRICE ROUNDING SELECT (client-side only) =========
+  const selectPriceRounding = (value) => {
+    setSelectedPriceRounding(value);
+  };
+
   // ================= SAVE =================
   const saveAll = async () => {
     setSaving(true);
@@ -114,6 +138,9 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
         { category: "dietary_type", current: dietaryOptions, original: dietaryOriginalRef.current },
         { category: "available_timings", current: timingOptions, original: timingOriginalRef.current },
         { category: "units", current: unitOptions, original: unitOriginalRef.current },
+        // NOTE: price_rounding is intentionally NOT in this diff list.
+        // Its DB row is a fixed, read-only menu of options — only the
+        // selection (cached below) changes.
       ];
 
       for (const { category, current, original } of diffs) {
@@ -129,6 +156,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
       unitOriginalRef.current = unitOptions;
 
       menuCache.set('units', clientId, unitOptions);
+      menuCache.set('selected_price_rounding', clientId, selectedPriceRounding);
       onClose();
     } catch (err) {
       console.error("Save failed", err);
@@ -146,17 +174,17 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
     }`;
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-bg-primary rounded-xl p-6 w-[450px] shadow-xl">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-bg-primary rounded-xl p-6 w-[450px] max-h-[90vh] shadow-xl flex flex-col">
 
         {/* HEADER */}
-        <div className="flex justify-between mb-4">
+        <div className="flex justify-between mb-4 shrink-0">
           <h2 className="text-lg font-bold">Menu Config</h2>
           <FaTimes onClick={onClose} className="cursor-pointer" />
         </div>
 
         {/* TABS */}
-        <div className="flex gap-2 border-b mb-4">
+        <div className="flex gap-2 border-b mb-4 shrink-0">
           <button
             className={tabClass("masters")}
             onClick={() => setActiveTab("masters")}
@@ -166,6 +194,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
         </div>
 
         {/* ================= MASTERS ================= */}
+        <div className="overflow-y-auto pr-2">
         {activeTab === "masters" && (
           <div className="flex flex-col gap-5">
 
@@ -349,11 +378,39 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
                 ))}
               </div>
             </div>
+
+            {/* ===== PRICE DISPLAY ===== */}
+            <div className="border p-3 rounded bg-gray-50">
+              <h4 className="font-semibold mb-2">Price Display</h4>
+
+              <div className="flex flex-col gap-2">
+                {priceRoundingOptions.length === 0 && (
+                  <span className="text-gray-400 text-sm">
+                    No price mode configured
+                  </span>
+                )}
+
+                {priceRoundingOptions.map((v) => (
+                  <label key={v} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedPriceRounding === v}
+                      onChange={() => selectPriceRounding(v)}
+                      className="w-4 h-4 accent-action-primary"
+                    />
+                    <span className="text-sm capitalize">
+                      {v.replace(/_/g, " ")}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
         )}
+        </div>
 
         {/* SAVE / CLOSE */}
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex gap-2 shrink-0">
           <button
             onClick={onClose}
             className="flex-1 bg-gray-700 text-white py-2 rounded"

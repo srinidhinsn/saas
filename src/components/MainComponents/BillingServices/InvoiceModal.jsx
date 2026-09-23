@@ -6,7 +6,7 @@ import CustomerAutocomplete from './CustomerAutocomplete';
 import { X, Save, Printer, CreditCard, CheckCircle } from 'lucide-react';
 import RazorpayPayment from "../../Constants/RazorPay/RazorpayPayment";
 import { useClient } from "../../../context/ClientContext";
-import { isPackagingOrderItem, fmt } from '../../utils/Menu-utils/menuUtils';
+import { isPackagingOrderItem, fmt, formatPriceByMode } from '../../utils/Menu-utils/menuUtils';
 import {
   PAYMENT_METHODS,
   needsRazorpay,
@@ -1035,11 +1035,11 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-primary text-text-primary font-medium text-xs">
                                     {item.quantity}x
                                   </span>
-                                  <span>@ ₹{fmt(item.unit_price || 0)}</span>
+                                  <span>@ ₹{formatPriceByMode(item.unit_price || 0, clientId)}</span>
                                 </div>
                               </div>
                               <div className="font-bold text-text-primary text-lg">
-                                ₹{fmt((item.unit_price || 0) * (item.quantity || 0))}
+                                ₹{formatPriceByMode((item.unit_price || 0) * (item.quantity || 0), clientId)}
                               </div>
                             </div>
                             {/* Addon rows indented below */}
@@ -1051,7 +1051,7 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
                                   <span className="text-xs text-blue-500">×{addon.quantity}</span>
                                 </div>
                                 <span className="text-xs font-semibold text-blue-600">
-                                  +₹{fmt((addon.unit_price || 0) * (addon.quantity || 0))}
+                                  +₹{formatPriceByMode((addon.unit_price || 0) * (addon.quantity || 0), clientId)}
                                 </span>
                               </div>
                             ))}
@@ -1066,37 +1066,37 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
                     <div className="space-y-2">
                       <div className="flex justify-between text-text-secondary">
                         <span>Subtotal</span>
-                        <span className="font-semibold">₹{fmt(orderSubtotal)}</span>
+                        <span className="font-semibold">₹{formatPriceByMode(orderSubtotal, clientId)}</span>
                       </div>
                       <div className="flex justify-between text-action-danger">
                         <span>Discount</span>
-                        <span className="font-semibold">-₹{fmt(calculatedDiscount)}</span>
+                        <span className="font-semibold">-₹{formatPriceByMode(calculatedDiscount, clientId)}</span>
                       </div>
                       <div className="flex justify-between text-text-secondary">
                         <span>GST ({taxPercent}%)</span>
-                        <span className="font-semibold">₹{fmt(calculatedGST)}</span>
+                        <span className="font-semibold">₹{formatPriceByMode(calculatedGST, clientId)}</span>
                       </div>
                       {packagingChargeTotal > 0 && (
                         <div className="flex justify-between text-text-secondary">
                           <span>Packaging Charges</span>
-                          <span className="font-semibold">₹{fmt(packagingChargeTotal)}</span>
+                          <span className="font-semibold">₹{formatPriceByMode(packagingChargeTotal, clientId)}</span>
                         </div>
                       )}
                       <div className="pt-3 border-t border-border-default flex justify-between items-center">
                         <span className="text-lg font-bold text-text-primary">TOTAL</span>
                         <span className="text-2xl font-bold text-action-primary">
-                          ₹{fmt(calculatedTotal)}
+                          ₹{formatPriceByMode(calculatedTotal, clientId)}
                         </span>
                       </div>
                         {dueAmount > 0 && (
                           <>
                           <div className="flex justify-between text-text-secondary">
                             <span>Paid</span>
-                            <span className="font-semibold">₹{fmt(paidAmount)}</span>
+                            <span className="font-semibold">₹{formatPriceByMode(paidAmount, clientId)}</span>
                           </div>
                           <div className="flex justify-between text-text-secondary">
                             <span>Due</span>
-                            <span className="font-semibold">₹{fmt(dueAmount)}</span>
+                            <span className="font-semibold">₹{formatPriceByMode(dueAmount, clientId)}</span>
                           </div>
                           </>
                         )}

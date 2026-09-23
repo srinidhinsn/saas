@@ -2687,6 +2687,36 @@ const handleWalkInSelect = async () => {
   useEffect(() => {
     initializeTakeOrder();
   }, [initializeTakeOrder]);
+
+  const hasAutoModeSelectRef = useRef(false);
+
+useEffect(() => {
+  if (hasAutoModeSelectRef.current) return;
+  if (tables.length === 0) return; // wait until tables have actually loaded
+
+  const dineinTableCount = tables.length - takeawayTables.length - walkinTables.length - deliveryTables.length;
+  const hasDineinTables = dineinTableCount > 0;
+
+  const availableModes = [
+    hasDineinTables && 'dinein',
+    walkinTables.length > 0 && 'walkin',
+    takeawayTables.length > 0 && 'takeaway',
+    deliveryTables.length > 0 && 'delivery',
+  ].filter(Boolean);
+
+  hasAutoModeSelectRef.current = true;
+
+  // Only auto-jump when dine-in isn't an option AND exactly one other mode is.
+  // If there's a real choice to make (dine-in exists, or multiple non-dinein
+  // modes exist), leave the floor view up so the user picks.
+  if (!hasDineinTables && availableModes.length === 1) {
+    const onlyMode = availableModes[0];
+    if (onlyMode === 'walkin') handleWalkInSelect();
+    else if (onlyMode === 'takeaway') handleTakeawaySelect();
+    else if (onlyMode === 'delivery') handleDeliverySelect();
+  }
+}, [tables, takeawayTables, walkinTables, deliveryTables]);
+
   // ─────────────────────────────────────────────────────────────────────────
   // Cart operations
   // ─────────────────────────────────────────────────────────────────────────
@@ -2697,7 +2727,7 @@ const handleWalkInSelect = async () => {
       .reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0)
       .toFixed(2);
 
-      const addToCart = (item, parentItemKey = null, onCommitted = null,batchOverride = null) => {
+      const addToCart = (item, parentItemKey = null, onCommitted = null,batchOverride = null, alwaysNew = false) => {
         const currentAvailability = getAvailability(item);
         const hasStockTracking = currentAvailability != null;
       
@@ -2708,7 +2738,7 @@ const handleWalkInSelect = async () => {
       
           if (hasStockTracking) adjustAvailability(item.id, -1);
       
-          if (!parentItemKey) {
+          if (!parentItemKey && !alwaysNew) {
             const existingIndex = cart.findIndex(
               ci => ci.id === Number(item.id) && ci.is_new_item && !ci.saved_sub_order && !ci.is_addon
             );
@@ -3127,7 +3157,8 @@ const handleWalkInSelect = async () => {
     attachPackagingIfTakeaway(mainKey, batch, packaging);
   };
 
-  addToCart(selectedMainItem, null, attachDependents, batch);
+  // handleAddMainItemWithSelectedAddons
+addToCart(selectedMainItem, null, attachDependents, batch, true);
 
   setHasNewItems(true);
   setLineItemsModalOpen(false);
@@ -3141,7 +3172,7 @@ const handleWalkInSelect = async () => {
   let batch = currentBatchTimestamp;
   if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
 
-  const mainKey = addToCart(selectedMainItem);
+  const mainKey = addToCart(selectedMainItem, null, null, batch, true);
   attachPackagingIfTakeaway(mainKey, batch, pendingPackagingItems);
 
   setLineItemsModalOpen(false);
@@ -3701,7 +3732,7 @@ const handleBillFromCart = async () => {
                     </button>
 
                     {/* Dietary type pills */}
-                    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-1 min-w-0 whitespace-nowrap py-1">
+                    <div className="flex gap-1.5 overflow-x-auto flex-1 min-w-0 whitespace-nowrap py-1">
                       <button
                         onClick={() => setSelectedDietary(null)}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all border
