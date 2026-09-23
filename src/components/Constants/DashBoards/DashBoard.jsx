@@ -876,7 +876,7 @@ const latestCancellation =
                 <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Live</span>
               </div>
               <h1 className="text-2xl lg:text-3xl font-extrabold text-gray-900 tracking-tight leading-none">
-                Restaurant Dashboard
+               Dashboard
               </h1>
               <p className="text-sm text-gray-400 mt-1">
                 Showing data for&nbsp;
