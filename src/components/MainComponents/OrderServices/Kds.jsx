@@ -7,7 +7,7 @@ import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-
 import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import { parseISTTimestamp, getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
-import { isPackagingMenuRecord } from '../../utils/Menu-utils/menuUtils';
+import { isPackagingMenuRecord,returnRentalItems  } from '../../utils/Menu-utils/menuUtils';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 
@@ -989,50 +989,13 @@ useEffect(() => {                                      // ← add
     });
 
     if (isRental) {
-      // ── Cancel/return only the clicked item (+ its packaging), not the whole order ──
-      await Promise.all(
-        [targetItem, ...packagingChildren].map(i =>
-          axios.delete(
-            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/order_item/delete`,
-            {
-              params: {
-                client_id: clientIdRef.current,
-                order_item_id: i.id,            // row id, not item_id
-                transaction_type: 'ORDER_RETURNED',
-                reason: 'Rental item returned',
-              },
-              headers: { Authorization: `Bearer ${tokenRef.current}` },
-            }
-          )
-        )
-      );
-    
-      // ── Restore availability locally for just these items ──
-      const changedRecords = [targetItem, ...packagingChildren]
-        .map(i => ({ qty: i.quantity || 1, record: menuItemsMap[String(i.item_id)] }))
-        .filter(({ record }) => record && record.availability != null);
-    
-      if (changedRecords.length > 0) {
-        const idToAvailability = {};
-        const updatedById = {};
-    
-        changedRecords.forEach(({ qty, record }) => {
-          const restored = Number(record.availability) + qty;
-          idToAvailability[record.id] = restored;
-          updatedById[record.id] = { ...record, availability: restored };
-        });
-    
-        setMenuItemsMap(prev => {
-          const next = { ...prev };
-          Object.entries(updatedById).forEach(([id, updated]) => {
-            next[String(id)] = updated;
-            next[Number(id)] = updated;
-          });
-          return next;
-        });
-    
-        menuCache.patchAvailability(clientIdRef.current, idToAvailability);
-      }
+      const nextMap = await returnRentalItems({
+        items: [targetItem, ...packagingChildren],
+        menuItemsMap,
+        clientId: clientIdRef.current,
+        token: tokenRef.current,
+      });
+      if (nextMap) setMenuItemsMap(nextMap);
     } else {
         const itemsPayload = [targetItem, ...packagingChildren].map(buildPayload);
         await axios.post(
