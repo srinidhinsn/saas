@@ -8,6 +8,9 @@ from models.billing_model import PaymentStatusEnum, ApprovalStatusEnum
 
 from sqlalchemy import and_, or_
 from datetime import datetime, timedelta
+import os
+from entity.billing_entity import BillingDocumentEntity
+TIMEZONE = os.getenv("TIMEZONE", "UTC")
 
 
 
@@ -469,9 +472,3 @@ def issue_invoice(db: Session, client_id: str, invoice_id: int) -> dict:
         "status": doc.status,
         "invoice_date": doc.invoice_date.isoformat()
     }
-
-
-
-
-
-
