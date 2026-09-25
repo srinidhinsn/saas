@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException,Header
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 from entity.billing_entity import BillingDocumentEntity
-from models.billing_model import BillingDocument, BillingDocumentItem
+from models.billing_model import BillingDocument, BillingDocumentItem,get_razorpay_client, RazorpayOrderRequest, RazorpayVerifyRequest,get_phonepe_client, PhonePeOrderRequest, PhonePeVerifyRequest
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
@@ -12,13 +12,10 @@ from services.billing_service import (
     create_items_service, read_items_service, update_items_service, delete_items_service, upsert_from_order_payload,
     generate_invoice, issue_invoice
 )
-from services.payment_routes import razorpay_client, RazorpayOrderRequest,RazorpayVerifyRequest
 import os
-from zoneinfo import ZoneInfo
-import hmac
-import hashlib
+from services.payment_services import create_phonepe_order_service, verify_phonepe_payment_service,create_razorpay_order_service, verify_razorpay_payment_service
 from datetime import datetime
-from sqlalchemy.orm.attributes import flag_modified
+
 router = APIRouter()
 from dotenv import load_dotenv
 load_dotenv()
@@ -282,118 +279,61 @@ def issue_invoice_route(
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/razorpay")
-def create_order(client_id: str, request_data: RazorpayOrderRequest, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+def create_order(client_id: str,request_data: RazorpayOrderRequest,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db),):
     if client_id != context.client_id:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
-    try:
-        order_data = {"amount": request_data.amount, "currency": request_data.currency,
-                      "receipt": request_data.receipt, "notes": request_data.notes}
+    razorpay_order = create_razorpay_order_service(
+        client_id=client_id,
+        amount=request_data.amount,
+        currency=request_data.currency,
+        receipt=request_data.receipt,
+        notes=request_data.notes,
+    )
 
-        razorpay_order = razorpay_client.order.create(data=order_data)
-
-        return ResponseModel(screen_id=context.screen_id, status="success", message="Razorpay order created", data=razorpay_order)
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Failed to create Razorpay order: {str(e)}")
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Razorpay order created",data=razorpay_order,)
 
 @router.post("/verify")
-async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db)):
+async def verify_payment(client_id: str,body: RazorpayVerifyRequest,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db),):
     if client_id != context.client_id:
         raise HTTPException(status_code=403, detail="Unauthorized")
-    # Signature verification here
-    body_str = f"{body.razorpay_order_id}|{body.razorpay_payment_id}"
-    key = os.getenv("RAZORPAY_KEY_SECRET", "")
-    if not key:
-        raise HTTPException(status_code=500, detail="RAZORPAY_KEY_SECRET not configured")
 
-    generated_signature = hmac.new(
-        key.encode("utf-8"),
-        body_str.encode("utf-8"),
-        hashlib.sha256
-    ).hexdigest()
-
-    if generated_signature != body.razorpay_signature:
-        raise HTTPException(status_code=400, detail="Invalid payment signature")
-    # Fetch from Razorpay
-    try:
-        payment = razorpay_client.payment.fetch(body.razorpay_payment_id)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch payment: {str(e)}")
-
-    if payment["status"] not in ["captured", "authorized"]:
-        raise HTTPException(status_code=400, detail=f"Payment not captured: {payment['status']}")
-    # Load invoice
-    invoice = db.query(BillingDocumentEntity).filter(
-        BillingDocumentEntity.id == body.document_id,
-        BillingDocumentEntity.client_id == client_id
-    ).first()
-    if not invoice:
-        raise HTTPException(status_code=404, detail=f"Invoice not found: id={body.document_id}")
-    # Enrich payment_method JSONB
-    existing_methods = list(invoice.payment_method or [])
-    updated_methods  = []
-    matched          = False
-
-    for pm in existing_methods:
-        if not isinstance(pm, dict):
-            updated_methods.append(pm)
-            continue
-
-        is_exact_match     = pm.get("razorpay_order_id") == body.razorpay_order_id
-        is_unverified_slot = (
-            pm.get("method", "").startswith("razorpay")
-            and not pm.get("razorpay_order_id")
-            and not matched
-        )
-
-        if is_exact_match or is_unverified_slot:
-            pm = {
-                **pm,
-                "razorpay_payment_id": body.razorpay_payment_id,
-                "razorpay_order_id":   body.razorpay_order_id,
-                "razorpay_signature":  body.razorpay_signature,
-                "razorpay_status":     payment["status"],
-                "verified_at":         datetime.now(ZoneInfo(TIMEZONE)).isoformat(),
-            }
-            matched = True
-
-        updated_methods.append(pm)
-
-    if not matched:
-        updated_methods.append({
-            "method":              "razorpay",
-            "amount":              payment.get("amount", 0) / 100,
-            "razorpay_payment_id": body.razorpay_payment_id,
-            "razorpay_order_id":   body.razorpay_order_id,
-            "razorpay_signature":  body.razorpay_signature,
-            "razorpay_status":     payment["status"],
-            "verified_at":         datetime.now(ZoneInfo(TIMEZONE)).isoformat(),
-        })
-
-    invoice.payment_method  = updated_methods
-    flag_modified(invoice, "payment_method")
-    invoice.payment_status  = "Paid"
-    invoice.approval_status = "Approved"
-    invoice.updated_at      = datetime.now(ZoneInfo(TIMEZONE))
-
-    if not invoice.customer_id:
-        invoice.customer_id   = payment.get("contact", "")
-    if not invoice.contact_phone:
-        invoice.contact_phone = payment.get("contact", "")
-    if not invoice.contact_email:
-        invoice.contact_email = payment.get("email", "")
-
-    db.commit()
-    db.refresh(invoice)
-
-    return ResponseModel(
-        screen_id=context.screen_id,
-        status="success",
-        message="Payment verified and stored",
-        data={
-            "invoice_id":     invoice.id,
-            "payment_method": updated_methods,
-            "payment_status": invoice.payment_status,
-        }
+    result = verify_razorpay_payment_service(
+        db=db,
+        client_id=client_id,
+        document_id=body.document_id,
+        razorpay_payment_id=body.razorpay_payment_id,
+        razorpay_order_id=body.razorpay_order_id,
+        razorpay_signature=body.razorpay_signature,
     )
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Payment verified and stored",data=result,)
+
+@router.post("/phonepe")
+def create_phonepe_order(client_id: str,request_data: PhonePeOrderRequest,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db),):
+    if client_id != context.client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    result = create_phonepe_order_service(
+        db=db,
+        client_id=client_id,
+        document_id=request_data.document_id,
+        amount=request_data.amount,
+        redirect_url=request_data.redirect_url,
+    )
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="PhonePe order created",data=result,)
+
+@router.post("/phonepe/verify")
+def verify_phonepe_payment(client_id: str,body: PhonePeVerifyRequest,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db),):
+    if client_id != context.client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    result = verify_phonepe_payment_service(
+        db=db,
+        client_id=client_id,
+        document_id=body.document_id,
+        merchant_order_id=body.merchant_order_id,
+    )
+
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Payment verified and stored",data=result,)
