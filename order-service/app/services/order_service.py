@@ -12,6 +12,8 @@ from fastapi import HTTPException
 from models.order_model import DineinOrderModel , resolve_base_status
 from .order_status import _status_label
 from models.saas_context import SaasContext
+from entity.billing_entity import BillingDocumentEntity
+
 
 def _is_rental_realm(context) -> bool:
     return (resolve_realm_from_context(context) or "").strip().lower() == "rental"
@@ -78,7 +80,7 @@ def _order_row_to_flat(order) -> dict:
     }
 
 
-def _merge_group(orders: list,context=None) -> dict:
+def _merge_group(orders: list,context=None, db: Session = None) -> dict:
     """
     Merge root + sub-order DB rows into one response dict for /dinein/table.
     Used by TakeOrder floor view to show one entry per table group.
@@ -91,6 +93,22 @@ def _merge_group(orders: list,context=None) -> dict:
     orders = sorted(orders, key=lambda o: o.created_at or 0)
     root = orders[0]
     merged_items = []
+    invoice = None
+    if root.invoice_id:
+       try:
+           invoice_id = int(root.invoice_id)
+       except (TypeError, ValueError):
+           invoice_id = None
+
+       if invoice_id:
+           invoice = (
+            db.query(BillingDocumentEntity)
+            .filter(
+                BillingDocumentEntity.id == invoice_id,
+                BillingDocumentEntity.client_id == root.client_id,
+            )
+            .first()
+        )
     all_cancelled = all((o.status or "").lower() == OrderStatusEnum.cancelled.value for o in orders)
     for order in orders:
         for item in order.items:
@@ -138,7 +156,19 @@ def _merge_group(orders: list,context=None) -> dict:
         "item_names": [i.get("item_name", "") for i in merged_items],
         "sub_orders": sub_orders_meta,           # for TakeOrder count + timer
         "order_count": len(orders),              # total batches incl. root
-        "invoice_status": root.invoice_status, }
+        "invoice_id": root.invoice_id,
+        "invoice_number": (invoice.document_number
+        if invoice
+        else None),
+        "invoice_status": (invoice.status
+        if invoice
+        else root.invoice_status),
+        "payment_status": (invoice.payment_status
+        if invoice
+        else "Pending"),
+        "approval_status": (invoice.approval_status
+        if invoice
+        else None), }
 
 # ───────────────────────────────────────────────────────────────────────────
 
