@@ -527,20 +527,41 @@ const onSplitAmountBlur = () => {
 
   const fetchInvoiceDraft = async (orderId) => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { client_id: clientId },
-      });
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          params: {
+            client_id: clientId,
+            document_type: "Invoice",
+          },
+        }
+      );
+  
       const invoices = res.data?.data || [];
+  
       const filtered = invoices.filter(
-        (d) => d.order_id?.toString() === orderId?.toString()
+        (d) =>
+          d.order_id?.toString() === orderId?.toString() &&
+          d.document_type === "Invoice"
       );
-      if (filtered.length === 0) return {};
-      filtered.sort(
-        (a, b) =>
-          (b.document_version || 1) - (a.document_version || 1) ||
-          new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0)
-      );
+  
+      if (filtered.length === 0) {
+        return {};
+      }
+  
+      filtered.sort((a, b) => {
+        const aTime = new Date(
+          a.updated_at || a.created_at || 0
+        ).getTime();
+  
+        const bTime = new Date(
+          b.updated_at || b.created_at || 0
+        ).getTime();
+  
+        return bTime - aTime;
+      });
+  
       return filtered[0] || {};
     } catch (err) {
       console.error("Failed to fetch invoice", err);
@@ -751,6 +772,14 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
     );
     const newDocumentNumber = issueRes?.data?.data?.document_number || issueRes?.data?.document_number;
     if (newDocumentNumber) setDocumentNumber(newDocumentNumber);
+    const latestInvoice = await fetchInvoiceDraft(selectedOrder.id);
+
+if (latestInvoice?.id) {
+  setInvoiceDraftId(latestInvoice.id);
+  setDocumentNumber(latestInvoice.document_number || "");
+  setPaymentStatus(latestInvoice.payment_status || "Pending");
+  setStatus(latestInvoice.status || "Draft");
+}
   } catch (err) {
     console.error("Failed to generate invoice number:", err.response?.data || err.message);
   }
@@ -833,7 +862,12 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
       tableId: selectedOrder.table_id,
       tablesMap,
     });
+    const updatedInvoice = await fetchInvoiceDraft(selectedOrder.id);
 
+    setInvoiceDraftId(updatedInvoice?.id || correctInvoiceDraftId);
+    setDocumentNumber(updatedInvoice?.document_number || "");
+    setPaymentStatus(updatedInvoice?.payment_status || paymentStatus);
+    setStatus(updatedInvoice?.status || "Issued");
     onClose();
   } catch (err) {
     console.error("Payment Confirmation Failed:", err.message);
