@@ -96,12 +96,12 @@ def _merge_group(orders: list,context=None, db: Session = None) -> dict:
     invoice = None
     if root.invoice_id:
        try:
-        invoice_id = int(root.invoice_id)
+           invoice_id = int(root.invoice_id)
        except (TypeError, ValueError):
-        invoice_id = None
+           invoice_id = None
 
        if invoice_id:
-        invoice = (
+           invoice = (
             db.query(BillingDocumentEntity)
             .filter(
                 BillingDocumentEntity.id == invoice_id,
