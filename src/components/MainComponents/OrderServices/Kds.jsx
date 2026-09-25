@@ -7,7 +7,8 @@ import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-
 import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import { parseISTTimestamp, getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
-import { isPackagingMenuRecord,returnRentalItems  } from '../../utils/Menu-utils/menuUtils';
+import { isPackagingMenuRecord  } from '../../utils/Menu-utils/menuUtils';
+import { returnRentalItems } from '../../utils/Menu-utils/rentalReturn';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 
