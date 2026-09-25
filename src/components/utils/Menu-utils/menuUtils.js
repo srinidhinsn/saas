@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { menuCache } from './menuCache';
 
 export function flattenCategoryTree(tree, level = 0, parentId = null) {
   let flat = [];
@@ -390,6 +391,17 @@ export function relinkCartItemsToParents(items) {
 
 
 export const fmt = (num) => Math.round(Number(num) || 0).toString();
+
+export const formatPriceByMode = (num, clientId) => {
+  const n = Number(num) || 0;
+  const mode = menuCache.get('selected_price_rounding', clientId) || 'nearest';
+  switch (mode) {
+    case 'exact': return n.toFixed(2);
+    case 'round_up': return Math.ceil(n).toString();
+    case 'round_down': return Math.floor(n).toString();
+    default: return Math.round(n).toString(); // covers "nearest" and any unknown value
+  }
+};
 
 export const isRentalRealm = (realm) => {
   return (realm || '').toLowerCase() === 'rental';

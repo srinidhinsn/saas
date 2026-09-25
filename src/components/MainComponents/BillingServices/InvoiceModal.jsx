@@ -6,7 +6,7 @@ import CustomerAutocomplete from './CustomerAutocomplete';
 import { X, Save, Printer, CreditCard, CheckCircle } from 'lucide-react';
 import RazorpayPayment from "../../Constants/RazorPay/RazorpayPayment";
 import { useClient } from "../../../context/ClientContext";
-import { isPackagingOrderItem, fmt } from '../../utils/Menu-utils/menuUtils';
+import { isPackagingOrderItem, fmt, formatPriceByMode } from '../../utils/Menu-utils/menuUtils';
 import {
   PAYMENT_METHODS,
   needsRazorpay,
@@ -19,7 +19,7 @@ import {
   validateSplitTotal,
   getPaidAndDue,
 } from '../../utils/BillingUtils';
-
+import PhonePeIframe from "../../Constants/RazorPay/PhonePeIframe";
 // ─────────────────────────────────────────────────────────────────────────────
 // REQ 2 helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -430,7 +430,7 @@ export default function InvoiceModal({
   const [showRazorpayModal, setShowRazorpayModal] = useState(false);
   const { clientDetails } = useClient();
   const clientGstNumber = clientDetails?.gst_number || "";
-
+  const [showPhonePeIframe, setShowPhonePeIframe] = useState(false);
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
   const allOrderItems = selectedOrder?.items || [];
@@ -852,7 +852,10 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
       return;
     }
     if (!draftId) return;
-
+    if (method === "phonepe" && !splitPaymentEnabled) {
+      setShowPhonePeIframe(true);
+      return;
+    }
     const requiresRazorpay = needsRazorpay(splitPaymentEnabled, paymentSplits, method);
     if (requiresRazorpay) {
       setShowRazorpayModal(true);
@@ -1035,11 +1038,11 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-primary text-text-primary font-medium text-xs">
                                     {item.quantity}x
                                   </span>
-                                  <span>@ ₹{fmt(item.unit_price || 0)}</span>
+                                  <span>@ ₹{formatPriceByMode(item.unit_price || 0, clientId)}</span>
                                 </div>
                               </div>
                               <div className="font-bold text-text-primary text-lg">
-                                ₹{fmt((item.unit_price || 0) * (item.quantity || 0))}
+                                ₹{formatPriceByMode((item.unit_price || 0) * (item.quantity || 0), clientId)}
                               </div>
                             </div>
                             {/* Addon rows indented below */}
@@ -1051,7 +1054,7 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
                                   <span className="text-xs text-blue-500">×{addon.quantity}</span>
                                 </div>
                                 <span className="text-xs font-semibold text-blue-600">
-                                  +₹{fmt((addon.unit_price || 0) * (addon.quantity || 0))}
+                                  +₹{formatPriceByMode((addon.unit_price || 0) * (addon.quantity || 0), clientId)}
                                 </span>
                               </div>
                             ))}
@@ -1066,37 +1069,37 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
                     <div className="space-y-2">
                       <div className="flex justify-between text-text-secondary">
                         <span>Subtotal</span>
-                        <span className="font-semibold">₹{fmt(orderSubtotal)}</span>
+                        <span className="font-semibold">₹{formatPriceByMode(orderSubtotal, clientId)}</span>
                       </div>
                       <div className="flex justify-between text-action-danger">
                         <span>Discount</span>
-                        <span className="font-semibold">-₹{fmt(calculatedDiscount)}</span>
+                        <span className="font-semibold">-₹{formatPriceByMode(calculatedDiscount, clientId)}</span>
                       </div>
                       <div className="flex justify-between text-text-secondary">
                         <span>GST ({taxPercent}%)</span>
-                        <span className="font-semibold">₹{fmt(calculatedGST)}</span>
+                        <span className="font-semibold">₹{formatPriceByMode(calculatedGST, clientId)}</span>
                       </div>
                       {packagingChargeTotal > 0 && (
                         <div className="flex justify-between text-text-secondary">
                           <span>Packaging Charges</span>
-                          <span className="font-semibold">₹{fmt(packagingChargeTotal)}</span>
+                          <span className="font-semibold">₹{formatPriceByMode(packagingChargeTotal, clientId)}</span>
                         </div>
                       )}
                       <div className="pt-3 border-t border-border-default flex justify-between items-center">
                         <span className="text-lg font-bold text-text-primary">TOTAL</span>
                         <span className="text-2xl font-bold text-action-primary">
-                          ₹{fmt(calculatedTotal)}
+                          ₹{formatPriceByMode(calculatedTotal, clientId)}
                         </span>
                       </div>
                         {dueAmount > 0 && (
                           <>
                           <div className="flex justify-between text-text-secondary">
                             <span>Paid</span>
-                            <span className="font-semibold">₹{fmt(paidAmount)}</span>
+                            <span className="font-semibold">₹{formatPriceByMode(paidAmount, clientId)}</span>
                           </div>
                           <div className="flex justify-between text-text-secondary">
                             <span>Due</span>
-                            <span className="font-semibold">₹{fmt(dueAmount)}</span>
+                            <span className="font-semibold">₹{formatPriceByMode(dueAmount, clientId)}</span>
                           </div>
                           </>
                         )}
@@ -1314,6 +1317,7 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
                           <option>Cash</option>
                           <option value="razorpay_upi">UPI (Razorpay)</option>
                           <option value="razorpay_card">Card (Razorpay)</option>
+                          <option value="phonepe">PhonePe</option>
                           <option>Due</option>
                         </select>
                         <input
@@ -1442,6 +1446,38 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
           onClose={() => setShowRazorpayModal(false)}
         />
       )}
+      {showPhonePeIframe && (
+  <PhonePeIframe
+    amount={total}
+    documentId={invoiceDraftId}
+    clientId={clientId}
+    token={token}
+    onPaymentSuccess={async (data) => {
+      try {
+        await axios.post(
+          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+          { id: selectedOrder.id, status: "served", invoice_status: "paid" },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
+        setPaymentStatus("Paid");
+        setStatus("Issued");  
+        setShowPhonePeIframe(false);
+        toast.success("PhonePe payment verified!");
+        if (onSave) onSave(invoiceDraftId); 
+        onClose();
+      } catch (err) {
+        console.error("Post-payment update failed:", err.response?.data || err.message);
+        toast.error("Payment verified but order update failed");
+      }
+    }}
+    onPaymentFailure={(error) => {
+      console.error('PhonePe payment failed:', error);
+      setShowPhonePeIframe(false);
+      toast.error(error.error || 'Payment failed. Please try again.');
+    }}
+  />
+)}
     </div>
   );
 }
