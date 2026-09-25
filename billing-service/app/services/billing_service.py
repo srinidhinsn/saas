@@ -464,6 +464,8 @@ def issue_invoice(db: Session, client_id: str, invoice_id: int) -> dict:
 
     doc.status = "Issued"
     doc.invoice_date = datetime.now()
+    if not doc.payment_status:
+        doc.payment_status = PaymentStatusEnum.pending
     db.commit()
     db.refresh(doc)
     return {

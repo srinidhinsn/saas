@@ -199,7 +199,7 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
         root = _root_dinein_id(order.dinein_order_id or str(order.id))
         groups.setdefault(root, []).append(order)
 
-    result = [_merge_group(group) for group in groups.values()]
+    result = [_merge_group(group, context=context, db=db) for group in groups.values()]
     for r in result:
         r["status_label"] = _status_label(context, r.get("status"))
     return ResponseModel(screen_id=context.screen_id, data=result)
@@ -912,7 +912,7 @@ def get_customer_orders(
         root = _root_dinein_id(order.dinein_order_id or str(order.id))
         groups.setdefault(root, []).append(order)
 
-    result = [_merge_group(group) for group in groups.values()]
+    result = [_merge_group(group,context=context,db=db) for group in groups.values()]
     for r in result:
         r["status_label"] = _status_label(context, r.get("status"))
 
