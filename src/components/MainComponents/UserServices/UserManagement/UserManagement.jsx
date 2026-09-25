@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaLock, FaUser, FaEnvelope, FaPhone, FaCalendar, FaUserShield } from "react-icons/fa";
 import { Search, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import AgGridTable from '../../../utils/AgGridTable';
 import axios from 'axios';
 const ConfirmModal = ({
   open,
@@ -80,7 +81,7 @@ const normalizeRoles = (data) => {
 
   return data.map((r) => {
     if (typeof r === "string") return r;
-    if (typeof r === "object" && r !== null) return r.name || r.id;
+    if (typeof r === "object" && r !== null) return r.id || r.name;
     return "";
   }).filter(Boolean);
 };
@@ -165,7 +166,6 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
   const [changeRoleValue, setChangeRoleValue] = useState("");
   const [isChangeRoleConfirmOpen, setIsChangeRoleConfirmOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const permissions = usePermissions(token, clientId);
 
@@ -234,6 +234,9 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
           const persons = res.data.data.persons.map((person) => ({
             id: person.id,
             username: person.username,
+            first_name: person.first_name || "",
+            last_name: person.last_name || "",
+            dob: person.dob || "",
             name: `${person.first_name || ""} ${person.last_name || ""}`.trim(),
             email: person.email,
             phone: person.phone || "",
@@ -335,14 +338,6 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
     return filtered;
   }, [users, filterRole, searchQuery, loggedInUserId]);
 
-
-  const paginatedUsers = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredUsers.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredUsers, currentPage]);
-
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-
   const confirmChangeRole = async () => {
     try {
       await Promise.all(
@@ -399,12 +394,108 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
   };
 
   const toggleSelectAll = () => {
-    if (selectionModel.length === paginatedUsers.length) {
+    if (selectionModel.length === filteredUsers.length) {
       setSelectionModel([]);
     } else {
-      setSelectionModel(paginatedUsers.map(u => u.id));
+      setSelectionModel(filteredUsers.map(u => u.id));
     }
   };
+
+  const userColumnDefs = [
+    {
+      headerName: '',
+      colId: 'select',
+      minWidth: 50,
+      maxWidth: 50,
+      sortable: false,
+      filter: false,
+      floatingFilter: false,
+      headerComponent: () => (
+        <input
+          type="checkbox"
+          checked={selectionModel.length === filteredUsers.length && filteredUsers.length > 0}
+          onChange={toggleSelectAll}
+          className="w-4 h-4 rounded border-border-default text-action-primary cursor-pointer"
+        />
+      ),
+      cellRenderer: (params) => (
+        <input
+          type="checkbox"
+          checked={selectionModel.includes(params.data.id)}
+          onChange={() => toggleSelection(params.data.id)}
+          className="w-4 h-4 rounded border-border-default text-text-primary focus:ring-action-primary cursor-pointer"
+        />
+      ),
+    },
+    {
+      headerName: 'User',
+      field: 'username',
+      minWidth: 220,
+      cellRenderer: (params) => (
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-bg-tertiary flex items-center justify-center text-action-primary font-semibold">
+            {params.data.username?.[0]?.toUpperCase() || "U"}
+          </div>
+          <div>
+            <div className="font-medium text-text-primary text-sm">{params.data.username || "(no username)"}</div>
+            <div className="text-xs text-text-secondary">{params.data.name || "-"}</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Email',
+      field: 'email',
+      minWidth: 200,
+      cellRenderer: (params) => (
+        <a href={`mailto:${params.value}`} className="text-text-secondary hover:text-action-danger text-sm hover:underline">
+          {params.value}
+        </a>
+      ),
+    },
+    {
+      headerName: 'Phone',
+      field: 'phone',
+      minWidth: 140,
+      valueGetter: (params) => params.data?.phone || "-",
+      cellRenderer: (params) => <span className="text-text-secondary text-sm">{params.value}</span>,
+    },
+    {
+      headerName: 'Role',
+      field: 'role',
+      minWidth: 140,
+      cellRenderer: (params) => (
+        <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-bulkActionsHover-updateHover text-text-white">
+          {params.value}
+        </span>
+      ),
+    },
+    {
+      headerName: 'Actions',
+      colId: 'actions',
+      minWidth: 100,
+      sortable: false,
+      filter: false,
+      floatingFilter: false,
+      cellRenderer: (params) => (
+        <div className="flex gap-3">
+          <button
+            onClick={() => onEdit(params.data)}
+            className="text-action-primary hover:text-action-danger"
+            title="Edit user"
+          >
+            <Edit size={16} />
+          </button>
+          <button
+            onClick={() => setDeleteUserId(params.data.id)}
+            className="text-red-600 hover:text-red-800"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-2">
@@ -438,7 +529,8 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
                 <Plus size={16} />
                 User
               </button>
-
+              {isSuperAdminScreen && (
+                <>
               <button
                 onClick={() => setShowAddRole(true)}
                 className="flex items-center justify-center gap-2
@@ -459,7 +551,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
                 <Trash2 size={16} />
                 Delete
               </button>
-
+             </> )}
               {isSuperAdminScreen && (     
                 <button
                   onClick={navigator}
@@ -484,7 +576,8 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
                 <Plus size={16} />
                 Add User
               </button>
-
+              {isSuperAdminScreen && (
+                <>
               <button
                 onClick={() => setShowAddRole(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg border"
@@ -500,7 +593,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
               >
                 <Trash2 size={16} />
                 Delete Role
-              </button>
+              </button> </>)}
 
               {isSuperAdminScreen && (
                 <button
@@ -526,7 +619,6 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
-                setCurrentPage(1);
               }}
               className="w-full pl-10 pr-3 py-2.5 rounded-lg border
                border-border-default text-sm"
@@ -536,91 +628,16 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
 
         {/* Table */}
         <div className="overflow-x-auto rounded-lg border-default border-border-default">
-          <table className="w-full">
-            <thead className="bg-bg-tertiary border-b-default border-default">
-              <tr>
-                <th className="px-4 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    checked={selectionModel.length === paginatedUsers.length && paginatedUsers.length > 0}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 rounded border-border-default text-action-primary cursor-pointer"
-                  />
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">User</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Phone</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-text-secondary uppercase tracking-wider">Role</th>
-                <th className="px-4 py-3 text-xs font-semibold text-text-secondary uppercase">
-                  Actions
-                </th>
-
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-text-secondary bg-bg-primary">
-              {paginatedUsers.map((user) => (
-                <tr
-                  key={user.id}
-                  className="hover:bg-gray-50 transition-colors cursor-pointer"
-                >
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectionModel.includes(user.id)}
-                      onChange={() => toggleSelection(user.id)}
-                      className="w-4 h-4 rounded border-border-default text-text-primary focus:ring-action-primary cursor-pointer"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-bg-tertiary flex items-center justify-center text-action-primary font-semibold">
-                        {user.username?.[0]?.toUpperCase() || "U"}
-                      </div>
-                      <div>
-                        <div className="font-medium text-text-primary text-sm">{user.username || "(no username)"}</div>
-                        <div className="text-xs text-text-secondary">{user.name || "-"}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <a href={`mailto:${user.email}`} className="text-text-secondary hover:text-action-danger text-sm hover:underline">
-                      {user.email}
-                    </a>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-text-secondary text-sm">{user.phone || "-"}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-bulkActionsHover-updateHover text-text-white">
-                      {user.role}
-                    </span>
-                  </td>
-
-                  <td className="px-4 py-3 flex gap-3">
-                    <button
-                      onClick={() => onEdit(user)}
-                      className="text-action-primary hover:text-action-danger"
-                      title="Edit user"
-                    >
-                      <Edit size={16} />
-                    </button>
-
-                    <button
-                      onClick={() => setDeleteUserId(user.id)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-
-
-                  </td>
-
-
-                </tr>
-
-              ))}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto rounded-lg border-default border-border-default">
+          <AgGridTable
+            columnDefs={userColumnDefs}
+            rowData={filteredUsers}
+            domLayout="normal"
+            height={600}
+            pagination={true}
+            paginationPageSize={itemsPerPage}
+          />
+        </div>
         </div>
         {/* Add Role Modal */}
         <ConfirmModal
@@ -700,45 +717,6 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
           }}
         />
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4">
-            <div className="text-sm text-text-secondary">
-              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredUsers.length)} of {filteredUsers.length} results
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 rounded-lg bg-bg-tertiary text-text-secondary hover:bg-bg-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <div className="flex gap-1">
-                {[...Array(totalPages)].map((_, i) => (
-                  <button
-                    key={i + 1}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${currentPage === i + 1
-                      ? "bg-action-primary text-text-white"
-                      : "bg-bg-tertiary text-text-secondary hover:bg-text-secondary"
-                      }`}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          </div>
-        )}
-
         {filteredUsers.length === 0 && (
           <div className="text-center py-12">
             <div className="text-text-secondary mb-2">
@@ -761,10 +739,11 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
     lastName: "",
     dob: "",
     phone: "",
-    password: "",
+    password: "", confirmPassword: "",
     role: "",
   });
-
+  const [resetPassword, setResetPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -777,7 +756,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
         lastName: editUser.last_name || "",
         dob: editUser.dob || "",
         phone: editUser.phone || "",
-        password: "",
+        password: "",confirmPassword: "",
         role: editUser.role || "",
       });
     }
@@ -818,6 +797,10 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if ((!isEdit || formData.password) && formData.password !== formData.confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
     setLoading(true);
 
     const payload = {
@@ -844,6 +827,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           email: formData.email,
           phone: formData.phone,
           roles: [formData.role],
+          ...(formData.password ? { password: formData.password } : {}),
         }
         : payload;
 
@@ -854,6 +838,10 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
       if (onSave) onSave();
     } catch (error) {
       console.error(`Failed to ${isEdit ? 'update' : 'add'} user:`, error);
+      const backendMessage = error.response?.data?.detail;
+    setErrorMessage(
+      backendMessage || `Failed to ${isEdit ? "update" : "add"} user. Please try again.`
+    );
     } finally {
       setLoading(false);
     }
@@ -902,7 +890,6 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
               type="email"
               value={formData.email}
               onChange={handleChange}
-              required
               className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
               placeholder="Enter email"
             />
@@ -972,23 +959,40 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           </div>
 
           {/* Password - Only show for new users */}
-          {!isEdit && (
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-                <FaLock className="text-action-danger text-xs" />
-                Password <span className="text-action-danger">*</span>
-              </label>
-              <input
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleChange}
-                required={!isEdit}
-                className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
-                placeholder="Enter password"
-              />
-            </div>
-          )}
+          {/* Password */}
+<div>
+  <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+    <FaLock className="text-action-danger text-xs" />
+    {isEdit ? "New Password" : "Password"} {!isEdit && <span className="text-action-danger">*</span>}
+  </label>
+  <input
+    name="password"
+    type="password"
+    value={formData.password}
+    onChange={handleChange}
+    required={!isEdit}
+    className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
+    placeholder={isEdit ? "Leave blank to keep current password" : "Enter password"}
+  />
+</div>
+
+{/* Confirm Password */}
+<div>
+  <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+    <FaLock className="text-action-danger text-xs" />
+    Confirm Password {!isEdit && <span className="text-action-danger">*</span>}
+  </label>
+  <input
+    name="confirmPassword"
+    type="password"
+    value={formData.confirmPassword}
+    onChange={handleChange}
+    required={!isEdit || !!formData.password}
+    className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
+    placeholder={isEdit ? "Confirm new password" : "Re-enter password"}
+  />
+</div>
+
 
           {/* Role */}
           <div>
@@ -1034,6 +1038,15 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           </button>
         </div>
       </form>
+      <ConfirmModal
+        open={!!errorMessage}
+        title="Something went wrong"
+        description={errorMessage}
+        confirmText="OK"
+        cancelText="Close"
+        onClose={() => setErrorMessage("")}
+        onConfirm={() => setErrorMessage("")}
+      />
     </div>
   );
 };

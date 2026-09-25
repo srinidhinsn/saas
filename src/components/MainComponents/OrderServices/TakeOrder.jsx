@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { jwtDecode } from 'jwt-decode';
 import {
   ShoppingCart, Plus, Minus, X, Check, Search,
-  Users, Package, Trash2, ArrowLeft, FileText,
-  Printer as PrinterIcon, Clock, Save, User, Phone,
+  Users, Package, Trash2, ArrowLeft, FileText, Mail, MapPin,  
+  Printer as PrinterIcon, Clock, Save, User, Phone,Truck,
 } from 'lucide-react';
 import { Eye, Lock, Printer } from 'lucide-react';
 import axios from 'axios';
@@ -11,1482 +12,39 @@ import CategoryTree from '../InventoryServices/CategoryTree';
 import ImagePreview from '../../utils/ImagePreview';
 import InvoiceModal from '../BillingServices/InvoiceModal';
 import { getMenuConfig } from '../../utils/menuConfigResolver';
+import { menuCache } from '../../utils/Menu-utils/menuCache';
+import { getDietaryFromSlug, isItemActive,buildCartItem, getGroupedCartItems, deduplicateOrderItems,getCategoryAndChildrenIds, isPackagingCategoryId,isDeliveryChargeCategoryId, excludePackagingItems, relinkCartItemsToParents}
+         from '../../utils/Menu-utils/menuUtils';
+import {useDietaryTypes, useTimings, useZoneConfig, useMenuData,useCounterTree} from '../../utils/Menu-utils/useMenuData';
+import { parseISTTimestamp } from '../../utils/dateRange';
+import CustomerAutocomplete from '../BillingServices/CustomerAutocomplete';
+import { useInvoiceModal } from '../../utils/BillingUtils';
+import {
+  TransferTableModal,
+  ItemStatusBadge,
+  CancelOrderConfirmModal,
+  OldItemDeleteModal,
+  CustomerCapturePanel,
+  AddressSelectPanel,
+  DeliveryDetailsSummary,
+  DeliveryDetailsModal,
+  TablePaymentConfirmModal,
+  LineItemsModal,
+  ComboDetailModal,
+  OldItemRow,
+  NewItemRow,
+  TableReservation,
+  TakeawayOrdersModal,
+  StockConfirmModal,
+  getUserIdFromToken,
+  readDraft,
+  writeDraft,
+  getDraftTableIdsFromOrders,
+  deleteDraftFromDB,
+  upsertBillingDocumentForCustomer,
+  printKOT
+} from './TakeOrderModals';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
-const TABLE_STATUS_CONFIG = {
-  vacant: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-action-success' },
-  available: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-green-700' },
-  occupied: { clickable: false, bg: 'bg-action-primary', border: 'border-action-primary', badge: 'bg-red-100 text-action-primary', viewable: true },
-  served: { clickable: false, bg: 'bg-blue-50', border: 'border-blue-400', badge: 'bg-blue-100 text-blue-700', viewable: true },
-  reserved: { clickable: false, bg: 'bg-yellow-50', border: 'border-yellow-400', badge: 'bg-yellow-100 text-yellow-700' },
-  cancelled: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-gray-100 text-gray-500' },
-};
-
-const CANCELLATION_REASONS = [
-  'Customer changed mind',
-  'Wrong item ordered',
-  'Duplicate entry',
-  'Item out of stock',
-  'Customer left',
-  'Order placed by mistake',
-  'Allergy concern',
-  'Other',
-];
-
-const WASTAGE_REASONS = [
-  'Plate returned by customer',
-  'Quality issue / not fresh',
-  'Preparation error',
-  'Spilled / dropped',
-  'Overcooked / undercooked',
-  'Customer complaint',
-  'Expired ingredient used',
-  'Other',
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TransferTableModal
-// ─────────────────────────────────────────────────────────────────────────────
-
-const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, onConfirm }) => {
-  const [selectedNewTable, setSelectedNewTable] = useState(null);
-
-  useEffect(() => {
-    if (isOpen) setSelectedNewTable(null);
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const vacantTables = tables.filter(
-    t => t.status?.toLowerCase() === 'vacant' && t.id.toString() !== currentTableId
-  );
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-800">Transfer Table</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
-          </button>
-        </div>
-        <div className="px-6 py-4 max-h-72 overflow-y-auto">
-          {vacantTables.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-4">No vacant tables available.</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {vacantTables.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => setSelectedNewTable(t)}
-                  className={`py-3 rounded-lg border-2 text-sm font-bold transition
-                    ${selectedNewTable?.id === t.id
-                      ? 'border-action-primary bg-action-primary/10 text-action-primary'
-                      : 'border-gray-200 hover:border-action-primary text-gray-700'}`}
-                >
-                  {t.table_number}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => { if (selectedNewTable) { onConfirm(selectedNewTable); onClose(); } }}
-            disabled={!selectedNewTable}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${selectedNewTable ? 'bg-action-primary hover:bg-action-danger' : 'bg-gray-300 cursor-not-allowed'}`}
-          >
-            Transfer
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Draft helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function readDraft(tableId, clientId, token) {
-  try {
-    const r = await axios.get(
-      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const allOrders = r.data?.data || [];
-    return allOrders.find(
-      o => o.status === 'draft' && String(o.table_id) === String(tableId)
-    ) || null;
-  } catch {
-    return null;
-  }
-}
-
-async function writeDraft(tableId, cart, clientId, token, customerDetails = {}) {
-  try {
-    const existing = await readDraft(tableId, clientId, token);
-    if (existing) {
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-        { id: existing.id, status: 'cancelled' },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-    }
-
-    // Only send parent (non-addon) items in the draft — addons are stored
-    // as metadata on the parent via parent_item_key so they can be restored
-    const parentItems = cart.filter(i => !i.is_addon);
-    const total = parentItems.reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
-
-    await axios.post(
-      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
-      {
-        client_id: clientId,
-        table_id: Number(tableId),
-        price: total,
-        gst: 0,
-        cst: 0,
-        total_price: total,
-        status: 'draft',
-        items: parentItems.map(i => ({
-          item_id: i.id,
-          item_name: i.name,
-          quantity: i.quantity,
-          unit_price: i.unit_price,
-          line_total: (i.unit_price || 0) * i.quantity,
-          status: 'draft',
-          slug: i.slug || '',
-          frontend_unique_key: i.frontend_unique_key,
-          // Store linked addon IDs so we can restore them on re-open
-          line_item_id: cart
-            .filter(a => a.is_addon && a.parent_item_key === i.frontend_unique_key)
-            .map(a => a.id),
-        })),
-      },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    return true;
-  } catch (err) {
-    console.error('writeDraft failed:', err);
-    return false;
-  }
-}
-
-async function deleteDraftFromDB(tableId, clientId, token) {
-  try {
-    const existing = await readDraft(tableId, clientId, token);
-    if (!existing) return;
-    await axios.post(
-      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-      { id: existing.id, status: 'cancelled' },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-  } catch (err) {
-    console.warn('deleteDraft warning:', err?.response?.data || err.message);
-  }
-}
-
-function getDraftTableIdsFromOrders(allOrders) {
-  return (allOrders || [])
-    .filter(o => o.status === 'draft')
-    .map(o => String(o.table_id));
-}
-
-async function upsertBillingDocumentForCustomer({
-  clientId,
-  token,
-  orderId,
-  tableRef,
-  customerDetails,
-  orderSubtotal = 0,
-}) {
-  try {
-    const payload = {
-      client_id: clientId,
-      document_type: 'Invoice',
-      document_date: new Date().toISOString(),
-      order_id: orderId.toString(),
-      reference_number: tableRef || `Order ${orderId}`,
-      subtotal: orderSubtotal,
-      tax_amount: 0,
-      tax_rate: 18,
-      discount_amount: 0,
-      discount: 0,
-      total_amount: orderSubtotal,
-      payment_status: 'Pending',
-      status: 'Draft',
-      customer_id: customerDetails.customer_id || '',
-      contact_email: customerDetails.contact_email || '',
-      contact_phone: customerDetails.contact_phone || '',
-    };
-
-    const res = await axios.post(
-      `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create_document`,
-      payload,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    return res?.data?.data?.id ?? null;
-  } catch (err) {
-    console.warn('[upsertBillingDocumentForCustomer] failed:', err?.response?.data || err.message);
-    return null;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ItemStatusBadge
-// ─────────────────────────────────────────────────────────────────────────────
-
-const ItemStatusBadge = ({ status }) => {
-  const cfg = {
-    pending: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Pending' },
-    preparing: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Preparing' },
-    ready: { bg: 'bg-green-100', text: 'text-green-700', label: 'Ready' },
-    served: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Served' },
-    cancelled: { bg: 'bg-red-50', text: 'text-red-400', label: 'Cancelled' },
-  }[status] || { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '—' };
-
-  return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
-      {cfg.label}
-    </span>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DeleteConfirmModal
-// ─────────────────────────────────────────────────────────────────────────────
-
-const ORDER_CANCEL_REASONS = [
-  'Customer changed mind',
-  'Customer left without paying',
-  'Duplicate order',
-  'Test / mistake order',
-  'Payment issue',
-  'Kitchen unable to fulfill',
-  'Other',
-];
-
-const CancelOrderConfirmModal = ({ isOpen, onClose, onConfirm }) => {
-  const [reason, setReason] = useState('');
-  const [customReason, setCustomReason] = useState('');
-
-  useEffect(() => {
-    if (isOpen) { setReason(''); setCustomReason(''); }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const effectiveReason = reason === 'Other' ? customReason : reason;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-red-600">Cancel Order</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
-          </button>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          <p className="text-sm text-gray-600">
-            The order will be marked as <span className="font-semibold text-red-600">cancelled</span> and kept for records. Select a reason:
-          </p>
-          <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1">
-            {ORDER_CANCEL_REASONS.map(r => (
-              <button
-                key={r}
-                onClick={() => setReason(r)}
-                className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
-                  ${reason === r
-                    ? 'bg-red-600 text-white border-red-600'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-          {reason === 'Other' && (
-            <input
-              value={customReason}
-              onChange={e => setCustomReason(e.target.value)}
-              placeholder="Describe the reason…"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
-            />
-          )}
-        </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-          >
-            Go Back
-          </button>
-          <button
-            disabled={!reason || (reason === 'Other' && !customReason.trim())}
-            onClick={() => { onConfirm(effectiveReason); onClose(); }}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${reason && !(reason === 'Other' && !customReason.trim())
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-gray-300 cursor-not-allowed'}`}
-          >
-            Cancel Order
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// OldItemDeleteModal
-// ─────────────────────────────────────────────────────────────────────────────
-
-const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemoveAll }) => {
-  const [reason, setReason] = useState('');
-  const [customReason, setCustomReason] = useState('');
-  const [removeQty, setRemoveQty] = useState(1);
-
-  const isServed = item?.status === 'served';
-  const transactionType = isServed ? 'WASTAGE' : 'ITEM_CANCELLED';
-  const reasonList = isServed ? WASTAGE_REASONS : CANCELLATION_REASONS;
-  const typeLabel = isServed ? 'Wastage' : 'Cancellation';
-  const typeColor = isServed ? 'text-red-600' : 'text-orange-600';
-  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200';
-  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600';
-
-  useEffect(() => {
-    if (isOpen) {
-      setReason('');
-      setCustomReason('');
-      setRemoveQty(1);
-    }
-  }, [isOpen]);
-
-  if (!isOpen || !item) return null;
-
-  const maxQty = item.quantity || 1;
-  const isRemoveAll = removeQty >= maxQty;
-  const effectiveReason = reason === 'Other' ? customReason : reason;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className={`text-lg font-bold ${typeColor}`}>Remove Item</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="px-6 py-5 space-y-4">
-          <div>
-            <p className="text-sm text-gray-700 font-semibold">{item.name}</p>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Ordered quantity: <span className="font-semibold">{maxQty}</span>
-            </p>
-          </div>
-
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-semibold ${typeBg} ${typeColor}`}>
-            <span className="w-2 h-2 rounded-full bg-current inline-block" />
-            {typeLabel} — {isServed
-              ? 'Item was already served. Stock will be reversed.'
-              : 'Item not yet served. No stock deduction.'}
-          </div>
-
-          {maxQty > 1 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-600 mb-2">How many to remove?</p>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setRemoveQty(q => Math.max(1, q - 1))}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold"
-                >−</button>
-                <span className="w-10 text-center text-lg font-bold text-gray-800">{removeQty}</span>
-                <button
-                  onClick={() => setRemoveQty(q => Math.min(maxQty, q + 1))}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold"
-                >+</button>
-                <span className="text-xs text-gray-400 ml-1">of {maxQty}</span>
-                <button
-                  onClick={() => setRemoveQty(maxQty)}
-                  className="ml-auto text-xs text-red-500 underline font-semibold"
-                >Remove all</button>
-              </div>
-              <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-red-400 rounded-full transition-all"
-                  style={{ width: `${(removeQty / maxQty) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          <div>
-            <p className="text-xs font-semibold text-gray-600 mb-2">Reason</p>
-            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
-              {reasonList.map(r => (
-                <button
-                  key={r}
-                  onClick={() => setReason(r)}
-                  className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
-                    ${reason === r
-                      ? isServed
-                        ? 'bg-red-600 text-white border-red-600'
-                        : 'bg-orange-500 text-white border-orange-500'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-            {reason === 'Other' && (
-              <input
-                value={customReason}
-                onChange={e => setCustomReason(e.target.value)}
-                placeholder="Describe the reason…"
-                className="mt-2 w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
-              />
-            )}
-          </div>
-        </div>
-
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            disabled={!reason || (reason === 'Other' && !customReason.trim())}
-            onClick={() => {
-              if (isRemoveAll) {
-                onRemoveAll(transactionType, effectiveReason);
-              } else {
-                onRemoveOne(transactionType, effectiveReason, removeQty);
-              }
-            }}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${reason && !(reason === 'Other' && !customReason.trim())
-                ? buttonColor
-                : 'bg-gray-300 cursor-not-allowed'}`}
-          >
-            {isRemoveAll
-              ? `Remove All (${maxQty})`
-              : `Remove ${removeQty}`}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CustomerCapturePanel
-// ─────────────────────────────────────────────────────────────────────────────
-
-const CustomerCapturePanel = ({ value, onChange }) => {
-  return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border-default bg-bg-tertiary shadow-sm">
-      <User size={15} className="text-text-secondary shrink-0" />
-      <input
-        value={value.customer_id}
-        onChange={e => onChange({ ...value, customer_id: e.target.value })}
-        placeholder="Customer name / ID (optional)"
-        className="flex-1 min-w-0 text-sm bg-transparent outline-none placeholder-text-secondary text-text-primary"
-      />
-      <div className="w-px h-5 bg-border-default shrink-0" />
-      <Phone size={15} className="text-text-secondary shrink-0" />
-      <input
-        value={value.contact_phone}
-        onChange={e => onChange({ ...value, contact_phone: e.target.value })}
-        placeholder="Phone (optional)"
-        className="w-32 text-sm bg-transparent outline-none placeholder-text-secondary text-text-primary"
-        inputMode="tel"
-      />
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TablePaymentConfirmModal
-// ─────────────────────────────────────────────────────────────────────────────
-
-const TablePaymentConfirmModal = ({ isOpen, orderId, onClose, onConfirm }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-green-700">Confirm Payment</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
-        </div>
-        <div className="px-6 py-5">
-          <p className="text-sm text-gray-600">
-            Mark order <span className="font-semibold">#{orderId}</span> as paid and free the table?
-          </p>
-        </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => { onConfirm(orderId); onClose(); }}
-            className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-green-600 hover:bg-green-700 text-white"
-          >
-            Confirm Paid
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LineItemsModal
-// ─────────────────────────────────────────────────────────────────────────────
-
-const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWithSelectedAddons, onAddMainOnly }) => {
-  const [selectedAddons, setSelectedAddons] = useState([]);
-
-  useEffect(() => {
-    if (isOpen) setSelectedAddons([]);
-  }, [isOpen]);
-
-  const toggleAddon = (id) => {
-    setSelectedAddons(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg max-w-lg w-full p-6 bg-bg-primary max-h-[80vh] overflow-y-auto">
-        <h3 className="text-xl font-semibold mb-2 text-text-primary">{mainItem?.name}</h3>
-        <p className="mb-4 text-text-secondary">Select add-ons:</p>
-
-        <div className="space-y-2 mb-6">
-          {lineItems.map(item => (
-            <div
-              key={item.id}
-              onClick={() => toggleAddon(item.id)}
-              className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-all
-                ${selectedAddons.includes(item.id)
-                  ? 'bg-action-primary/10 border-2 border-action-primary'
-                  : 'bg-bg-tertiary border border-border-default hover:border-action-primary/50'}`}
-            >
-              <div className="flex items-center gap-3 flex-1">
-                <div
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all
-                    ${selectedAddons.includes(item.id)
-                      ? 'bg-action-primary border-action-primary'
-                      : 'border-gray-300'}`}
-                >
-                  {selectedAddons.includes(item.id) && <Check size={14} className="text-white" />}
-                </div>
-                <span className="text-text-primary font-medium">{item.name}</span>
-              </div>
-              <span className="font-semibold text-action-primary">₹{item.unit_price}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg border border-border-default bg-bg-tertiary text-text-primary hover:bg-gray-100"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onAddMainOnly}
-            className="flex-1 px-4 py-2 rounded-lg bg-gray-600 text-white hover:bg-gray-700"
-          >
-            Main Only
-          </button>
-          <button
-            onClick={() => onAddWithSelectedAddons(selectedAddons)}
-            disabled={selectedAddons.length === 0}
-            className={`flex-1 px-4 py-2 rounded-lg transition-colors
-              ${selectedAddons.length > 0
-                ? 'bg-action-primary text-white hover:bg-action-danger'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
-          >
-            Add ({selectedAddons.length})
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ComboDetailModal — shown when a combo item is clicked
-// ─────────────────────────────────────────────────────────────────────────────
-
-const ComboDetailModal = ({ isOpen, onClose, comboItem, comboComponents, onAddCombo }) => {
-  if (!isOpen || !comboItem) return null;
-
-  const aLaCarteTotal = comboComponents.reduce(
-    (sum, c) => sum + (Number(c.unit_price) || 0), 0
-  );
-  const savings = aLaCarteTotal - Number(comboItem.unit_price);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="rounded-2xl w-full max-w-md bg-white shadow-2xl overflow-hidden">
-        <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-4 flex items-start justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-white">{comboItem.name}</h3>
-            {comboItem.description && (
-              <p className="text-xs text-violet-200 mt-0.5">{comboItem.description}</p>
-            )}
-          </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center text-white">
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="px-6 py-3 bg-violet-50 border-b border-violet-100 flex items-center justify-between">
-          <div>
-            <span className="text-2xl font-bold text-violet-700">₹{Number(comboItem.unit_price).toFixed(0)}</span>
-            {savings > 0 && (
-              <span className="ml-2 text-xs text-gray-400 line-through">₹{aLaCarteTotal.toFixed(0)}</span>
-            )}
-          </div>
-          {savings > 0 && (
-            <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded-full">
-              Save ₹{savings.toFixed(0)}
-            </span>
-          )}
-        </div>
-
-        <div className="px-6 py-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            What's included ({comboComponents.length} items)
-          </p>
-          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-            {comboComponents.length === 0 ? (
-              <p className="text-sm text-gray-400 italic text-center py-4">No component details available</p>
-            ) : (
-              comboComponents.map((c, idx) => (
-                <div
-                  key={c.id || idx}
-                  className="flex items-center justify-between px-3 py-2 rounded-xl bg-violet-50 border border-violet-100"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-violet-200 text-violet-700 text-xs font-bold flex items-center justify-center shrink-0">
-                      {idx + 1}
-                    </span>
-                    <span className="text-sm font-medium text-gray-800">{c.name}</span>
-                  </div>
-                  <span className="text-xs text-violet-600 font-semibold">₹{Number(c.unit_price).toFixed(0)}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => { onAddCombo(); onClose(); }}
-            className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-violet-600 hover:bg-violet-700 text-white transition-colors"
-          >
-            Add Combo · ₹{Number(comboItem.unit_price).toFixed(0)}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// printKOT
-//
-// FIX: Items store category_name (e.g. "Juices") in category_id field instead
-// of the actual DB category ID (e.g. "juices_veg"). We resolve the real ID by
-// looking up the category by name in categoriesFlat before walking ancestors.
-// ─────────────────────────────────────────────────────────────────────────────
-
-const printKOT = ({ counterTree, categoriesFlat, itemsToPrint, meta }) => {
-
-  // Build a name→id map from categoriesFlat so we can resolve category names
-  // that items store in their category_id field
-  const categoryNameToId = {};
-  categoriesFlat.forEach(c => {
-    if (c.name) categoryNameToId[c.name.trim().toLowerCase()] = c.id;
-  });
-
-  // Resolve the real category ID for an item, handling both actual IDs and
-  // category names stored in the category_id field
-  const resolveRealCategoryId = (rawCategoryId) => {
-    if (!rawCategoryId) return null;
-    // Check if it already exists as a real category ID
-    const directMatch = categoriesFlat.find(c => c.id === rawCategoryId);
-    if (directMatch) return rawCategoryId;
-    // Otherwise treat it as a category name and look up the ID
-    const nameKey = String(rawCategoryId).trim().toLowerCase();
-    return categoryNameToId[nameKey] || null;
-  };
-
-  // Walk from a category ID up through all ancestor IDs (inclusive)
-  const getCategoryAncestors = (categoryId) => {
-    const ancestors = new Set();
-    let cur = categoryId;
-    const visited = new Set();
-    while (cur && !visited.has(cur)) {
-      visited.add(cur);
-      ancestors.add(cur);
-      const cat = categoriesFlat.find(c => c.id === cur);
-      cur = cat?.parentId || null;
-    }
-    return ancestors;
-  };
-
-  // Map counter id → set of assigned sub-category IDs
-  const counterCategoryMap = {};
-  counterTree.forEach(counter => {
-    counterCategoryMap[counter.id] = new Set(
-      (counter.subCategories || []).map(sc => sc.id)
-    );
-  });
-
-  // Find which counter an item belongs to by resolving its real category ID
-  // first, then walking ancestors to match against counter assignments
-  const findCounterForItem = (item) => {
-    // Resolve the actual category ID (item.category_id may be a name)
-    const realCategoryId = resolveRealCategoryId(item.category_id || item.category);
-    if (!realCategoryId) return null;
-
-    const ancestors = getCategoryAncestors(realCategoryId);
-    for (const counter of counterTree) {
-      const assigned = counterCategoryMap[counter.id];
-      for (const catId of assigned) {
-        if (ancestors.has(catId)) return counter;
-      }
-    }
-    return null;
-  };
-
-  // Build addon map keyed by parent's frontend_unique_key
-  const addonsByParentKey = {};
-  itemsToPrint.forEach(item => {
-    if (item.is_addon && item.parent_item_key) {
-      if (!addonsByParentKey[item.parent_item_key]) {
-        addonsByParentKey[item.parent_item_key] = [];
-      }
-      addonsByParentKey[item.parent_item_key].push(item);
-    }
-  });
-
-  // Only route parent / standalone items to counters
-  const parentItems = itemsToPrint.filter(item => !item.is_addon);
-
-  const groups = {};
-  parentItems.forEach(item => {
-    const counter = findCounterForItem(item);
-    const key = counter ? counter.id : '__unassigned__';
-    const name = counter ? counter.name : 'General Kitchen';
-    if (!groups[key]) groups[key] = { counterName: name, items: [] };
-    groups[key].items.push({
-      ...item,
-      linkedAddons: addonsByParentKey[item.frontend_unique_key] || [],
-    });
-  });
-
-  const groupEntries = Object.entries(groups);
-  if (groupEntries.length === 0) {
-    toast.warn('No items to print KOT for.');
-    return;
-  }
-
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const dateStr = now.toLocaleDateString();
-
-  const slipHtml = groupEntries.map(([, group]) => {
-    const rows = group.items.map(item => {
-      const mainRow = `
-        <tr>
-          <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;font-weight:bold;">
-            ${item.name}
-          </td>
-          <td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:13px;text-align:center;font-weight:bold;">
-            ${item.quantity}
-          </td>
-          ${item.note
-          ? `<td style="padding:4px 2px;border-bottom:1px dashed #ccc;font-size:11px;color:#555;font-style:italic;">${item.note}</td>`
-          : '<td></td>'}
-        </tr>
-      `;
-      const addonRows = (item.linkedAddons || []).map(addon => `
-        <tr>
-          <td style="padding:2px 2px 2px 16px;border-bottom:1px dashed #eee;font-size:11px;color:#555;">
-            ↳ ${addon.name}
-          </td>
-          <td style="padding:2px 2px;border-bottom:1px dashed #eee;font-size:11px;text-align:center;color:#555;">
-            ${addon.quantity}
-          </td>
-          <td></td>
-        </tr>
-      `).join('');
-      return mainRow + addonRows;
-    }).join('');
-
-    return `
-      <div class="kot-slip">
-        <div style="text-align:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px;">
-          <div style="font-size:16px;font-weight:bold;letter-spacing:1px;">KOT</div>
-          <div style="font-size:13px;font-weight:bold;margin-top:2px;">Counter: ${group.counterName}</div>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px;">
-          <span>${meta.orderMode === 'takeaway' ? '🛍 Takeaway' : `Table: ${meta.tableNumber}`}</span>
-          <span>${dateStr} ${timeStr}</span>
-        </div>
-        ${meta.dineinOrderId
-        ? `<div style="font-size:11px;margin-bottom:6px;color:#555;">Order #${meta.dineinOrderId}</div>`
-        : ''}
-        <table style="width:100%;border-collapse:collapse;">
-          <thead>
-            <tr style="border-bottom:2px solid #000;">
-              <th style="text-align:left;font-size:12px;padding:3px 2px;">Item</th>
-              <th style="text-align:center;font-size:12px;padding:3px 2px;">Qty</th>
-              <th style="text-align:left;font-size:12px;padding:3px 2px;">Note</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <div style="text-align:center;margin-top:10px;font-size:11px;color:#888;">— End of KOT —</div>
-      </div>
-    `;
-  }).join('<div class="page-break"></div>');
-
-  const printWindow = window.open('', '_blank', 'width=400,height=600');
-  if (!printWindow) {
-    toast.error('Popup blocked. Please allow popups to print KOT.');
-    return;
-  }
-  printWindow.document.write(`
-    <!DOCTYPE html><html><head><title>KOT</title>
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font-family: 'Courier New', monospace; background: #fff; }
-      .kot-slip { width: 72mm; padding: 8px; margin: 0 auto; }
-      .page-break { page-break-after: always; }
-      @media print {
-        body { -webkit-print-color-adjust: exact; }
-        .kot-slip { page-break-inside: avoid; }
-        .page-break { page-break-after: always; height: 0; }
-      }
-    </style></head><body>
-    ${slipHtml}
-    <script>
-      window.onload = function() {
-        window.print();
-        window.onafterprint = function() { window.close(); };
-      };
-    <\/script>
-    </body></html>
-  `);
-  printWindow.document.close();
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// OldItemRow — previously placed items (read-only in cart)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequestDelete }) => {
-  const { main, addons } = group;
-  return (
-    <div className="space-y-1">
-      <div className="flex items-start gap-2 p-3 rounded-xl border bg-white shadow-sm">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-11 h-11 rounded-lg overflow-hidden border bg-white shrink-0">
-            <ImagePreview
-              clientId={clientId}
-              imageId={main.image_id}
-              token={token}
-              alt={main.name}
-              baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-              urlBuilder={({ baseUrl, clientId, imageId }) =>
-                `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
-            <p className="text-xs font-bold text-action-primary">
-            ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
-            </p>
-            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              {main.batch_label && main.batch_label !== activeDineinOrderId && (
-                <span className="text-xs text-orange-500 font-mono font-semibold">
-                  #{main.batch_label}
-                </span>
-              )}
-              {main.status && <ItemStatusBadge status={main.status} />}
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 self-center">
-          <span className="text-sm font-semibold text-gray-500">×{main.quantity}</span>
-          <button
-            onClick={() => onRequestDelete && onRequestDelete(main)}
-            className="text-red-400 hover:text-red-600 transition-colors"
-            title="Remove item"
-          >
-            <Trash2 size={15} />
-          </button>
-        </div>
-      </div>
-
-      {addons.map(addon => (
-        <div
-          key={addon.frontend_unique_key || addon.id}
-          className="flex items-center gap-2 p-2 pl-8 rounded-lg border border-dashed bg-blue-50/50"
-        >
-          <span className="text-xs text-blue-600">↳</span>
-          <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
-          <span className="text-xs font-semibold text-blue-600">
-          ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
-          </span>
-          <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NewItemRow — newly added items (editable quantity / removable)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove }) => {
-  const { main, addons } = group;
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2 p-3 rounded-xl border bg-orange-50 shadow-sm">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-11 h-11 rounded-lg overflow-hidden border bg-white shrink-0">
-            <ImagePreview
-              clientId={clientId}
-              imageId={main.image_id}
-              token={token}
-              alt={main.name}
-              baseUrl={import.meta.env.VITE_API_DOCUMENT_SERVICE_URL}
-              urlBuilder={({ baseUrl, clientId, imageId }) =>
-                `${baseUrl}/${clientId}/document/download?doc_id=${imageId}`}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
-            <p className="text-xs font-bold text-action-primary">
-            ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => onUpdateQuantity(main.id, -1, main.frontend_unique_key)}
-            className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
-          >
-            <Minus size={14} />
-          </button>
-          <span className="w-6 text-center text-sm font-semibold">{main.quantity}</span>
-          <button
-            onClick={() => onUpdateQuantity(main.id, 1, main.frontend_unique_key)}
-            className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
-          >
-            <Plus size={14} />
-          </button>
-        </div>
-
-        <button
-          onClick={() => onRemove(main.id, main.frontend_unique_key)}
-          className="text-action-primary hover:text-red-700"
-        >
-          <X size={16} />
-        </button>
-      </div>
-
-      {addons.map(addon => (
-        <div
-          key={addon.frontend_unique_key}
-          className="flex items-center gap-2 p-2 pl-8 rounded-lg border border-dashed bg-orange-100/50"
-        >
-          <span className="text-xs text-orange-600">↳</span>
-          <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
-          <span className="text-xs font-semibold text-orange-600">
-          ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
-          </span>
-          <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TableReservation — floor view
-// ─────────────────────────────────────────────────────────────────────────────
-
-const TableReservation = ({
-  tables = [],
-  orderMode = 'dinein',
-  tableOrders = {},
-  draftTableIds = [],
-  onSelectTable,
-  onSelectTakeaway,
-  onSelectDineIn,
-  onViewOrder,
-  onPrintBill,
-  onCancelOrder,
-  onMarkAsServed,
-  onConfirmPayment,
-}) => {
-  const [selectedSections, setSelectedSections] = useState([]);
-  const [selectedZones, setSelectedZones] = useState([]);
-
-  const getZone = t => t.location_zone?.trim() || 'Unassigned';
-  const getSection = t => t.section?.trim() || 'Other';
-
-  const zonesFromDB = [...new Set(tables.map(t => t.location_zone).filter(Boolean))];
-  const sectionsFromDB = [...new Set(tables.map(t => t.section).filter(Boolean))];
-
-  const toggleFilter = (value, setter) => {
-    setter(prev =>
-      prev.includes(value) ? prev.filter(x => x !== value) : [...prev, value]
-    );
-  };
-
-  const filteredTables = tables.filter(t => {
-    const z = getZone(t);
-    const s = getSection(t);
-    return (selectedZones.length === 0 || selectedZones.includes(z))
-      && (selectedSections.length === 0 || selectedSections.includes(s));
-  });
-
-  const visibleZones = [...new Set(filteredTables.map(t => getZone(t)))];
-  const getSectionsByZone = zone =>
-    [...new Set(filteredTables.filter(t => getZone(t) === zone).map(t => getSection(t)))];
-
-  const calcElapsed = (createdAt) => {
-    if (!createdAt) return null;
-    const utc = typeof createdAt === 'string'
-      ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
-      : createdAt;
-    const diff = Date.now() - new Date(utc).getTime();
-    if (diff < 0) return 'Just now';
-    const s = Math.floor(diff / 1000);
-    const m = Math.floor(s / 60);
-    const h = Math.floor(m / 60);
-    const d = Math.floor(h / 24);
-    if (s < 60) return 'Just now';
-    if (m === 1) return '1 min ago';
-    if (m < 60) return `${m} mins ago`;
-    if (h === 1) return '1 hr ago';
-    if (h < 24) return `${h} hrs ago`;
-    if (d === 1) return '1 day ago';
-    return `${d} days ago`;
-  };
-
-  const getOrderStatusStyle = (status) => {
-    const map = {
-      pending: 'bg-orange-100 text-orange-700',
-      preparing: 'bg-blue-100 text-blue-700',
-      ready: 'bg-green-100 text-green-700',
-      served: 'bg-purple-100 text-purple-700',
-      cancelled: 'bg-gray-100 text-gray-500',
-    };
-    return map[status] || 'bg-gray-100 text-gray-700';
-  };
-
-  return (
-    <div className="p-4 bg-bg-primary overflow-y-auto h-[calc(100vh-4rem)]">
-
-      {/* ── Filter bar ── */}
-      <div className="mb-3 sticky top-0 z-10 bg-bg-primary">
-        <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-border-default bg-bg-tertiary">
-          <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl">
-            <button
-              onClick={() => { setSelectedSections([]); setSelectedZones([]); }}
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                ${selectedSections.length === 0 && selectedZones.length === 0
-                  ? 'bg-action-primary text-white'
-                  : 'bg-white text-text-secondary hover:bg-gray-100'}`}
-            >
-              All
-            </button>
-            <div className="w-px bg-border-default mx-1" />
-            {sectionsFromDB.map(sec => (
-              <button
-                key={sec}
-                onClick={() => toggleFilter(sec, setSelectedSections)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                  ${selectedSections.includes(sec)
-                    ? 'bg-action-primary text-white'
-                    : 'bg-white text-text-secondary hover:bg-gray-100'}`}
-              >
-                {sec}
-              </button>
-            ))}
-            <div className="w-px bg-border-default mx-1" />
-            {/* {zonesFromDB.map(zone => (
-              <button
-                key={zone}
-                onClick={() => toggleFilter(zone, setSelectedZones)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                  ${selectedZones.includes(zone)
-                    ? 'bg-action-primary text-white'
-                    : 'bg-white text-text-secondary hover:bg-gray-100'}`}
-              >
-                {zone}
-              </button>
-            ))} */}
-          </div>
-
-          {/* Dine-in / Takeaway toggle */}
-          <div className="ml-auto flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
-            <button
-              onClick={onSelectDineIn}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all
-                ${orderMode === 'dinein'
-                  ? 'bg-action-primary text-text-white shadow'
-                  : 'text-text-secondary hover:bg-gray-100'}`}
-            >
-              Dine In
-            </button>
-            <button
-              onClick={onSelectTakeaway}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
-                ${orderMode === 'takeaway'
-                  ? 'bg-orange-500 text-white shadow'
-                  : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              <Package size={12} /> Takeaway
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Table grid ── */}
-      {orderMode === 'dinein' && visibleZones.map(zone => {
-        const sections = getSectionsByZone(zone);
-        return (
-          <div key={zone} className="mb-10">
-            <h3 className="text-xl font-bold mb-4 text-gray-800">{zone}</h3>
-            {sections.map(section => (
-              <div key={section} className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm font-semibold px-3 py-1 rounded-full bg-gray-200">
-                    {section}
-                  </span>
-                </div>
-                <div className="grid gap-4 grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-5">
-                  {filteredTables
-                    .filter(t => getZone(t) === zone && getSection(t) === section)
-                    .map(table => {
-                      const statusKey = table.status?.toLowerCase();
-                      const config = TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
-                      const orderInfo = tableOrders[table.id];
-                      const hasViewableOrder = (statusKey === 'occupied' || statusKey === 'served') && orderInfo;
-                      const tableHasDraft = draftTableIds.includes(table.id.toString());
-                      const elapsedTime = orderInfo?.created_at ? calcElapsed(orderInfo.created_at) : null;
-                      const orderCount = orderInfo?.order_count || 1;
-                      const totalPrice = orderInfo?.total_price
-                        ? `₹${Number(orderInfo.total_price).toFixed(0)}`
-                        : null;
-
-                      const invoiceStatus = orderInfo?.invoice_status?.toLowerCase();
-                      const showConfirmPayment = hasViewableOrder && invoiceStatus === 'pending';
-
-                      const handleCardClick = () => {
-                        if (config.clickable) onSelectTable(table);
-                        else if (hasViewableOrder && onViewOrder) onViewOrder(table);
-                      };
-
-                      return (
-                        <div
-                          key={table.id}
-                          className="rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition bg-white"
-                        >
-                          <div
-                            onClick={handleCardClick}
-                            className={config.clickable || hasViewableOrder ? 'cursor-pointer' : ''}
-                          >
-                            {/* Card header */}
-                            <div className="flex justify-between items-center px-3 py-2 bg-action-primary text-white">
-                              <span className="font-bold text-lg tracking-wide">{table.table_number}</span>
-                              {tableHasDraft && !hasViewableOrder && (
-                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-yellow-300 text-yellow-900">
-                                  DRAFT
-                                </span>
-                              )}
-                              {hasViewableOrder && (
-                                <>
-                                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${getOrderStatusStyle(orderInfo.status)}`}>
-                                    {orderInfo.status?.toUpperCase()}
-                                  </span>
-                                  <span className="text-xl opacity-80 font-bold">
-                                    #{orderInfo.dinein_order_id || orderInfo.id}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-
-                            {/* Card body */}
-                            <div
-                              className={`p-3 flex items-center justify-between gap-2
-                                ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50'
-                                  : statusKey === 'served' ? 'text-purple-600 bg-purple-50'
-                                    : statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50'
-                                      : 'text-green-600 bg-green-50'}`}
-                            >
-                              {statusKey === 'vacant' && <span className="text-2xl text-green-400">—</span>}
-                              {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={22} />}
-                              {statusKey === 'reserved' && <Lock size={22} />}
-
-                              {hasViewableOrder && (
-                                <div className="flex flex-col items-center flex-1">
-                                  <span className="text-xs font-bold text-gray-700">
-                                    {orderCount} time ordered
-                                  </span>
-                                  {totalPrice && (
-                                    <span className="text-sm font-bold text-action-primary">{totalPrice}</span>
-                                  )}
-                                </div>
-                              )}
-
-                              {hasViewableOrder && (
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={e => { e.stopPropagation(); onPrintBill?.(orderInfo.id, table.id); }}
-                                    className="text-yellow-600 hover:scale-110 transition-transform"
-                                    title="Print Bill"
-                                  >
-                                    <Printer size={22} />
-                                  </button>
-                                  <button
-                                    onClick={e => { e.stopPropagation(); onCancelOrder?.(orderInfo.id, table.id); }}
-                                    className="text-red-600 hover:scale-110 transition-transform"
-                                    title="Cancel Order"
-                                  >
-                                    <Trash2 size={22} />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Elapsed time */}
-                            {hasViewableOrder && elapsedTime && (
-                              <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100">
-                                <div className="flex items-center justify-center gap-1 text-xs font-semibold text-gray-600">
-                                  <Clock size={13} className="text-orange-500" />
-                                  <span>{elapsedTime}</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {showConfirmPayment && (
-                            <button
-                              onClick={e => {
-                                e.stopPropagation();
-                                onConfirmPayment?.(orderInfo.id, table.id);
-                              }}
-                              className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
-                            >
-                              <Check size={14} />
-                              Confirm Payment
-                            </button>
-                          )}
-
-                          {hasViewableOrder && orderInfo.status === 'ready' && !showConfirmPayment && (
-                            <button
-                              onClick={e => { e.stopPropagation(); onMarkAsServed?.(orderInfo.id, table.id); }}
-                              className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
-                            >
-                              Mark as Served
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-      })}
-
-      {orderMode === 'takeaway' && (
-        <div className="text-center mt-10 text-gray-500 text-sm">
-          Takeaway selected. Opening menu…
-        </div>
-      )}
-    </div>
-  );
-};
-// ─────────────────────────────────────────────────────────────────────────────
-// TakeawayOrdersModal — today's takeaway orders picker
-// ─────────────────────────────────────────────────────────────────────────────
-
-const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeawayTableIds, onSelectOrder }) => {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const fetchTodayOrders = async () => {
-      setLoading(true);
-      try {
-        const r = await axios.get(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const all = r.data?.data || [];
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-
-        const todayTakeaway = all.filter(o => {
-          if (!takeawayTableIds.includes(String(o.table_id))) return false;
-          if (o.status?.toLowerCase() === 'completed') return false;
-          if (o.status?.toLowerCase() === 'draft') return false;
-          const created = new Date(
-            typeof o.created_at === 'string'
-              ? o.created_at.replace(' ', 'T').split('.')[0] + 'Z'
-              : o.created_at
-          );
-          return created >= todayStart;
-        }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-        setOrders(todayTakeaway);
-      } catch (err) {
-        console.error('TakeawayOrdersModal fetch failed:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchTodayOrders();
-  }, [isOpen, clientId, token, takeawayTableIds]);
-
-  if (!isOpen) return null;
-
-  const statusStyle = (s) => ({
-    pending: 'bg-orange-100 text-orange-700',
-    preparing: 'bg-blue-100 text-blue-700',
-    ready: 'bg-green-100 text-green-700',
-    served: 'bg-purple-100 text-purple-700',
-  }[s?.toLowerCase()] || 'bg-gray-100 text-gray-600');
-
-  const calcElapsed = (createdAt) => {
-    if (!createdAt) return '';
-    const utc = typeof createdAt === 'string'
-      ? createdAt.replace(' ', 'T').split('.')[0] + 'Z'
-      : createdAt;
-    const diff = Date.now() - new Date(utc).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return 'Just now';
-    if (m < 60) return `${m} min ago`;
-    const h = Math.floor(m / 60);
-    return h < 24 ? `${h} hr ago` : `${Math.floor(h / 24)} day ago`;
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-xl w-full max-w-md bg-white shadow-xl flex flex-col max-h-[80vh]">
-        {/* Header */}
-        <div className="px-5 py-4 border-b flex justify-between items-center">
-          <div>
-            <h2 className="text-lg font-bold text-gray-800">Today's Takeaway Orders</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Select an order to add more items</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-          {loading && (
-            <p className="text-sm text-center text-gray-400 py-6">Loading…</p>
-          )}
-          {!loading && orders.length === 0 && (
-            <p className="text-sm text-center text-gray-400 py-6">No takeaway orders today yet.</p>
-          )}
-          {!loading && orders.map(order => (
-            <button
-              key={order.id}
-              onClick={() => { onSelectOrder(order); onClose(); }}
-              className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-action-primary hover:bg-orange-50 transition group"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-gray-800 font-mono">
-                    #{order.dinein_order_id || order.id}
-                  </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${statusStyle(order.status)}`}>
-                    {order.status?.toUpperCase()}
-                  </span>
-                </div>
-                <span className="text-sm font-bold text-action-primary">
-                  ₹{Number(order.total_price || 0).toFixed(0)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between mt-1.5 text-xs text-gray-500">
-                <span>{(order.items || []).length} item{(order.items || []).length !== 1 ? 's' : ''}</span>
-                <span className="flex items-center gap-1">
-                  <Clock size={11} className="text-orange-400" />
-                  {calcElapsed(order.created_at)}
-                </span>
-              </div>
-              {(order.items || []).length > 0 && (
-                <p className="mt-1 text-xs text-gray-400 truncate">
-                  {order.items.slice(0, 3).map(i => i.item_name).join(', ')}
-                  {order.items.length > 3 ? ` +${order.items.length - 3} more` : ''}
-                </p>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Footer — new order option */}
-        <div className="px-4 py-3 border-t bg-gray-50 rounded-b-xl">
-          <button
-            onClick={() => { onSelectOrder(null); onClose(); }}
-            className="w-full py-2.5 rounded-lg border-2 border-dashed border-orange-300 text-orange-600 text-sm font-semibold hover:bg-orange-50 transition"
-          >
-            + Start a new takeaway order
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 // ─────────────────────────────────────────────────────────────────────────────
 // TakeOrder — main component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1500,18 +58,24 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // ── Remote data ───────────────────────────────────────────────────────────
   const [tables, setTables] = useState([]);
   const [tableOrders, setTableOrders] = useState({});
-  const [menuItems, setMenuItems] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [categoriesFlat, setCategoriesFlat] = useState([]);
-  const [dieterySubCategories, setDieterySubCategories] = useState([]);
+  // const [menuItems, setMenuItems] = useState([]);
+  // const [categories, setCategories] = useState([]);
+  // const [categoriesFlat, setCategoriesFlat] = useState([]);
+  // const [dieterySubCategories, setDieterySubCategories] = useState([]);
   const [sidebarCategories, setSidebarCategories] = useState([]);
-  const [counterTree, setCounterTree] = useState([]);
+  // const [counterTree, setCounterTree] = useState([]);
   const [inventoryMap, setInventoryMap] = useState({});
-  const [loading, setLoading] = useState(true);
-
+  // const [loading, setLoading] = useState(true);
+//   const { dietaryOptions, dietaryColorMap } = useDietaryTypes({ clientId, token });
+// const { timingOptions }                   = useTimings({ clientId, token });
+// const { sections, zones }                 = useZoneConfig({ clientId, token });
   // ── Order context ─────────────────────────────────────────────────────────
   const [selectedTable, setSelectedTable] = useState('');
   const [takeawayTables, setTakeawayTables] = useState([]);
+  const [walkinTables, setWalkinTables] = useState([]);
+  const [deliveryTables, setDeliveryTables] = useState([]);
+  const [walkinTableId, setWalkinTableId] = useState(null);
+  const [deliveryTableId, setDeliveryTableId] = useState(null);
   const [dineinTableId, setDineinTableId] = useState(null);
   const [takeawayTableId, setTakeawayTableId] = useState(null);
   const [activeOrderId, setActiveOrderId] = useState(null);
@@ -1528,9 +92,11 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   // ── Drafts ────────────────────────────────────────────────────────────────
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableIds, setDraftTableIds] = useState([]);   // for floor DRAFT badges
-
-  const [customerDetails, setCustomerDetails] = useState({ customer_id: '', contact_phone: '' });
-
+  const [showDeliveryDetailsModal, setShowDeliveryDetailsModal] = useState(false);
+  const [customerDetails, setCustomerDetails] = useState({ customer_id: '', contact_phone: '',contact_email: '',shipping_address: '', });
+  const [customersList, setCustomersList] = useState([]);
+  const [customerAddresses, setCustomerAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState('');
   // ── UI state ──────────────────────────────────────────────────────────────
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1547,143 +113,96 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [comboModalItem, setComboModalItem] = useState(null);
   const [comboModalComponents, setComboModalComponents] = useState([]);
 
-  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
-  const [invoiceOrderData, setInvoiceOrderData] = useState(null);
+  const {
+  invoiceModalOpen,
+  invoiceOrderData,
+  openInvoiceForOrder,
+  closeInvoiceModal,
+} = useInvoiceModal({ clientId, token, inventoryMap });
 
   const [oldItemDeleteModal, setOldItemDeleteModal] = useState({ isOpen: false, item: null });
 
   const searchInputRef = useRef(null);
   const isMobile = window.matchMedia('(max-width: 1024px)').matches;
 
-  const [sections, setSections] = useState([]);
-  const [takeawaySections, setTakeawaySections] = useState([]);
+  const [pendingPackagingItems, setPendingPackagingItems] = useState([]);
+
+  // const [takeawaySections, setTakeawaySections] = useState([]);
   const [zoneConfigId, setZoneConfigId] = useState(null);
-  const [dietaryOptions, setDietaryOptions] = useState([]);
-  const [dietaryColorMap, setDietaryColorMap] = useState({});
   const [selectedDietary, setSelectedDietary] = useState(null);
-  const [stockWarning, setStockWarning] = useState(null);
-  const [timingOptions, setTimingOptions] = useState([]);
   const [showTakeawayOrdersModal, setShowTakeawayOrdersModal] = useState(false);
+  const hasFetchedRef = useRef(false);
   const menuConfig = useMemo(
     () => (clientId ? getMenuConfig(clientId) : null),
     [clientId]
   );
-
-  const fetchZoneConfig = async () => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      const takeawayRoots =
-        (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
-          .split(',')
-          .map(v => v.trim().toLowerCase())
-          .filter(Boolean);
-
-      const allSections = res.data || [];
-
-      // Dine-in sections — exclude anything that matches takeaway roots
-      const dineInSections = takeawayRoots.length > 0
-        ? allSections.filter(s =>
-          !takeawayRoots.some(root =>
-            (s.zone || '').toLowerCase().startsWith(root) ||
-            (s.section || '').toLowerCase().startsWith(root)
-          )
-        )
-        : allSections;
-
-      // Takeaway sections — only those matching takeaway roots
-      const takeawaySectionsFiltered = takeawayRoots.length > 0
-        ? allSections.filter(s =>
-          takeawayRoots.some(root =>
-            (s.zone || '').toLowerCase().startsWith(root) ||
-            (s.section || '').toLowerCase().startsWith(root)
-          )
-        )
-        : [];
-
-      setSections(dineInSections);
-      setTakeawaySections(takeawaySectionsFiltered);
-    } catch (err) {
-      console.error('Zone config fetch failed', err);
-    }
-  };
-  const DIETARY_COLORS = ['bg-green-500', 'bg-red-500', 'bg-yellow-400', 'bg-orange-500', 'bg-purple-500', 'bg-blue-500'];
-
-  const fetchDietaryTypes = async () => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
-        { params: { category_id: 'dietary_type' }, headers: { Authorization: `Bearer ${token}` } }
-      );
-      const opts = res.data?.data || [];
-      setDietaryOptions(opts);
-      const map = {};
-      opts.forEach((opt, idx) => {
-        map[opt.toLowerCase().replace(/[-_\s]/g, '')] = DIETARY_COLORS[idx % DIETARY_COLORS.length];
-      });
-      setDietaryColorMap(map);
-    } catch (err) {
-      console.error('Dietary fetch failed:', err);
-    }
-  };
-  const fetchTimings = async () => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/item-types`,
-        {
-          params: { category_id: 'available_timings' },
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const raw = res.data?.data || [];
-      const parsed = raw.map(v => {
-        const match = v.match(/^(.+)\((.+)-(.+)\)$/);
-        return {
-          name: (match?.[1] ?? v).trim().toLowerCase(),
-          start: match?.[2] ?? null,
-          end: match?.[3] ?? null,
-          raw: v
-        };
-      });
-      setTimingOptions(parsed);
-    } catch (err) {
-      console.error('Timing fetch failed:', err);
-      setTimingOptions([]);
-    }
-  };
+  const {
+    menuItems,
+    allMenuItemsRaw,
+    categories,
+    categoriesFlat,
+    dieterySubCategories,
+    dedupedMenuItems,
+    requiredScreenId,
+    loading,
+    refetch: fetchData,
+  } = useMenuData({
+    clientId,
+    token,
+    menuConfig,
+    zoneConfigId,
+    includeAllRaw: true,
+  });
+  const [availabilityMap, setAvailabilityMap] = useState({});
+  const [pendingStockConfirm, setPendingStockConfirm] = useState(null);
+  
+  const getAvailability = useCallback((item) => {
+    if (!item) return null;
+    const override = availabilityMap[item.id];
+    return override !== undefined ? override : (item.availability != null ? Number(item.availability) : null);
+  }, [availabilityMap]);
+  
+  const adjustAvailability = useCallback((itemId, delta) => {
+    setAvailabilityMap(prev => {
+      const current = prev[itemId] !== undefined
+        ? prev[itemId]
+        : (menuItems.find(mi => Number(mi.id) === Number(itemId))?.availability ?? null);
+      if (current == null) return prev; // item doesn't track stock at all
+      return { ...prev, [itemId]: Number(current) + delta };
+    });
+  }, [menuItems]);
   // ─────────────────────────────────────────────────────────────────────────
   // Draft helpers
   // ─────────────────────────────────────────────────────────────────────────
-
-  const deduplicateOrderItems = (items) => {
-    const uniqueKeyToItemMap = new Map();
-    const result = [];
+  const { counterTree } = useCounterTree({
+    clientId,
+    token,
+  });
   
-    items.forEach(item => {
-      // Prefer frontend_unique_key, then DB id, then warn and include as-is
-      const fkey = item.frontend_unique_key || (item.id ? String(item.id) : null);
+  const {
+    sections,
+    takeawaySections,
+    zones,
+  } = useZoneConfig({
+    clientId,
+    token,
+    takeawayRootEnv: menuConfig?.takeawayTableRoot,
+  });
   
-      if (!fkey) {
-        console.warn(`Item ${item.item_id} has no unique key or DB id — included without dedup`);
-        result.push({ ...item });
-        return;
-      }
+  const {
+    dietaryOptions,
+    dietaryColorMap,
+  } = useDietaryTypes({
+    clientId,
+    token,
+  });
   
-      if (uniqueKeyToItemMap.has(fkey)) {
-        // Same logical item appearing in multiple sub-orders — accumulate quantity
-        uniqueKeyToItemMap.get(fkey).quantity += (item.quantity ?? 0);
-      } else {
-        const copy = { ...item };
-        uniqueKeyToItemMap.set(fkey, copy);
-        result.push(copy);
-      }
-    });
-  
-    return result;
-  };
+  const {
+    timingOptions,
+  } = useTimings({
+    clientId,
+    token,
+  });
   const handleSaveDraft = useCallback(async () => {
     if (!selectedTable || cart.length === 0) {
       toast.warn('Nothing to save — cart is empty.');
@@ -1700,6 +219,87 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
   }, [selectedTable, cart, clientId, token, customerDetails]);
 
+  const attachPackagingIfTakeaway = (mainKey, batch, packagingItems) => {
+  if (!['takeaway', 'delivery'].includes(orderMode) || !mainKey || !packagingItems?.length) return;
+  packagingItems.forEach(pkg => {
+    const pkgEntry = buildCartItem(pkg, {
+      batch_timestamp: batch,
+      parent_item_key: mainKey,
+      is_addon: true,
+      _item_type: 'addon',       // reuse the known-good addon path for pricing
+      is_container: true,        // custom flag for later identification only
+    });
+    setCart(prev => [...prev, {
+      ...pkgEntry,
+      unit_price: Number(pkg.unit_price) || 0,   // force-cast in case buildCartItem left it stringy/undefined
+    }]);
+  });
+};
+
+const syncPackagingForOrderMode = (newMode) => {
+  setCart(prev => {
+    if (['takeaway', 'delivery'].includes(newMode)) {
+      const additions = [];
+      prev
+        .filter(i => !i.parent_item_key && !i.saved_sub_order)
+        .forEach(mainItem => {
+          const menuRecord = menuItems.find(mi => Number(mi.id) === Number(mainItem.id));
+          const linkedIds = menuRecord?.line_item_id || [];
+          if (!linkedIds.length) return;
+
+          const alreadyHasPackaging = prev.some(
+            i => i.parent_item_key === mainItem.frontend_unique_key && i.is_container
+          );
+          if (alreadyHasPackaging) return;
+
+          linkedIds
+            .map(id => menuItems.find(mi => Number(mi.id) === Number(id)))
+            .filter(li => li && isPackagingCategoryId(li.category_id, categoriesFlat))
+            .forEach(pkg => {
+              const batch = mainItem.batch_timestamp || currentBatchTimestamp || Date.now();
+              const entry = buildCartItem(pkg, {
+                batch_timestamp: batch,
+                parent_item_key: mainItem.frontend_unique_key,
+                is_addon: true,
+                _item_type: 'addon',
+                is_container: true,
+              });
+              additions.push({ ...entry, unit_price: Number(pkg.unit_price) || 0 });
+            });
+        });
+      return [...prev, ...additions];
+    }
+    // Switching back to dine-in — drop any unsaved packaging containers
+    return prev.filter(i => !(i.is_container && !i.saved_sub_order));
+  });
+};
+const syncDeliveryChargeForOrderMode = (newMode) => {
+  setCart(prev => {
+    if (newMode === 'delivery') {
+      const already = prev.some(i => i.is_delivery_charge && !i.saved_sub_order);
+      if (already) return prev;
+
+      const chargeItem = menuItems.find(mi =>
+        isDeliveryChargeCategoryId(mi.category_id, categoriesFlat)
+      );
+      if (!chargeItem) return prev; // not configured — silently skip
+
+      const batch = currentBatchTimestamp || Date.now();
+      const entry = buildCartItem(chargeItem, {
+        batch_timestamp: batch,
+        is_addon: false,
+        _item_type: 'delivery_charge',
+      });
+      return [...prev, {
+        ...entry,
+        unit_price: Number(chargeItem.unit_price) || 0,
+        quantity: 1,
+        is_delivery_charge: true,
+      }];
+    }
+    return prev.filter(i => !(i.is_delivery_charge && !i.saved_sub_order));
+  });
+};
   // ─────────────────────────────────────────────────────────────────────────
   // Category / tree utilities
   // ─────────────────────────────────────────────────────────────────────────
@@ -1752,19 +352,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return null;
   }, [categoriesFlat]);
 
-  const getCategoryAndChildrenIds = useCallback((targetId) => {
-    if (!targetId || !categoriesFlat.length) return [];
-    const result = new Set();
-    const addWithChildren = (id) => {
-      result.add(id);
-      categoriesFlat
-        .filter(c => c.parentId === id)
-        .forEach(c => addWithChildren(c.id));
-    };
-    addWithChildren(targetId);
-    return Array.from(result);
-  }, [categoriesFlat]);
-
   const findCategoryNode = (tree, matcher) => {
     for (const c of tree) {
       if (
@@ -1799,40 +386,6 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
     return null;
   };
-  const isItemActive = useCallback((slug) => {
-    if (!slug) return true;
-
-    const doubleUnderIdx = slug.lastIndexOf('__');
-    const timingSegment = doubleUnderIdx !== -1
-      ? slug.slice(doubleUnderIdx + 2).toLowerCase()
-      : null;
-
-    // ✅ Explicit unavailable flag
-    if (timingSegment === 'unavailable') return false;
-
-    if (!timingOptions || timingOptions.length === 0) return true;
-    if (!timingSegment || timingSegment === 'allday') return true;
-
-    const timingKeys = timingSegment.split('+').filter(Boolean);
-    if (timingKeys.length === 0) return true;
-
-    const recognizedKeys = timingKeys.filter(key => {
-      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-      return t && t.start && t.end;
-    });
-
-    if (recognizedKeys.length === 0) return true;
-
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-    return recognizedKeys.some(key => {
-      const t = timingOptions.find(o => o.name?.toLowerCase() === key);
-      const [sh, sm] = t.start.split(':').map(Number);
-      const [eh, em] = t.end.split(':').map(Number);
-      return currentMinutes >= (sh * 60 + sm) && currentMinutes <= (eh * 60 + em);
-    });
-  }, [timingOptions]);
   // ─────────────────────────────────────────────────────────────────────────
   // Determine if a category is a combo category (walks ancestors)
   // ─────────────────────────────────────────────────────────────────────────
@@ -1851,27 +404,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return false;
   }, [categoriesFlat]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Data fetching
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const fetchCounterTree = async () => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category`,
-        {
-          params: { client_id: clientId, category_id: 'counter' },
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      setCounterTree(res.data.data?.[0]?.subCategories || []);
-    } catch (err) {
-      console.error('Failed to fetch counter tree:', err);
-    }
-  };
-
-
-  const fetchTableOrders = async (tableList) => {
+  const fetchTableOrders = async (tableList = []) => {
     try {
       const r = await axios.get(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
@@ -1913,221 +446,75 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
   };
 
-  // REMOVE the old fetchTables and REPLACE WITH:
-  const fetchTables = async () => {
-    const takeawayRoots =
-      (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || '')
-        .split(',')
-        .map(v => v.trim().toLowerCase());
-
-    const res = await axios.get(
-      `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const list = Array.isArray(res.data?.data)
-      ? res.data.data.map(t => ({
-        ...t,
-        table_number: t.name || t.table_number || '-',
-      }))
+  const fetchTables = useCallback(async () => {
+    const takeawayRoots = (menuConfig?.takeawayTableRoot || 'takeaway')
+      .split(',')
+      .map(v => v.trim().toLowerCase())
+      .filter(Boolean);
+  
+    const walkinRoots = (menuConfig?.walkinTableRoot || 'walkin')
+      .split(',')
+      .map(v => v.trim().toLowerCase())
+      .filter(Boolean);
+  
+    const deliveryRoots = (menuConfig?.deliveryTableRoot || 'delivery')
+      .split(',')
+      .map(v => v.trim().toLowerCase())
+      .filter(Boolean);
+  
+    const [tableRes, configRes] = await Promise.all([
+      axios.get(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      ),
+      axios.get(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      ),
+    ]);
+  
+    const freshConfigs = configRes.data || [];
+  
+    const list = Array.isArray(tableRes.data?.data)
+      ? tableRes.data.data.map(t => {
+          const matchedConfig = freshConfigs.find(
+            c =>
+              c.section?.trim().toLowerCase() === t.section?.trim().toLowerCase() &&
+              c.zone?.trim().toLowerCase() === t.location_zone?.trim().toLowerCase()
+          );
+          return {
+            ...t,
+            table_number: t.name || t.table_number || '-',
+            config_id: matchedConfig?.id || null,
+          };
+        })
       : [];
-
+  
     const takeaway = list.filter(t =>
-      takeawayRoots.some(root =>
-        (t.name || '').toLowerCase().startsWith(root)
-      )
+      takeawayRoots.some(root => (t.name || '').toLowerCase().startsWith(root))
     );
-
     setTakeawayTables(takeaway);
-    if (takeaway.length > 0) {
-      setTakeawayTableId(takeaway[0].id);
-    }
-
+    if (takeaway.length > 0) setTakeawayTableId(takeaway[0].id);
+  
+    const walkin = list.filter(t =>
+      walkinRoots.some(root => (t.name || '').toLowerCase().startsWith(root))
+    );
+    setWalkinTables(walkin);
+    if (walkin.length > 0) setWalkinTableId(walkin[0].id);
+  
+    const delivery = list.filter(t =>
+      deliveryRoots.some(root => (t.name || '').toLowerCase().startsWith(root))
+    );
+    setDeliveryTables(delivery);
+    if (delivery.length > 0) setDeliveryTableId(delivery[0].id);
+  
     list.sort((a, b) =>
       a.table_number.localeCompare(b.table_number, undefined, { numeric: true })
     );
     setTables(list);
     await fetchTableOrders(list);
-  };
+  }, [clientId, token, menuConfig]);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Initial data load
-  // ─────────────────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!clientId || !token || !menuConfig) return;
-      try {
-        setLoading(true);
-        await Promise.all([fetchTables(), fetchCounterTree(), fetchZoneConfig(), fetchDietaryTypes(), fetchTimings()]);
-
-        const [catRes, itemRes, invRes] = await Promise.all([
-          axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read_category?category_id=${menuConfig.root}`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          ),
-          axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-              params: {
-                inventory_id: menuConfig.menuInventoryId,
-                ...(zoneConfigId && { zone_config_id: zoneConfigId }),
-              }
-            }
-          ),
-          axios.get(
-            `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          ),
-        ]);
-
-        const iMap = {};
-        (invRes.data?.data || []).forEach(i => (iMap[i.id] = i));
-        setInventoryMap(iMap);
-
-        const fullTree = catRes.data.data.filter(c => c.name?.toLowerCase() !== 'all');
-        const subIds = new Set();
-        fullTree.forEach(c => c.subCategories?.forEach(s => subIds.add(s.id)));
-        const topLevel = fullTree.filter(c => !subIds.has(c.id));
-        const flatCats = flattenCategoryTree(topLevel);
-        setCategoriesFlat(
-          flatCats.map(c => ({
-            id: c.id,
-            name: (c.name || '').trim(),
-            parentId: c.parentId ?? c.parent_id ?? null,
-          }))
-        );
-
-        const enrichedItems = itemRes.data.data.map(item => {
-          const cat = flatCats.find(c => c.id === item.category_id);
-          return { ...item, category_name: cat?.name || 'Uncategorized' };
-        });
-        enrichedItems.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        setMenuItems(enrichedItems);
-
-        const buildTree = () => {
-          const map = new Map();
-          flatCats.forEach(c =>
-            map.set(c.id, {
-              ...c,
-              count: enrichedItems.filter(i => i.category_id === c.id).length,
-              children: [],
-            })
-          );
-          const tree = [];
-          map.forEach(c => {
-            if (c.parentId && map.has(c.parentId)) map.get(c.parentId).children.push(c);
-            else tree.push(c);
-          });
-          return tree;
-        };
-
-        const categoryTree = buildTree().map(c =>
-          c.id === menuConfig.root || c.name?.toLowerCase() === menuConfig.root.toLowerCase()
-            ? { ...c, name: 'All Categories', count: c.children.length }
-            : c
-        );
-        setCategories(categoryTree);
-        setSidebarCategories(categoryTree);
-
-        const rootNode = findCategoryNode(categoryTree, menuConfig.root);
-        let qc = [];
-        if (rootNode) {
-          let l = menuConfig.level;
-          while (l >= 0) {
-            qc = getCategoriesAtLevel(rootNode, l);
-            if (qc.length > 0) break;
-            l--;
-          }
-        }
-        setDieterySubCategories(qc);
-      } catch (err) {
-        console.error('Fetch error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, token, realm, menuConfig]);
-
-  useEffect(() => {
-    if (!zoneConfigId || !clientId || !token || !menuConfig) return;
-
-    const refetchMenu = async () => {
-      try {
-        const itemRes = await axios.get(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            params: {
-              inventory_id: menuConfig.menuInventoryId,
-              zone_config_id: zoneConfigId,
-            }
-          }
-        );
-
-        // Deduplicate: prefer base record (zone_config_id === 0) when no zone match
-        const allItems = itemRes.data.data || [];
-        const uniqueKeyToItemMap = new Map();
-        allItems.forEach(item => {
-          const existing = uniqueKeyToItemMap.get(item.id);
-          if (!existing || item.zone_config_id === zoneConfigId) {
-            uniqueKeyToItemMap.set(item.id, item);
-          }
-        });
-
-        const enriched = Array.from(uniqueKeyToItemMap.values()).map(item => {
-          const cat = categoriesFlat.find(c => c.id === item.category_id);
-          return { ...item, category_name: cat?.name || 'Uncategorized' };
-        });
-        enriched.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        setMenuItems(enriched);
-      } catch (err) {
-        console.error('Zone menu refetch failed:', err);
-      }
-    };
-
-    refetchMenu();
-  }, [zoneConfigId, clientId, token, menuConfig]);
-  const getDietaryFromSlug = useCallback((item) => {
-    if (!item || !dietaryOptions.length) return null;
-    const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
-    const slug = item.slug || '';
-    const doubleUnderIdx = slug.lastIndexOf('__');
-  
-    // ── NEW FORMAT: dietary is in the __ suffix ──
-    if (doubleUnderIdx !== -1) {
-      const suffix = slug.slice(doubleUnderIdx + 2).toLowerCase();
-      if (suffix && suffix !== 'unavailable' && suffix !== 'allday') {
-        const suffixParts = suffix.split('+').filter(Boolean);
-        const sortedOptions = [...dietaryOptions].sort(
-          (a, b) => normalize(b).length - normalize(a).length
-        );
-        for (const part of suffixParts) {
-          const match = sortedOptions.find(d => normalize(d) === normalize(part));
-          if (match) return normalize(match);
-        }
-      }
-    }
-  
-    // ── OLD FORMAT FALLBACK: dietary was injected into the main slug path ──
-    const mainPart = doubleUnderIdx !== -1 ? slug.slice(0, doubleUnderIdx) : slug;
-    const slugSegments = mainPart.toLowerCase().split('_').filter(Boolean);
-    const sortedOptions = [...dietaryOptions].sort(
-      (a, b) => normalize(b).length - normalize(a).length
-    );
-    for (let i = 0; i < slugSegments.length; i++) {
-      for (let j = 1; j <= 3; j++) {
-        const joined = normalize(slugSegments.slice(i, i + j).join(''));
-        const match = sortedOptions.find(d => normalize(d) === joined);
-        if (match) return normalize(match);
-      }
-    }
-  
-    return null;
-  }, [dietaryOptions]);
   // ─────────────────────────────────────────────────────────────────────────
   // Browser history (back button) — push initial floor state once
   // ─────────────────────────────────────────────────────────────────────────
@@ -2147,12 +534,95 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     return () => window.removeEventListener('popstate', onBack);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentView]);
-
+  useEffect(() => {
+    if (menuItems.length > 0 && Object.keys(availabilityMap).length === 0) {
+      const seed = {};
+      menuItems.forEach(mi => { if (mi.availability != null) seed[mi.id] = Number(mi.availability); });
+      setAvailabilityMap(seed);
+    }
+  }, [menuItems]);
   // ─────────────────────────────────────────────────────────────────────────
   // Navigation helpers
   // ─────────────────────────────────────────────────────────────────────────
 
 
+const handleDeliverySelect = async () => {
+  const t = deliveryTables[0];
+  if (!t) { toast.error('Delivery table not configured. Check VITE_DELIVERY_TABLE_DEFAULT_ROOT.'); return; }
+
+  setOrderMode('delivery');
+  setActiveOrderId(null);
+  setActiveDineinOrderId(null);
+  setHasNewItems(false);
+  setCurrentBatchTimestamp(null);
+  setSelectedTable(t.id.toString());
+  setDeliveryTableId(t.id);
+  setZoneConfigId(t.config_id || null);
+  setCart([]);
+  setCustomerDetails({ customer_id: '', contact_phone: '', contact_email: '', shipping_address: '' });
+  setShowDeliveryDetailsModal(true); 
+  setShowCart(true);
+  syncDeliveryChargeForOrderMode('delivery');
+  goToOrderView();
+};
+
+const handleWalkInSelect = async () => {
+  const t = walkinTables[0];
+  if (!t) { toast.error('Walk-in table not configured. Check VITE_WALKIN_TABLE_DEFAULT_ROOT.'); return; }
+
+  setOrderMode('walkin');
+  setActiveOrderId(null);
+  setActiveDineinOrderId(null);
+  setHasNewItems(false);
+  setCurrentBatchTimestamp(null);
+  setSelectedTable(t.id.toString());
+  setWalkinTableId(t.id);
+  setZoneConfigId(t.config_id || null);
+  setCart([]);
+  setSelectedAddressId('');
+  setShowCart(true);
+  goToOrderView();
+};
+  useEffect(() => {
+    if (!token || !clientId) return;
+  
+    const fetchUsernameAndAddresses = async () => {
+      try {
+        const userId = getUserIdFromToken(token);
+        if (!userId) return;
+  
+        const usersRes = await axios.get(
+          `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/users`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const users = usersRes.data?.data?.users || [];
+        const match = users.find(u => u.client_id === clientId) || users[0];
+  
+        setCustomerDetails(prev => ({
+          ...prev,
+          customer_id: userId,
+          customer_name: match?.username || '',
+        }));
+  
+        if (match?.id) {
+          try {
+            const addrRes = await axios.get(
+              `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/address`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const addresses = addrRes.data?.data?.addresses || [];
+            setCustomerAddresses(addresses);
+          } catch {
+            setCustomerAddresses([]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch user info:', err?.response?.data || err.message);
+      }
+    };
+  
+    fetchUsernameAndAddresses();
+  }, [clientId, token]);
   /**
    * goToOrderView — switches to the order view and ensures the cart panel
    * is always visible so the waiter sees items immediately.
@@ -2186,7 +656,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       return;
     }
     try {
-      setLoading(true);
+      // setLoading(true);
       const headers = { Authorization: `Bearer ${token}` };
       const oldTableId = Number(selectedTable);
       const newTableId = newTable.id;
@@ -2219,166 +689,175 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     } catch (err) {
       console.error('[Transfer] Failed:', err);
       toast.error('Transfer failed');
-    } finally {
-      setLoading(false);
+    } finally { 
+      console.log("error");
+      
+      // setLoading(false);
     }
   };
-
-  const handleTableSelect = async (table) => {
+  
+  const selectOrderTable = async ({
+    table,
+    mode = "dinein",
+    restoreDraft = false,
+    openTakeawayModal = false,
+  }) => {
     const tableIdStr = table.id.toString();
-
+    const resolvedZoneConfigId = table.config_id || null;
+  
     setActiveOrderId(null);
     setActiveDineinOrderId(null);
     setHasNewItems(false);
     setCurrentBatchTimestamp(null);
-    setOrderMode('dinein');
+  
+    setOrderMode(mode);
     setSelectedTable(tableIdStr);
-    setDineinTableId(tableIdStr);
-    const matchedSection = sections.find(
-      s => s.zone === table.location_zone && s.section === table.section
-    );
-    const resolvedZoneConfigId = matchedSection ? matchedSection.id : null;
     setZoneConfigId(resolvedZoneConfigId);
-    const draft = await readDraft(tableIdStr, clientId, token);
-
-    if (draft) {
-      // Reconstruct cart from draft order items
-      const restoredCart = (draft.items || []).flatMap(item => {
-        const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
-        const mainKey = item.frontend_unique_key || `${item.item_id}_restored_${Date.now()}`;
-        const mainEntry = {
-          id: Number(item.item_id),
-          name: item.item_name || menuItem?.name || 'Item',
-          unit_price: item.unit_price ?? menuItem?.unit_price ?? 0,
-          discount: menuItem?.discount || 0,
-          image_id: menuItem?.image_id,
-          slug: item.slug || menuItem?.slug,
-          category: menuItem?.category_name,
-          category_id: menuItem?.category_id || null,
-          quantity: item.quantity || 1,
-          note: '',
-          frontend_unique_key: mainKey,
-          batch_timestamp: null,
-          is_new_item: true,
-          saved_sub_order: false,
-          status: 'draft',
-          is_addon: false,
-          parent_item_key: null,
-        };
-
-        // Restore linked addons that were saved as line_item_id on the draft item
-        const addonEntries = (item.line_item_id || []).map((addonId, idx) => {
-          const addonMenuItem = menuItems.find(mi => Number(mi.id) === Number(addonId));
-          if (!addonMenuItem) return null;
-          return {
-            id: Number(addonId),
-            name: addonMenuItem.name || 'Addon',
-            unit_price: addonMenuItem.unit_price ?? 0,
-            discount: addonMenuItem.discount || 0,
-            image_id: addonMenuItem.image_id,
-            slug: addonMenuItem.slug,
-            category: addonMenuItem.category_name,
-            category_id: addonMenuItem.category_id || null,
-            quantity: 1,
-            note: '',
-            frontend_unique_key: `${addonId}_addon_${mainKey}_${idx}`,
+  
+    if (mode === "dinein") {
+      setDineinTableId(tableIdStr);
+    }
+  
+    if (restoreDraft) {
+      const draft = await readDraft(tableIdStr, clientId, token);
+  
+      if (draft) {
+        const restoredCart = (draft.items || []).flatMap(item => {
+          const menuItem = menuItems.find(
+            mi => Number(mi.id) === Number(item.item_id)
+          );
+  
+          const mainKey =
+            item.frontend_unique_key ||
+            `${item.item_id}_restored_${Date.now()}`;
+  
+          const mainEntry = {
+            id: Number(item.item_id),
+            name: item.item_name || menuItem?.name || "Item",
+            unit_price: item.unit_price ?? menuItem?.unit_price ?? 0,
+            discount: menuItem?.discount || 0,
+            image_id: menuItem?.image_id,
+            slug: item.slug || menuItem?.slug,
+            category: menuItem?.category_name,
+            category_id: menuItem?.category_id || null,
+            quantity: item.quantity || 1,
+            note: "",
+            frontend_unique_key: mainKey,
             batch_timestamp: null,
             is_new_item: true,
             saved_sub_order: false,
-            status: 'draft',
-            is_addon: true,
-            parent_item_key: mainKey,
+            status: "draft",
+            is_addon: false,
+            parent_item_key: null,
           };
-        }).filter(Boolean);
-
-        return [mainEntry, ...addonEntries];
-      });
-
-      setCart(restoredCart);
-      setHasNewItems(true);
-      setDraftSavedAt(Date.now());
-      setShowCart(true);
-      if (draft.customer_id || draft.contact_phone) {
+  
+          const addonEntries = (item.line_item_id || [])
+            .map((addonId, idx) => {
+              const addonMenuItem = menuItems.find(
+                mi => Number(mi.id) === Number(addonId)
+              );
+  
+              if (!addonMenuItem) return null;
+  
+              return {
+                id: Number(addonId),
+                name: addonMenuItem.name,
+                unit_price: addonMenuItem.unit_price ?? 0,
+                discount: addonMenuItem.discount || 0,
+                image_id: addonMenuItem.image_id,
+                slug: addonMenuItem.slug,
+                category: addonMenuItem.category_name,
+                category_id: addonMenuItem.category_id || null,
+                quantity: 1,
+                note: "",
+                frontend_unique_key: `${addonId}_addon_${mainKey}_${idx}`,
+                batch_timestamp: null,
+                is_new_item: true,
+                saved_sub_order: false,
+                status: "draft",
+                is_addon: true,
+                parent_item_key: mainKey,
+              };
+            })
+            .filter(Boolean);
+  
+          return [mainEntry, ...addonEntries];
+        });
+  
+        setCart(restoredCart);
+        setHasNewItems(true);
+        setDraftSavedAt(Date.now());
+  
         setCustomerDetails({
-          customer_id: draft.customer_id || '',
-          contact_phone: draft.contact_phone || '',
+          customer_id: draft.customer_id || "",
+          contact_phone: draft.contact_phone || "",
+        });
+  
+        toast.info("Draft restored for this table.", {
+          autoClose: 2000,
         });
       } else {
-        setCustomerDetails({ customer_id: '', contact_phone: '' });
+        setCart([]);
+        setDraftSavedAt(null);
+        setCustomerDetails({
+          customer_id: "",
+          contact_phone: "",
+        });
       }
-      toast.info('Draft restored for this table.', { autoClose: 2000 });
     } else {
       setCart([]);
-      setDraftSavedAt(null);
-      setCustomerDetails({ customer_id: '', contact_phone: '' });
-      setShowCart(true);
+      setCustomerDetails({
+        customer_id: "",
+        contact_phone: "",
+      });
     }
-
+  
+    setShowCart(true);
+  
+    if (openTakeawayModal) {
+      setShowTakeawayOrdersModal(true);
+    }
+  
     goToOrderView();
   };
+  const handleTableSelect = async (table) => {
+    await selectOrderTable({
+      table,
+      mode: "dinein",
+      restoreDraft: true,
+    });
+  };
 
-  const handleTakeawaySelect = () => {
+  const handleTakeawaySelect = async () => {
     if (!takeawayTables.length) {
-      toast.error('No takeaway table configured');
+      toast.error("No takeaway table configured");
       return;
     }
-    setShowTakeawayOrdersModal(true);
-    const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
-    setOrderMode('takeaway');
-    setSelectedTable(tableIdStr);
-    setActiveOrderId(null);
-    setActiveDineinOrderId(null);
-    setCart([]);
-    setCustomerDetails({ customer_id: '', contact_phone: '' });
-    setShowCart(true);
-
-    // Set takeaway zone_config_id so correct prices are fetched
+  
+    const tableIdStr = (
+      takeawayTableId || takeawayTables[0].id
+    ).toString();
+  
     const takeawayTable = tables.find(
-      t => String(t.id) === String(tableIdStr)
+      t => String(t.id) === tableIdStr
     );
-    
-    const matchedSection = takeawaySections.find(
-      s =>
-        s.zone === takeawayTable?.location_zone &&
-        s.section === takeawayTable?.section
-    );
-    
-    const takeawayZoneConfigId = matchedSection?.id || null;
-    
-    console.log("TAKEAWAY TABLE:", takeawayTable);
-    console.log("MATCHED TAKEAWAY SECTION:", matchedSection);
-    console.log("ZONE CONFIG:", takeawayZoneConfigId);
-    
-    setZoneConfigId(takeawayZoneConfigId);
-
-    goToOrderView();
+  
+    await selectOrderTable({
+      table: takeawayTable,
+      mode: "takeaway",
+      restoreDraft: false,
+      openTakeawayModal: true,
+    });
   };
   const handleTakeawayOrderSelected = async (existingOrder) => {
     const tableIdStr = (takeawayTableId || takeawayTables[0].id).toString();
+    const takeawayTable = tables.find(t => String(t.id) === tableIdStr);
+    const takeawayZoneConfigId = takeawayTable?.config_id || null; 
     setOrderMode('takeaway');
     setSelectedTable(tableIdStr);
-
-    // Set takeaway zone_config_id so correct prices are fetched
-    const takeawayTable = tables.find(
-      t => String(t.id) === String(tableIdStr)
-    );
-    
-    const matchedSection = takeawaySections.find(
-      s =>
-        s.zone === takeawayTable?.location_zone &&
-        s.section === takeawayTable?.section
-    );
-    
-    const takeawayZoneConfigId = matchedSection?.id || null;
-    
-    console.log("TAKEAWAY TABLE:", takeawayTable);
-    console.log("MATCHED TAKEAWAY SECTION:", matchedSection);
-    console.log("ZONE CONFIG:", takeawayZoneConfigId);
-    
     setZoneConfigId(takeawayZoneConfigId);
-
+  
     if (!existingOrder) {
-      // New order
       setActiveOrderId(null);
       setActiveDineinOrderId(null);
       setCart([]);
@@ -2386,8 +865,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       setCurrentBatchTimestamp(null);
       setDraftSavedAt(null);
     } else {
-      // Resume existing order — reconstruct cart as old (read-only) items
-      const reconstructedCart = (existingOrder.items || []).map(item => {
+      const reconstructedCart = relinkCartItemsToParents(
+         (existingOrder.items || []).map(item => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
         return {
           id: Number(item.item_id),
@@ -2408,7 +887,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
         };
-      });
+      }));
       setCart(reconstructedCart);
       setActiveOrderId(existingOrder.id);
       setActiveDineinOrderId(existingOrder.dinein_order_id);
@@ -2426,7 +905,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       return;
     }
     try {
-      setLoading(true);
+      // setLoading(true);
       const r = await axios.get(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
         { headers: { Authorization: `Bearer ${token}` } }
@@ -2443,7 +922,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         (a, b) => new Date(b.created_at) - new Date(a.created_at)
       )[0];
 
-      const reconstructedCart = (activeOrder.items || []).map(item => {
+      const reconstructedCart = relinkCartItemsToParents(
+        (activeOrder.items || []).map(item => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
         return {
           id: Number(item.item_id),
@@ -2465,14 +945,12 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           batch_label: item.batch_label,
           sub_order_id: item.sub_order_id,
         };
-      });
+      }));
 
       setCart(reconstructedCart);
       setSelectedTable(table.id.toString());
-      const matchedSection = sections.find(
-        s => s.zone === table.location_zone && s.section === table.section
-      );
-      setZoneConfigId(matchedSection ? matchedSection.id : null);
+      const tableObj = tables.find(t => t.id === table.id);
+      setZoneConfigId(tableObj?.config_id || null);
       setOrderMode('dinein');
       setActiveOrderId(activeOrder.id);
       setActiveDineinOrderId(activeOrder.dinein_order_id);
@@ -2484,7 +962,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       console.error(err);
       alert('Failed to load order');
     } finally {
-      setLoading(false);
+      console.log("error");
+      
+      // setLoading(false);
     }
   };
 
@@ -2492,26 +972,54 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     // Leave cart & draft untouched — waiter can return to same table
     goToFloor();
   };
+  const initializeTakeOrder = useCallback(async () => {
+    if (!clientId || !token) return;
+  
+    try {
+      await Promise.all([
+        fetchTables(),
+        fetchTableOrders()
+      ]);
+    } catch (err) {
+      console.error("TakeOrder initialization failed:", err);
+    }
+  }, [clientId, token]);
+  useEffect(() => {
+    initializeTakeOrder();
+  }, [initializeTakeOrder]);
+
+  const hasAutoModeSelectRef = useRef(false);
+
+useEffect(() => {
+  if (hasAutoModeSelectRef.current) return;
+  if (tables.length === 0) return; // wait until tables have actually loaded
+
+  const dineinTableCount = tables.length - takeawayTables.length - walkinTables.length - deliveryTables.length;
+  const hasDineinTables = dineinTableCount > 0;
+
+  const availableModes = [
+    hasDineinTables && 'dinein',
+    walkinTables.length > 0 && 'walkin',
+    takeawayTables.length > 0 && 'takeaway',
+    deliveryTables.length > 0 && 'delivery',
+  ].filter(Boolean);
+
+  hasAutoModeSelectRef.current = true;
+
+  // Only auto-jump when dine-in isn't an option AND exactly one other mode is.
+  // If there's a real choice to make (dine-in exists, or multiple non-dinein
+  // modes exist), leave the floor view up so the user picks.
+  if (!hasDineinTables && availableModes.length === 1) {
+    const onlyMode = availableModes[0];
+    if (onlyMode === 'walkin') handleWalkInSelect();
+    else if (onlyMode === 'takeaway') handleTakeawaySelect();
+    else if (onlyMode === 'delivery') handleDeliverySelect();
+  }
+}, [tables, takeawayTables, walkinTables, deliveryTables]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Cart operations
   // ─────────────────────────────────────────────────────────────────────────
-
-  const getGroupedCartItems = (items) => {
-    const grouped = [];
-    const processed = new Set();
-    items.forEach(item => {
-      const key = item.frontend_unique_key || item.id;
-      if (processed.has(key)) return;
-      if (!item.parent_item_key) {  // ← parent items have no parent_item_key
-        const children = items.filter(i => i.parent_item_key === item.frontend_unique_key);
-        grouped.push({ main: { ...item }, addons: children });
-        processed.add(key);
-        children.forEach(c => processed.add(c.frontend_unique_key || c.id));
-      }
-    });
-    return grouped;
-  };
 
   const getTotalPrice = () =>
     cart
@@ -2519,108 +1027,93 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       .reduce((t, i) => t + (i.unit_price || 0) * i.quantity, 0)
       .toFixed(2);
 
-      const buildCartItem = (item, extra = {}) => {
-        const ts = Date.now() + Math.random();
-        const { _item_type, ...cleanExtra } = extra;
-
-        const typePrefix = _item_type || 'main';
-        const parentKey = cleanExtra.parent_item_key || '';
-        const key = parentKey
-          ? `${typePrefix}_${parentKey}_${item.id}_${ts}`
-          : `${typePrefix}_${item.id}_${ts}`;
+      const addToCart = (item, parentItemKey = null, onCommitted = null,batchOverride = null, alwaysNew = false) => {
+        const currentAvailability = getAvailability(item);
+        const hasStockTracking = currentAvailability != null;
       
-        return {
-          id: Number(item.id),
-          name: item.name,
-          image_id: item.image_id,
-          unit_price: (item.unit_price || 0) * (1 - (Number(item.discount) || 0) / 100),
-          slug: item.slug,
-          category: item.category_name,
-          category_id: item.category_id || null,
-          quantity: 1,
-          note: '',
-          frontend_unique_key: key,
-          is_new_item: true,
-          saved_sub_order: false,
-          is_addon: false,
-          parent_item_key: null,
-          ...cleanExtra,
+        const commit = () => {
+          setHasNewItems(true);
+          let batch = batchOverride || currentBatchTimestamp;
+          if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+      
+          if (hasStockTracking) adjustAvailability(item.id, -1);
+      
+          if (!parentItemKey && !alwaysNew) {
+            const existingIndex = cart.findIndex(
+              ci => ci.id === Number(item.id) && ci.is_new_item && !ci.saved_sub_order && !ci.is_addon
+            );
+            if (existingIndex !== -1) {
+              const existingKey = cart[existingIndex].frontend_unique_key;
+              setCart(prev => prev.map((ci, idx) => idx === existingIndex ? { ...ci, quantity: ci.quantity + 1 } : ci));
+              if (!isMobile) setShowCart(true);
+              onCommitted && onCommitted(existingKey);
+              return existingKey;
+            }
+          }
+      
+          const newItem = buildCartItem(item, {
+            batch_timestamp: batch,
+            parent_item_key: parentItemKey,
+            is_addon: !!parentItemKey,
+          });
+          setCart(prev => [...prev, newItem]);
+          if (!isMobile) setShowCart(true);
+          onCommitted && onCommitted(newItem.frontend_unique_key);
+          return newItem.frontend_unique_key;
         };
+      
+        if (hasStockTracking && currentAvailability <= 0) {
+          setPendingStockConfirm({ item, onConfirm: commit });
+          return null; // added only if user confirms
+        }
+      
+        return commit();
       };
 
-  const addToCart = (item, parentItemKey = null) => {
-    // Count how many of this item are already in the new (unsaved) cart
-    const alreadyInCart = cart
-      .filter(i => i.id === item.id && i.is_new_item && !i.saved_sub_order)
-      .reduce((sum, i) => sum + i.quantity, 0);
-
-    const available = Number(item.availability ?? Infinity);
-
-    if (available > 0 && alreadyInCart >= available) {
-      setStockWarning({
-        itemName: item.name,
-        available,
-      });
-      return null;
-    }
-
-    setHasNewItems(true);
-    let batch = currentBatchTimestamp;
-    if (!batch) {
-      batch = Date.now();
-      setCurrentBatchTimestamp(batch);
-    }
-
-    if (!parentItemKey) {
-      const existingIndex = cart.findIndex(
-        ci => ci.id === Number(item.id) && ci.is_new_item && !ci.saved_sub_order && !ci.is_addon
-      );
-      if (existingIndex !== -1) {
-        setCart(prev =>
-          prev.map((ci, idx) =>
-            idx === existingIndex ? { ...ci, quantity: ci.quantity + 1 } : ci
-          )
-        );
-        if (!isMobile) setShowCart(true);
-        return cart[existingIndex].frontend_unique_key;
-      }
-    }
-
-    const newItem = buildCartItem(item, {
-      batch_timestamp: batch,
-      parent_item_key: parentItemKey,
-      is_addon: !!parentItemKey,
-    });
-    setCart(prev => [...prev, newItem]);
-    if (!isMobile) setShowCart(true);
-    return newItem.frontend_unique_key;
-  };
-
-  const removeFromCart = (itemId, uniqueKey = null) => {
-    setHasNewItems(true);
-    if (uniqueKey) {
-      setCart(prev =>
-        prev.filter(i =>
-          i.frontend_unique_key !== uniqueKey && i.parent_item_key !== uniqueKey
-        )
-      );
-    } else {
-      setCart(prev => prev.filter(i => i.id !== itemId));
-    }
-  };
+      const removeFromCart = (itemId, uniqueKey = null) => {
+        setHasNewItems(true);
+        const removed = uniqueKey
+          ? cart.filter(i => i.frontend_unique_key === uniqueKey || i.parent_item_key === uniqueKey)
+          : cart.filter(i => i.id === itemId);
+      
+        removed.forEach(i => {
+          if (getAvailability(i) != null) adjustAvailability(i.id, i.quantity);
+        });
+      
+        if (uniqueKey) {
+          setCart(prev => prev.filter(i => i.frontend_unique_key !== uniqueKey && i.parent_item_key !== uniqueKey));
+        } else {
+          setCart(prev => prev.filter(i => i.id !== itemId));
+        }
+      };
 
   const updateQuantity = (itemId, change, uniqueKey = null) => {
-    setHasNewItems(true);
-    setCart(prev =>
-      prev.map(item => {
-        const match = uniqueKey
-          ? item.frontend_unique_key === uniqueKey
-          : item.id === itemId && !item.frontend_unique_key;
-        if (!match) return item;
-        const q = item.quantity + change;
-        return q > 0 ? { ...item, quantity: q } : null;
-      }).filter(Boolean)
+    const cartItem = cart.find(i =>
+      uniqueKey ? i.frontend_unique_key === uniqueKey : (i.id === itemId && !i.frontend_unique_key)
     );
+    const currentAvailability = cartItem ? getAvailability(cartItem) : null;
+    const hasStockTracking = currentAvailability != null;
+  
+    const commit = () => {
+      setHasNewItems(true);
+      if (hasStockTracking) adjustAvailability(itemId, -change); // change>0 decrements, change<0 gives back
+      setCart(prev =>
+        prev.map(item => {
+          const match = uniqueKey
+            ? item.frontend_unique_key === uniqueKey
+            : item.id === itemId && !item.frontend_unique_key;
+          if (!match) return item;
+          const q = item.quantity + change;
+          return q > 0 ? { ...item, quantity: q } : null;
+        }).filter(Boolean)
+      );
+    };
+  
+    if (change > 0 && hasStockTracking && currentAvailability <= 0) {
+      setPendingStockConfirm({ item: cartItem, onConfirm: commit });
+      return;
+    }
+    commit();
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -2651,7 +1144,8 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
         return;
       }
 
-      const rebuiltOldItems = order.items.map(item => {
+      const rebuiltOldItems = relinkCartItemsToParents(
+        order.items.map(item => {
         const menuItem = menuItems.find(mi => Number(mi.id) === Number(item.item_id));
         return {
           id: Number(item.item_id),
@@ -2674,7 +1168,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           sub_order_id: item.sub_order_id,
           parent_item_key: item.parent_item_key || null,
         };
-      });
+      }));
 
       setCart(prev => {
         const unsavedNew = prev.filter(ci => ci.is_new_item && !ci.saved_sub_order);
@@ -2697,7 +1191,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
 
     try {
-      setLoading(true);
+      // setLoading(true);
 
       await axios.delete(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
@@ -2738,6 +1232,26 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
           ));
         }
       }
+      if (transactionType === 'ITEM_CANCELLED') {
+        const currentAvail = availabilityMap[item.id];
+        if (currentAvail != null) {
+          const restored = Number(currentAvail) + removeQty;
+          const menuRecord = menuItems.find(mi => Number(mi.id) === Number(item.id));
+          if (menuRecord) {
+            adjustAvailability(item.id, removeQty);
+            try {
+              await axios.post(
+                `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+                { id: item.id, client_id: clientId, availability: restored, zone_config_id: menuRecord.zone_config_id ?? null },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              menuCache.patchAvailability(clientId, { [item.id]: restored });
+            } catch (err) {
+              console.error(`Failed to restore stock for item ${item.id}:`, err);
+            }
+          }
+        }
+      }
       toast.success(
         newQty > 0
           ? `Quantity reduced to ${newQty}. (${transactionType})`
@@ -2748,7 +1262,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       console.error('[handleOldItemRemoveOne] failed:', err);
       toast.error('Failed to update item quantity.');
     } finally {
-      setLoading(false);
+      console.log("error");
+      
+      // setLoading(false);
     }
   };
 
@@ -2761,7 +1277,7 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
     }
 
     try {
-      setLoading(true);
+      // setLoading(true);
 
       // ✅ FIX: if this is a parent, find all saved children by parent_item_key
       const itemsToDelete = item.parent_item_key
@@ -2773,7 +1289,26 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
               i.parent_item_key === item.frontend_unique_key
           ),
         ];
-
+        if (transactionType === 'ITEM_CANCELLED') {
+          const currentAvail = availabilityMap[item.id];
+          if (currentAvail != null) {
+            const restored = Number(currentAvail) + item.quantity;
+            const menuRecord = menuItems.find(mi => Number(mi.id) === Number(item.id));
+            if (menuRecord) {
+              adjustAvailability(item.id, item.quantity);
+              try {
+                await axios.post(
+                  `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+                  { id: item.id, client_id: clientId, availability: restored, zone_config_id: menuRecord.zone_config_id ?? null },
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+                menuCache.patchAvailability(clientId, { [item.id]: restored });
+              } catch (err) {
+                console.error(`Failed to restore stock for item ${item.id}:`, err);
+              }
+            }
+          }
+        }
       await Promise.all(itemsToDelete.map(targetItem =>
         axios.delete(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
@@ -2795,7 +1330,9 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
       console.error('[handleOldItemRemoveAll] failed:', err);
       toast.error('Failed to remove item.');
     } finally {
-      setLoading(false);
+      console.log("error");
+      
+      // setLoading(false);
     }
   };
   // ─────────────────────────────────────────────────────────────────────────
@@ -2866,60 +1403,84 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
               _item_type: 'cchild',
             })
           );
-    
           return [...prev, comboParentEntry, ...childEntries];
         });
-    
+        if (getAvailability(item) != null) adjustAvailability(item.id, -1);
+        linkedItems.forEach(comp => {
+          if (getAvailability(comp) != null) adjustAvailability(comp.id, -1);
+        });
         setHasNewItems(true);
         if (!isMobile) setShowCart(true);
     
       } else {
-      // Show addon picker
-      if (linkedItems.length > 0) {
-        setSelectedMainItem(item);
-        setLineItemsDetails(linkedItems);
-        setLineItemsModalOpen(true);
-      } else {
-        addToCart(item);
-      }
+    // Split real add-ons from packaging/container items
+    const packagingItems = linkedItems.filter(li => isPackagingCategoryId(li.category_id, categoriesFlat));
+    const regularAddons = linkedItems.filter(li => !isPackagingCategoryId(li.category_id, categoriesFlat));
+
+    if (regularAddons.length > 0) {
+      // Show modal with ONLY real add-ons; packaging is auto-handled after selection
+      setSelectedMainItem(item);
+      setLineItemsDetails(regularAddons);
+      setPendingPackagingItems(packagingItems);
+      setLineItemsModalOpen(true);
+    } else {
+      // Nothing but packaging linked — skip modal, add item directly
+      let batch = currentBatchTimestamp;
+      if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+      const mainKey = addToCart(item);
+      attachPackagingIfTakeaway(mainKey, batch, packagingItems);
     }
-  };
+  }
+};
 
-  const handleAddMainItemWithSelectedAddons = (selectedAddonIds) => {
-    if (!selectedMainItem) return;
-    let batch = currentBatchTimestamp;
-    if (!batch) {
-      batch = Date.now();
-      setCurrentBatchTimestamp(batch);
-    }
+  const handleAddMainItemWithSelectedAddons = (selectedAddonIds) => { 
+  if (!selectedMainItem) return;
+  let batch = currentBatchTimestamp;
+  if (!batch) {
+    batch = Date.now();
+    setCurrentBatchTimestamp(batch);
+  }
 
-    const mainKey = addToCart(selectedMainItem);
+  const selectedAddons = lineItemsDetails.filter(i => selectedAddonIds.includes(i.id));
+  const packaging = pendingPackagingItems;
 
-    lineItemsDetails
-      .filter(i => selectedAddonIds.includes(i.id))
-      .forEach(addon => {
-        const addonEntry = buildCartItem(addon, {
-          batch_timestamp: batch,
-          parent_item_key: mainKey,
-          is_addon: true, _item_type: 'addon', 
-        });
-        setCart(prev => [...prev, addonEntry]);
+  const attachDependents = (mainKey) => {
+    selectedAddons.forEach(addon => {
+      const addonEntry = buildCartItem(addon, {
+        batch_timestamp: batch,
+        parent_item_key: mainKey,
+        is_addon: true, _item_type: 'addon',
       });
-
-    setHasNewItems(true);
-    setLineItemsModalOpen(false);
-    setSelectedMainItem(null);
-    setLineItemsDetails([]);
+      setCart(prev => [...prev, addonEntry]);
+      if (getAvailability(addon) != null) adjustAvailability(addon.id, -1);
+    });
+    attachPackagingIfTakeaway(mainKey, batch, packaging);
   };
+
+  // handleAddMainItemWithSelectedAddons
+addToCart(selectedMainItem, null, attachDependents, batch, true);
+
+  setHasNewItems(true);
+  setLineItemsModalOpen(false);
+  setSelectedMainItem(null);
+  setLineItemsDetails([]);
+  setPendingPackagingItems([]);
+};
 
   const handleAddMainItemOnly = () => {
-    if (!selectedMainItem) return;
-    addToCart(selectedMainItem);
-    setLineItemsModalOpen(false);
-    setSelectedMainItem(null);
-    setLineItemsDetails([]);
-    if (!isMobile) setShowCart(true);
-  };
+  if (!selectedMainItem) return;
+  let batch = currentBatchTimestamp;
+  if (!batch) { batch = Date.now(); setCurrentBatchTimestamp(batch); }
+
+  const mainKey = addToCart(selectedMainItem, null, null, batch, true);
+  attachPackagingIfTakeaway(mainKey, batch, pendingPackagingItems);
+
+  setLineItemsModalOpen(false);
+  setSelectedMainItem(null);
+  setLineItemsDetails([]);
+  setPendingPackagingItems([]);
+  if (!isMobile) setShowCart(true);
+};
 
   // ─────────────────────────────────────────────────────────────────────────
   // Place order
@@ -2933,6 +1494,10 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
 
   const handlePlaceOrder = async () => {
     if (isPlacingRef.current || !canPlaceOrder) return;
+    if (orderMode === 'delivery' && !customerDetails.shipping_address?.trim()) {
+      toast.error('Please enter a delivery address');
+      return;
+    }
     isPlacingRef.current = true;
     setIsPlacingOrder(true);
 
@@ -2957,6 +1522,7 @@ const buildOrderPayload = (items) =>
     try {
       const headers = { Authorization: `Bearer ${token}` };
       let placedOrderId = null;
+      let placedDineinOrderId = activeDineinOrderId;
 
       if (activeOrderId && activeDineinOrderId) {
         const newOnly = cart.filter(i => i.is_new_item && !i.saved_sub_order);
@@ -2970,7 +1536,8 @@ const buildOrderPayload = (items) =>
             { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId } }
           );
           placedOrderId = activeOrderId;
-          toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
+          placedDineinOrderId = r?.data?.data?.dinein_order_id || activeDineinOrderId;
+          // toast.success(`Sub-order ${r.data.data.dinein_order_id} created!`);
         }
       } else {
         const existingDraft = await readDraft(selectedTable, clientId, token);
@@ -2999,6 +1566,7 @@ const buildOrderPayload = (items) =>
             { headers }
           );
           placedOrderId = existingDraft.id;
+          placedDineinOrderId = String(existingDraft.id);
         } else {
           const createRes = await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
@@ -3011,13 +1579,17 @@ const buildOrderPayload = (items) =>
               total_price: total,
               status: 'pending',
               items: itemsPayload,
+              customer_id: customerDetails.customer_id || getUserIdFromToken(token) || '',
+              contact_phone: customerDetails.contact_phone || '',
+              contact_email: customerDetails.contact_email || '',          
             },
             { headers }
           );
           placedOrderId = createRes?.data?.data?.id;
+          placedDineinOrderId = createRes?.data?.data?.dinein_order_id || String(placedOrderId);
         }
 
-        if (orderMode !== 'takeaway') {
+        if (!['takeaway', 'walkin', 'delivery'].includes(orderMode)) {
           const tableToUpdate = tables.find(t => t.id.toString() === selectedTable);
           if (tableToUpdate) {
             await axios.post(
@@ -3039,12 +1611,28 @@ const buildOrderPayload = (items) =>
         const tableObj = tables.find(t => t.id.toString() === selectedTable);
         const orderSubtotal = cart.filter(i => !(i.frontend_unique_key || '').startsWith('cchild_'))
                                   .reduce((s, i) => s + (i.unit_price || 0) * i.quantity, 0);
+        let resolvedCustomerId = customerDetails.customer_id;
+        try {
+          const custRes = await axios.post(
+            `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/customer/find_or_create`,
+            {
+              contact_email: customerDetails.contact_email,
+              contact_phone: customerDetails.contact_phone,
+              shipping_address: customerDetails.shipping_address,
+              customer_id: customerDetails.customer_id,
+            },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          resolvedCustomerId = custRes.data?.data?.person_id || resolvedCustomerId;
+        } catch (err) {
+          console.error('Failed to resolve/create customer:', err.response?.data || err.message);
+        }
         await upsertBillingDocumentForCustomer({
           clientId,
           token,
           orderId: placedOrderId,
           tableRef: tableObj?.table_number || `Table ${selectedTable}`,
-          customerDetails,
+          customerDetails: { ...customerDetails, customer_id: resolvedCustomerId },
           orderSubtotal,
         });
       }
@@ -3066,11 +1654,30 @@ const buildOrderPayload = (items) =>
         meta: {
           tableNumber: tableObj?.table_number || selectedTable,
           orderMode,
-          dineinOrderId: activeDineinOrderId,
+          dineinOrderId: placedDineinOrderId,
           timestamp: new Date(),
         },
       });
-
+      const orderedItemIds = new Set(
+        cart
+          .filter(i => i.is_new_item && !i.saved_sub_order && !i.is_addon && !(i.frontend_unique_key || '').startsWith('cchild_'))
+          .map(i => i.id)
+      );
+      
+      // ✅ Reflect the reservation in the UI immediately — but do NOT persist to
+      // the DB here. Real deduction happens server-side only when the order is
+      // marked "served" (via _deduct_stock_for_order in update_order_status_service).
+      const idToAvailability = {};
+      Array.from(orderedItemIds).forEach(itemId => {
+        const newAvailability = availabilityMap[itemId];
+        if (newAvailability == null) return; // item doesn't track stock
+        idToAvailability[itemId] = newAvailability;
+      });
+      
+      if (Object.keys(idToAvailability).length > 0) {
+        // client-side cache only — no axios call, so DB availability is untouched
+        menuCache.patchAvailability(clientId, idToAvailability);
+      }
       setCart([]);
       setActiveOrderId(null);
       setActiveDineinOrderId(null);
@@ -3078,8 +1685,9 @@ const buildOrderPayload = (items) =>
       setCurrentView('floor');
       setCurrentBatchTimestamp(null);
       setHasNewItems(false);
-      setCustomerDetails({ customer_id: '', contact_phone: '' });
-      toast.success('Order placed!');
+      setCustomerDetails({ customer_id: '', contact_phone: '', contact_email: '', shipping_address: '' });
+      setSelectedAddressId('');
+      // toast.success('Order placed!');
     } catch (err) {
       console.error('ORDER ERROR:', err);
       toast.error('Order failed');
@@ -3089,6 +1697,24 @@ const buildOrderPayload = (items) =>
     }
   };
 
+  const fetchUniqueCustomers = async () => {
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/customer/search`,
+        { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId } }
+      );
+      setCustomersList(res.data?.data?.customers || []);
+    } catch (err) {
+      console.error('Failed to fetch customers:', err);
+      setCustomersList([]);
+    }
+  };
+  
+  useEffect(() => {
+    if (clientId && token) {
+      fetchUniqueCustomers();
+    }
+  }, [clientId, token]);
   // ─────────────────────────────────────────────────────────────────────────
   // Clear cart
   // ─────────────────────────────────────────────────────────────────────────
@@ -3109,7 +1735,7 @@ const buildOrderPayload = (items) =>
     setActiveDineinOrderId(null);
     setCurrentBatchTimestamp(null);
     setHasNewItems(false);
-    setCustomerDetails({ customer_id: '', contact_phone: '' });
+    setCustomerDetails({ customer_id: '', contact_phone: '', contact_email: '', shipping_address: '' });
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -3119,13 +1745,60 @@ const buildOrderPayload = (items) =>
   const handleCancelOrder = async (orderId, tableId, reason) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-
+  
+      // 1. Fetch the order's items BEFORE cancelling, so we know what to restore
+      const orderRes = await axios.get(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+        { headers }
+      );
+      const orderGroup = (orderRes.data?.data || []).find(o => o.id === orderId);
+  
+      // 2. Cancel the order (unchanged)
       await axios.post(
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/cancel?order_id=${orderId}&reason=${encodeURIComponent(reason || '')}`,
         {},
         { headers }
       );
-
+  
+      // 3. Restore availability for every non-cancelled item in that order
+      if (orderGroup?.items?.length) {
+        const restoreQtyByItemId = {};
+        orderGroup.items.forEach(item => {
+          if ((item.status || '').toLowerCase() === 'cancelled') return;
+          const id = Number(item.item_id);
+          restoreQtyByItemId[id] = (restoreQtyByItemId[id] || 0) + (item.quantity || 0);
+        });
+  
+        const idToNewAvailability = {};
+        Object.entries(restoreQtyByItemId).forEach(([itemId, qty]) => {
+          const menuRecord = menuItems.find(mi => Number(mi.id) === Number(itemId));
+          const currentAvail = availabilityMap[itemId] ??
+            (menuRecord?.availability != null ? Number(menuRecord.availability) : null);
+          if (currentAvail == null) return; // item doesn't track stock
+          const restored = Number(currentAvail) + qty;
+          idToNewAvailability[itemId] = restored;
+          adjustAvailability(itemId, qty); // updates local state immediately
+        });
+  
+        const bulkItems = Object.entries(idToNewAvailability).map(([id, availability]) => ({
+          id: Number(id),
+          availability,
+        }));
+  
+        if (bulkItems.length > 0) {
+          try {
+            await axios.post(
+              `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
+              { items: bulkItems },
+              { headers }
+            );
+            menuCache.patchAvailability(clientId, idToNewAvailability);
+          } catch (err) {
+            console.error('Failed to restore stock after order cancel:', err);
+          }
+        }
+      }
+  
       toast.success('Order cancelled and transaction recorded.');
       await fetchTables();
     } catch (err) {
@@ -3159,7 +1832,7 @@ const buildOrderPayload = (items) =>
 
   const handleConfirmPaymentFromGrid = async (orderId, tableId) => {
     try {
-      setLoading(true);
+      // setLoading(true);
       const headers = { Authorization: `Bearer ${token}` };
 
       const docsRes = await axios.get(
@@ -3211,124 +1884,21 @@ const buildOrderPayload = (items) =>
       console.error('[handleConfirmPaymentFromGrid]', err);
       toast.error('Failed to confirm payment');
     } finally {
-      setLoading(false);
+      console.log("error");
+      
+      // setLoading(false);
     }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Bill / Invoice
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const combineDuplicateItems = (items) => {
-    const m = new Map();
-    items.forEach(item => {
-      const k = item.item_id.toString();
-      if (m.has(k)) m.get(k).quantity += item.quantity || 0;
-      else m.set(k, { ...item });
-    });
-    return Array.from(m.values());
-  };
-
-  const fetchBillingDocumentForOrder = async (orderId) => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { client_id: clientId },
-        }
-      );
-      const invoices = (res.data?.data || []).filter(
-        d => d.order_id?.toString() === orderId?.toString()
-      );
-      if (!invoices.length) return null;
-      invoices.sort(
-        (a, b) =>
-          (b.document_version || 1) - (a.document_version || 1) ||
-          new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0)
-      );
-      return invoices[0];
-    } catch {
-      return null;
-    }
-  };
 
   const handlePrintBill = async (orderId) => {
-    try {
-      setLoading(true);
-      const r = await axios.get(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const order = (r.data?.data || []).find(o => o.id === orderId);
-      if (!order) { toast.error('Order not found'); return; }
-  
-      const enriched = (order.items || []).map(item => {
-        const inv = inventoryMap[item.item_id] || {};
-        return {
-          ...item,
-          unit_price: item.unit_price ?? inv.unit_price ?? 0,
-          name: item.item_name ?? inv.name ?? 'Unnamed Item',
-        };
-      });
-  
-      const deduplicatedItems = deduplicateOrderItems(enriched);
-  
-      const billingDoc = await fetchBillingDocumentForOrder(orderId);
-      setInvoiceOrderData({
-        ...order,
-        items: deduplicatedItems,
-        customer_id: billingDoc?.customer_id || order.customer_id || '',
-        contact_phone: billingDoc?.contact_phone || order.contact_phone || '',
-        contact_email: billingDoc?.contact_email || order.contact_email || '',
-      });
-      setInvoiceModalOpen(true);
-    } catch (e) {
-      console.error(e);
-      toast.error('Failed to load order');
-    } finally {
-      setLoading(false);
-    }
-  };
+  await openInvoiceForOrder(orderId, customerDetails);
+};
 
-  const handleBillFromCart = async () => {
-    if (!activeOrderId) { toast.error('No active order'); return; }
-    try {
-      setLoading(true);
-      const r = await axios.get(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const order = (r.data?.data || []).find(o => o.id === activeOrderId);
-      if (!order) { toast.error('Order not found'); return; }
-  
-      const enriched = (order.items || []).map(item => {
-        const inv = inventoryMap[item.item_id] || {};
-        return {
-          ...item,
-          unit_price: item.unit_price ?? inv.unit_price ?? 0,
-          name: item.item_name ?? inv.name ?? 'Unnamed',
-        };
-      });
-  
-      const deduplicatedItems = deduplicateOrderItems(enriched);
-  
-      const billingDoc = await fetchBillingDocumentForOrder(activeOrderId);
-      setInvoiceOrderData({
-        ...order,
-        items: deduplicatedItems,
-        customer_id: customerDetails.customer_id || billingDoc?.customer_id || order.customer_id || '',
-        contact_phone: customerDetails.contact_phone || billingDoc?.contact_phone || order.contact_phone || '',
-        contact_email: billingDoc?.contact_email || order.contact_email || '',
-      });
-      setInvoiceModalOpen(true);
-    } catch (e) {
-      console.error(e);
-      toast.error('Failed to load order');
-    } finally {
-      setLoading(false);
-    }
-  };
+const handleBillFromCart = async () => {
+  if (!activeOrderId) { toast.error('No active order'); return; }
+  await openInvoiceForOrder(activeOrderId, customerDetails);
+};
 
   // ─────────────────────────────────────────────────────────────────────────
   // Derived values
@@ -3346,14 +1916,14 @@ const buildOrderPayload = (items) =>
     // ── 2. Dietary filter ──
     if (selectedDietary) {
       items = items.filter(item => {
-        const dietary = getDietaryFromSlug(item);
+        const dietary = getDietaryFromSlug(item,dietaryOptions);
         return dietary !== null && dietary === selectedDietary;
       });
     }
 
     // ── 3. Category filter — uses flat list for reliable traversal ──
     if (selectedCategoryId) {
-      const ids = getCategoryAndChildrenIds(selectedCategoryId); // ← no categories arg needed now
+      const ids = getCategoryAndChildrenIds(selectedCategoryId,categoriesFlat); // ← no categories arg needed now
       items = items.filter(i => ids.includes(i.category_id));
     }
 
@@ -3376,7 +1946,7 @@ const buildOrderPayload = (items) =>
   }, {});
   const batchTimestamps = Object.keys(groupedNewItems).sort();
 
-  const canPlaceOrder = orderMode === 'takeaway'
+  const canPlaceOrder = ['takeaway', 'walkin', 'delivery'].includes(orderMode)
     ? cart.filter(i => !i.parent_item_key).length > 0
     : activeOrderId
       ? hasNewItems && newItems.filter(i => !i.parent_item_key).length > 0
@@ -3395,13 +1965,23 @@ const buildOrderPayload = (items) =>
       {/* ══════════════ FLOOR VIEW ══════════════ */}
       {currentView === 'floor' && (
         <TableReservation
-          tables={tables.filter(t => !takeawayTables.some(tw => tw.id === t.id))}
+        tables={tables.filter(t =>
+          !takeawayTables.some(tw => tw.id === t.id) &&
+          !walkinTables.some(w => w.id === t.id) &&
+          !deliveryTables.some(d => d.id === t.id)
+        )}
           orderMode={orderMode}
           tableOrders={tableOrders}
           draftTableIds={draftTableIds}
+          hasDinein={tables.length > takeawayTables.length + walkinTables.length + deliveryTables.length}
+          hasWalkin={walkinTables.length > 0}
+          hasTakeaway={takeawayTables.length > 0}
+          hasDelivery={deliveryTables.length > 0}
           onSelectTable={handleTableSelect}
           onSelectTakeaway={handleTakeawaySelect}
           onSelectDineIn={() => setOrderMode('dinein')}
+          onSelectWalkIn={handleWalkInSelect}
+    onSelectDelivery={handleDeliverySelect}
           onViewOrder={handleViewOrder}
           onPrintBill={handlePrintBill}
           onCancelOrder={(orderId, tableId) =>
@@ -3423,7 +2003,7 @@ const buildOrderPayload = (items) =>
             <div className="xl:col-span-1 min-w-0 w-full overflow-hidden">
               <div className="lg:h-[calc(98dvh-4rem)] lg:overflow-y-auto pr-1">
                 <CategoryTree
-                  categories={sidebarCategories}
+                  categories={categories}
                   selectedCategoryId={selectedCategoryId}
                   onSelectCategory={setSelectedCategoryId}
                   defaultOpenAll
@@ -3452,7 +2032,7 @@ const buildOrderPayload = (items) =>
                     </button>
 
                     {/* Dietary type pills */}
-                    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-1 min-w-0 whitespace-nowrap py-1">
+                    <div className="flex gap-1.5 overflow-x-auto flex-1 min-w-0 whitespace-nowrap py-1">
                       <button
                         onClick={() => setSelectedDietary(null)}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all border
@@ -3464,7 +2044,7 @@ const buildOrderPayload = (items) =>
                       </button>
                       {dietaryOptions.map(type => {
                         const key = type.toLowerCase().replace(/[-_\s]/g, '');
-                        const count = menuItems.filter(item => getDietaryFromSlug(item) === key).length;
+                        const count = menuItems.filter(item => getDietaryFromSlug(item,dietaryOptions) === key).length;
                         return (
                           <button
                             key={key}
@@ -3502,8 +2082,12 @@ const buildOrderPayload = (items) =>
                   {filteredItems.map(item => {
                     const dp = item.discount && Number(item.discount) > 0
                       ? Number(item.discount).toFixed(0) : null;
-                    const ac = item.line_item_id?.length || 0;
-                    const dietary = getDietaryFromSlug(item);
+                    {/* OLD: const ac = item.line_item_id?.length || 0; */}
+                    const ac = (item.line_item_id || []).filter(id => {
+                      const li = menuItems.find(mi => Number(mi.id) === Number(id));
+                      return li ? !isPackagingCategoryId(li.category_id, categoriesFlat) : true;
+                    }).length;
+                    const dietary = getDietaryFromSlug(item,dietaryOptions);
                     const dietaryColor = dietary ? (dietaryColorMap[dietary] || '') : '';
                     return (
                       <div
@@ -3545,14 +2129,11 @@ const buildOrderPayload = (items) =>
                               </span>
                             )}
                           </div>
-                          {item.availability != null && (
-                            <p className={`text-[10px] font-semibold mt-0.5
-    ${Number(item.availability) <= 5
-                                ? 'text-red-500'
-                                : 'text-text-secondary'}`}>
-                              Qty: {Number(item.availability)}
-                            </p>
-                          )}
+                          {getAvailability(item) != null && (
+  <p className={`text-[10px] font-semibold mt-0.5 ${getAvailability(item) <= 5 ? 'text-red-500' : 'text-text-secondary'}`}>
+    Qty: {getAvailability(item)}
+  </p>
+)}
                           {ac > 0 && (
                             <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
                               ${isComboCategoryId(item.category_id)
@@ -3579,7 +2160,18 @@ const buildOrderPayload = (items) =>
                     {/* Cart header */}
                     <div className="pb-3 border-b space-y-2">
                       <h2 className="text-lg font-semibold text-gray-800">Your Order</h2>
-
+                      {orderMode === 'delivery' && (
+    <DeliveryDetailsSummary
+    value={customerDetails}
+    onClick={() => setShowDeliveryDetailsModal(true)}
+  />
+  )}
+                          <DeliveryDetailsModal
+                                   isOpen={showDeliveryDetailsModal}
+                                   onClose={() => setShowDeliveryDetailsModal(false)}
+                                   value={customerDetails}
+                                   onSave={setCustomerDetails}
+                                   customers={customersList} />
                       <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
                         <div className="flex items-center gap-2">
                           {orderMode === 'dinein' && selectedTable && (
@@ -3637,34 +2229,32 @@ const buildOrderPayload = (items) =>
                     </div>
 
                     {/* Dine-in / Takeaway toggle */}
-                    <div className="mt-3">
-                      <div className="flex bg-gray-100 rounded-lg p-1">
-                        <button
-                          onClick={() => {
-                            setOrderMode('dinein');
-                            if (dineinTableId) setSelectedTable(dineinTableId);
-                          }}
-                          className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                            ${orderMode === 'dinein'
-                              ? 'bg-action-primary text-white shadow-sm'
-                              : 'text-gray-600 hover:text-gray-800'}`}
-                        >
-                          <Users size={16} /> Dine In
-                        </button>
-                        <button
-                          onClick={() => {
-                            setOrderMode('takeaway');
-                            setSelectedTable(takeawayTableId?.toString());
-                          }}
-                          className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                            ${orderMode === 'takeaway'
-                              ? 'bg-action-primary text-white shadow-sm'
-                              : 'text-gray-600 hover:text-gray-800'}`}
-                        >
-                          <Package size={16} /> Takeaway
-                        </button>
-                      </div>
-                    </div>
+                  {['dinein', 'takeaway'].includes(orderMode) && (
+                      <div className="mt-3">
+                          <div className="flex bg-gray-100 rounded-lg p-1">
+                               <button onClick={() => {
+                                                      setOrderMode('dinein');
+                                                      if (dineinTableId) setSelectedTable(dineinTableId);
+                                                      syncPackagingForOrderMode('dinein'); }}
+                                        className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                                                    ${orderMode === 'dinein'
+                                                                      ? 'bg-action-primary text-white shadow-sm'
+                                                                      : 'text-gray-600 hover:text-gray-800'}`}>
+                                <Users size={16} /> Dine In
+                               </button>
+                               <button
+                                       onClick={() => {
+                                                      setOrderMode('takeaway');
+                                                      setSelectedTable(takeawayTableId?.toString());
+                                                      syncPackagingForOrderMode('takeaway'); }}
+                                        className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                                                    ${orderMode === 'takeaway'
+                                                                     ? 'bg-action-primary text-white shadow-sm'
+                                                                     : 'text-gray-600 hover:text-gray-800'}`}>
+                                <Package size={16} /> Takeaway
+                               </button>
+                          </div>
+                    </div>)}
 
                     {/* Cart body */}
                     {cart.length === 0 ? (
@@ -3852,14 +2442,14 @@ const buildOrderPayload = (items) =>
               {/* Dine-in / Takeaway toggle */}
               <div className="flex bg-gray-100 rounded-lg p-1 mb-3 flex-shrink-0">
                 <button
-                  onClick={() => { setOrderMode('dinein'); if (dineinTableId) setSelectedTable(dineinTableId); }}
+                  onClick={() => { setOrderMode('dinein'); if (dineinTableId) setSelectedTable(dineinTableId); syncPackagingForOrderMode('dinein'); }}
                   className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                     ${orderMode === 'dinein' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600'}`}
                 >
                   <Users size={16} /> Dine In
                 </button>
                 <button
-                  onClick={() => { setOrderMode('takeaway'); setSelectedTable(takeawayTableId?.toString()); }}
+                  onClick={() => { setOrderMode('takeaway'); setSelectedTable(takeawayTableId?.toString()); syncPackagingForOrderMode('takeaway'); }}
                   className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                     ${orderMode === 'takeaway' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600'}`}
                 >
@@ -3987,6 +2577,7 @@ const buildOrderPayload = (items) =>
           setLineItemsModalOpen(false);
           setSelectedMainItem(null);
           setLineItemsDetails([]);
+          setPendingPackagingItems([]);
         }}
         mainItem={selectedMainItem}
         lineItems={lineItemsDetails}
@@ -4050,7 +2641,10 @@ const buildOrderPayload = (items) =>
 
     return [...prev, comboParentEntry, ...childEntries];
   });
-
+  if (getAvailability(comboModalItem) != null) adjustAvailability(comboModalItem.id, -1);
+  comboModalComponents.forEach(comp => {
+    if (getAvailability(comp) != null) adjustAvailability(comp.id, -1);
+  });
   setHasNewItems(true);
   if (!isMobile) setShowCart(true);
 }}
@@ -4106,8 +2700,7 @@ const buildOrderPayload = (items) =>
           tablesMap={tables.reduce((m, t) => { m[t.id] = t; return m; }, {})}
           inventoryMap={inventoryMap}
           onClose={() => {
-            setInvoiceModalOpen(false);
-            setInvoiceOrderData(null);
+            closeInvoiceModal();
             fetchTables();
           }}
           onSave={id => {
@@ -4116,26 +2709,15 @@ const buildOrderPayload = (items) =>
           }}
         />
       )}
-      {stockWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl p-6 w-80 shadow-xl">
-            <h3 className="text-base font-bold text-red-600 mb-2">Stock Limit Reached</h3>
-            <p className="text-sm text-gray-600 mb-1">
-              <span className="font-semibold text-gray-800">{stockWarning.itemName}</span>
-            </p>
-            <p className="text-sm text-gray-500 mb-4">
-              Only <span className="font-bold text-red-500">{stockWarning.available}</span> available.
-              You've already added the maximum quantity.
-            </p>
-            <button
-              onClick={() => setStockWarning(null)}
-              className="w-full py-2.5 bg-action-primary text-white rounded-lg font-semibold text-sm hover:bg-action-danger"
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
+      <StockConfirmModal
+  pending={pendingStockConfirm}
+  onCancel={() => setPendingStockConfirm(null)}
+  onConfirmed={() => {
+    const { onConfirm } = pendingStockConfirm;
+    setPendingStockConfirm(null);
+    onConfirm && onConfirm();
+  }}
+/>
     </div>
   );
 };

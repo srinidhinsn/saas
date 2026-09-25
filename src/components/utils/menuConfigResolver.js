@@ -44,13 +44,29 @@ export function getMenuConfig(clientId) {
     import.meta.env.VITE_INVENTORY_CATEGORY_ROOT ??
     "inventory";
 
+  const takeawayTableRoot =
+    import.meta.env[`VITE_${prefix}_TAKEAWAY_TABLE_DEFAULT_ROOT`] ??
+    import.meta.env.VITE_TAKEAWAY_TABLE_DEFAULT_ROOT ??
+    "takeaway";
 
+    const walkinTableRoot =
+    import.meta.env[`VITE_${prefix}_WALKIN_TABLE_DEFAULT_ROOT`] ??
+    import.meta.env.VITE_WALKIN_TABLE_DEFAULT_ROOT ??
+    "walkin";
+  
+  const deliveryTableRoot =
+    import.meta.env[`VITE_${prefix}_DELIVERY_TABLE_DEFAULT_ROOT`] ??
+    import.meta.env.VITE_DELIVERY_TABLE_DEFAULT_ROOT ??
+    "delivery";
   return {
     root,
     level,
     menuInventoryId,
     inventoryCategoryRoot,
     addons,
+    takeawayTableRoot,
+    walkinTableRoot,
+    deliveryTableRoot
   };
 }
 
