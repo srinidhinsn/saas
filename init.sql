@@ -914,3 +914,7 @@ ALTER TABLE client ADD COLUMN subscription TEXT[] DEFAULT ARRAY['home']::TEXT[];
 
 ALTER TABLE billing_documents ADD COLUMN gst_number TEXT;
 ALTER TABLE client ADD COLUMN gst_number TEXT;
+
+UPDATE category
+SET sub_categories = array_cat(sub_categories, ARRAY['phonepe'])
+WHERE id = 'invoice' AND client_id = 'saas';

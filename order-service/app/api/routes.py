@@ -11,7 +11,7 @@ from models.order_model import (
     OrderItemModel,
     OrderStatusEnum,
     TransactionTypeEnum,
-    MovementTypeEnum,
+    MovementTypeEnum,_discover_realms,resolve_realm_from_context
 )
 from utils.auth import verify_token
 from utils.transaction import record_partial_transaction, create_transaction , TxPayload, resolve_reason, build_remark
@@ -31,10 +31,10 @@ from services.order_service import (
 )
 from services.order_status import _status_label
 from decimal import Decimal
-
+import logging
 
 router = APIRouter()
-
+logger = logging.getLogger("uvicorn.error")
 
 @router.post("/dinein/create", response_model=ResponseModel[DineinOrderModel])
 def create_order(client_id: str, order: DineinOrderModel, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
@@ -304,7 +304,7 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
         oid = int(str(order_item_id).strip())
     except:
         raise HTTPException(status_code=400, detail="Invalid order_item_id format")
-
+    is_rental = _is_rental_realm(context)
     tx_type: Optional[TransactionTypeEnum] = None
     if transaction_type:
         try:
@@ -405,7 +405,18 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
             def _record_item_transaction(inv_item, qty, is_combo_child=False):
                 if tx_type == TransactionTypeEnum.item_cancelled:
                     tag = TransactionTypeEnum.combo_child_cancelled if is_combo_child else TransactionTypeEnum.item_cancelled
-                    _tx(inv_item.id, TransactionTypeEnum.item_cancelled, qty, tag, inv_item.name)
+                    if is_rental:
+                        restored_after = Decimal(str(inv_item.availability or 0)) + Decimal(str(qty))
+                        create_transaction(
+                    db=db, context=context,
+                    payload=TxPayload(
+                        item_id=inv_item.id, tx_type=tag, ref_id=order_id, qty=qty,
+                        after_stock=restored_after,   # ← forces movement=IN, stock restored
+                        remarks=build_remark(tag, order_id, inv_item.name, qty, effective_reason),
+                    ),
+                )
+                    else:    
+                       _tx(inv_item.id, TransactionTypeEnum.item_cancelled, qty, tag, inv_item.name)
 
                 elif tx_type == TransactionTypeEnum.wastage:
                     tag = TransactionTypeEnum.combo_child_wastage if is_combo_child else TransactionTypeEnum.wastage
