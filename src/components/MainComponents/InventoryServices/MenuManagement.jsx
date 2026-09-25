@@ -1595,10 +1595,10 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end">
 
-                  {normalizedRealm === 'restaurant' &&
+                 
                     <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
                       <span>Config</span>
-                    </button>}
+                    </button>
                   <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-primary text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
                     <Plus size={14} /><span>{isComboCategory ? 'Add Combo' : 'Add Item'}</span>
                   </button>
