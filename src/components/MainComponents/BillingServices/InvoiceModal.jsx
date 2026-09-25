@@ -1432,6 +1432,7 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
               setPaymentStatus("Paid");
               setShowRazorpayModal(false);
               toast.success("Payment verified successfully!");
+              if (onSave) onSave(invoiceDraftId); 
               onClose();
             } catch (err) {
               console.error("VERIFY ERROR:", err.response?.data || err.message);
