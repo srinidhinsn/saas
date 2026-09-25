@@ -138,7 +138,7 @@ def _merge_group(orders: list,context=None) -> dict:
         "item_names": [i.get("item_name", "") for i in merged_items],
         "sub_orders": sub_orders_meta,           # for TakeOrder count + timer
         "order_count": len(orders),              # total batches incl. root
-    }
+        "invoice_status": root.invoice_status, }
 
 # ───────────────────────────────────────────────────────────────────────────
 
@@ -379,6 +379,8 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
         ]
         resolved_status = _status_label(context, body.status) or body.status
         order.status = resolved_status
+        if body.invoice_status is not None:
+            order.invoice_status = body.invoice_status
 
         order_items = (
             db.query(Db_OrderItem_Entity)
@@ -424,7 +426,8 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
 
         if body.dinein_order_id is not None:
             order.dinein_order_id = body.dinein_order_id
-
+        if body.invoice_status is not None:
+            order.invoice_status = body.invoice_status
         db.commit()
         db.refresh(order)
 
