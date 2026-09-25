@@ -7,7 +7,7 @@ from entity.billing_entity import BillingDocumentEntity
 from datetime import datetime
 import hmac, hashlib
 import uuid
-from .payment_routes import get_phonepe_client, get_razorpay_client
+from models.billing_model import get_phonepe_client, get_razorpay_client
 from zoneinfo import ZoneInfo
 from sqlalchemy.orm.attributes import flag_modified
 from phonepe.sdk.pg.payments.v2.models.request.standard_checkout_pay_request import (StandardCheckoutPayRequest,)
