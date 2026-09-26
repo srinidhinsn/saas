@@ -20,7 +20,7 @@ from typing import Optional
 from entity.inventory_entity import InventoryEntity, CategoryEntity
 from entity.client_entity import Address
 from models.inventory_model import InventoryTransaction
-from services.order_service import (
+from ..services.order_service import (
     _root_dinein_id,
     _order_row_to_flat,
     STATUS_PRIORITY,
@@ -29,7 +29,7 @@ from services.order_service import (
     _convert,
     update_order_status_service,_is_rental_realm
 )
-from services.order_status import _status_label
+from ..services.order_status import _status_label
 from decimal import Decimal
 import logging
 

@@ -14,14 +14,14 @@ from utils.send_email_otp import otpEmailService, otp_store
 from utils.create_notification import get_template_body, render_template
 from entity.inventory_entity import CategoryEntity
 from entity.order_entity import DineinOrder
-from services.chat_service import ask_restaurant_ai,ChatbotService,ChatRequest
+from ..services.chat_service import ask_restaurant_ai,ChatbotService,ChatRequest
 from datetime import datetime, timedelta, time
-from services.add_users import (create_user_and_person, login_user_service, get_user_perms, has_user_permission , delete_user_service , 
+from ..services.add_users import (create_user_and_person, login_user_service, get_user_perms, has_user_permission , delete_user_service , 
                                   forgot_password_service ,reset_password_service,register_client_service)
-from services.person_service import (update_person_details_service, get_person_details_service, get_all_persons_service, 
+from ..services.person_service import (update_person_details_service, get_person_details_service, get_all_persons_service, 
                                        save_address_service, get_addresses_service, update_address_service, get_customer_addresses_service, set_primary_address_service,
 find_or_create_customer_service,search_customers_service)
-from services.auth_service import refresh_access_token
+from ..services.auth_service import refresh_access_token
 from jose import jwt
 import uuid , os
 from sqlalchemy import func

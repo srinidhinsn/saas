@@ -10,7 +10,7 @@ from entity.inventory_entity import InventoryEntity, CategoryEntity, InventoryTr
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
-from services import service
+from ..services import service
 from utils.transaction import _compute_current_stock, create_transaction, _convert , TxPayload
 from sqlalchemy import text
 from utils.services import add_master_value , get_master_values ,delete_master_value
