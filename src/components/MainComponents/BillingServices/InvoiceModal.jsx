@@ -534,6 +534,7 @@ const onSplitAmountBlur = () => {
           params: {
             client_id: clientId,
             document_type: "Invoice",
+            order_id: orderId,
           },
         }
       );
@@ -734,7 +735,6 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
         payment_status: paymentStatus,
         payment_method: paymentMethodArray,
         single_payment_amount: splitPaymentEnabled ? null : Number(paymentSplits[0]?.amount ?? total),
-        status: "Draft",
         customer_id: resolvedCustomerId ?? initialOrder.customer_id ?? undefined,
         contact_email: selectedOrder.contact_email || "",
         contact_phone: selectedOrder.contact_phone || "",
@@ -748,7 +748,7 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
       if (!draftId) {
         const res = await axios.post(
           `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create_document`,
-          payload,
+          {...payload,status: "Draft" },
           { headers: { Authorization: `Bearer ${token}` } }
         );
         draftId = res?.data?.data?.id;
@@ -770,16 +770,10 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
       null,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    const newDocumentNumber = issueRes?.data?.data?.document_number || issueRes?.data?.document_number;
-    if (newDocumentNumber) setDocumentNumber(newDocumentNumber);
-    const latestInvoice = await fetchInvoiceDraft(selectedOrder.id);
+    const data = issueRes?.data?.data || {};
+    if (data.document_number) setDocumentNumber(data.document_number);
+    if (data.status) setStatus(data.status);
 
-if (latestInvoice?.id) {
-  setInvoiceDraftId(latestInvoice.id);
-  setDocumentNumber(latestInvoice.document_number || "");
-  setPaymentStatus(latestInvoice.payment_status || "Pending");
-  setStatus(latestInvoice.status || "Draft");
-}
   } catch (err) {
     console.error("Failed to generate invoice number:", err.response?.data || err.message);
   }
@@ -826,55 +820,39 @@ if (latestInvoice?.id) {
   // and THEN frees the table.
 
   const handleConfirmPayment = async () => {
-  setSaving(true);
-  try {
-    const invoiceDraft = await fetchInvoiceDraft(selectedOrder.id);
-    const correctInvoiceDraftId = invoiceDraft?.id || invoiceDraftId;
-
-    if (!correctInvoiceDraftId) {
-      throw new Error("No invoice draft found");
+    setSaving(true);
+    try {
+      const invoiceDraft = await fetchInvoiceDraft(selectedOrder.id);
+      const correctInvoiceDraftId = invoiceDraft?.id || invoiceDraftId;
+      if (!correctInvoiceDraftId) throw new Error("No invoice draft found");
+  
+      const updateRes = await axios.post(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+        { id: correctInvoiceDraftId, client_id: clientId, payment_status: paymentStatus, status: "Issued" },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const updatedInvoice = updateRes?.data?.data;
+  
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        { id: selectedOrder.id, status: "served", invoice_status: paymentStatus.toLowerCase() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+  
+      await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
+  
+      setInvoiceDraftId(updatedInvoice?.id || correctInvoiceDraftId);
+      setDocumentNumber(updatedInvoice?.document_number || documentNumber);
+      setPaymentStatus(updatedInvoice?.payment_status || paymentStatus);
+      setStatus(updatedInvoice?.status || "Issued");
+      onClose();
+    } catch (err) {
+      console.error("Payment Confirmation Failed:", err.message);
+      toast.error("Payment confirmation failed");
+    } finally {
+      setSaving(false);
     }
-
-    await axios.post(
-      `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
-      {
-        id: correctInvoiceDraftId,
-        client_id: clientId,
-        payment_status: paymentStatus, // "Paid" or "Partial"
-        status: "Issued",
-      },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    await axios.post(
-      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-      {
-        id: selectedOrder.id,
-        status: "served",
-        invoice_status: paymentStatus.toLowerCase(),
-      },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    // Table is freed for both full and partial payment
-    await freeTable({
-      clientId,
-      token,
-      tableId: selectedOrder.table_id,
-      tablesMap,
-    });
-    const updatedInvoice = await fetchInvoiceDraft(selectedOrder.id);
-
-    setInvoiceDraftId(updatedInvoice?.id || correctInvoiceDraftId);
-    setDocumentNumber(updatedInvoice?.document_number || "");
-    setPaymentStatus(updatedInvoice?.payment_status || paymentStatus);
-    setStatus(updatedInvoice?.status || "Issued");
-    onClose();
-  } catch (err) {
-    console.error("Payment Confirmation Failed:", err.message);
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
   // ─── handlePaymentClick ────────────────────────────────────────────────────
 
