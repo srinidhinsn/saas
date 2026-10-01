@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus, Search, Edit, Trash2, Upload, Download, CloudUpload } from 'lucide-react';
 import axios from 'axios';
-import * as XLSX from 'xlsx';
 import MenuCategoryTree from './Tree&CategoryManage/MenuCategoryTree';
 import MenuImagePreview, { imageCache } from './Tree&CategoryManage/MenuImagePreview';
 import UniversalAddModal from '../../utils/Modals/UniversalAddModal';
@@ -11,8 +10,9 @@ import { jwtDecode } from "jwt-decode";
 import { getMenuConfig } from '../../utils/menuConfigResolver';
 import MenuConfigModal from '../../utils/Modals/MenuConfigModal';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
-import { getDietaryFromSlug, isItemActive, generateSlug, toSlugSegment, isPackagingCategoryId,generateTierId,isRentalRealm,buildRentalTier} from '../../utils/Menu-utils/menuUtils';
+import { getDietaryFromSlug, isItemActive, toSlugSegment, isPackagingCategoryId,buildRentalTier} from '../../utils/Menu-utils/menuUtils';
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData} from '../../utils/Menu-utils/useMenuData';
+import MenuExcelTools from './MenuExcelTools';
 
 const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -32,7 +32,6 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   const [timeTick, setTimeTick] = useState(Date.now());
   const isAddingItemRef = useRef(false);
   const [isAddingItem, setIsAddingItem] = useState(false);
-  // All IDs and keywords come from menuConfigResolver — nothing hardcoded here
   const menuConfig = React.useMemo(() => {
     if (!clientId) return null;
     return getMenuConfig(clientId);
@@ -51,10 +50,7 @@ const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   const [newItemImageUrl, setNewItemImageUrl] = useState('');
   const [editItemImage, setEditItemImage] = useState(null);
   const [editItemImageUrl, setEditItemImageUrl] = useState('');
-  const [importValidationModal, setImportValidationModal] = useState(null);
   const [importSuccess, setImportSuccess] = useState(null);
-  const [importConfirm, setImportConfirm] = useState(null);
-  const [importError, setImportError] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [newItem, setNewItem] = useState({
@@ -111,7 +107,6 @@ const getNonPackagingAddonCount = useCallback((item) => {
     const interval = setInterval(() => {
       setTimeTick(Date.now()); // triggers re-render
     }, 60000); // every 1 minute
-
     return () => clearInterval(interval);
   }, []);
 
@@ -119,19 +114,13 @@ const getNonPackagingAddonCount = useCallback((item) => {
   useEffect(() => {
     if (!selectedZone || !selectedSection) return;
 
-    const found = sections.find(
-      s => s.zone === selectedZone && s.section === selectedSection
-    );
-
-    if (found) {
-      setZoneConfigId(found.id);
-    }
+    const found = sections.find(s => s.zone === selectedZone && s.section === selectedSection);
+    if (found) {setZoneConfigId(found.id);}
   }, [selectedZone, selectedSection, sections]);
 
   // ─── Get top-level section name dynamically ─────────────────────────
   const getTopLevelSection = useCallback((categoryId) => {
     if (!categoryId || !categoriesFlat.length || !menuConfig) return null;
-
     const rootNode = categoriesFlat.find(
       c =>
         c.name.toLowerCase() === menuConfig.root.toLowerCase() ||
@@ -144,16 +133,12 @@ const getNonPackagingAddonCount = useCallback((item) => {
 
     while (current && current.parentId) {
       if (current.parentId === rootNode.id) {
-        // console.log("Current name", current.name)
-        return current.name; // THIS is AC / Rooftop / Garden etc
+        return current.name;
       }
       current = categoriesFlat.find(c => c.id === current.parentId);
     }
-
     return null;
   }, [categoriesFlat, menuConfig]);
-
-
 
   const getAddonCategoryId = useCallback((itemCategoryId) => {
     if (!itemCategoryId) return null;
@@ -161,13 +146,11 @@ const getNonPackagingAddonCount = useCallback((item) => {
     const sectionName = getTopLevelSection(itemCategoryId);
     if (!sectionName) return null;
 
-    // convert to slug format
     const slug = sectionName
       .trim()
       .toLowerCase()
       .replace(/[\s-]+/g, "")
       .replace(/[^a-z0-9]/g, "");
-    // console.log("Slug =", slug)
     return `addons_${slug}`;
   }, [getTopLevelSection]);
 
@@ -196,11 +179,8 @@ if (cachedAddon) return cachedAddon;
           }
         )
       ]);
-
       const addonsCategory = catRes.data.data?.[0];
-
       if (!addonsCategory) {
-        // No addon category created yet
         return { subcategories: [], items: [] };
       }
 
@@ -253,8 +233,6 @@ if (cachedAddon) return cachedAddon;
     }
   }, [clientId, token, menuConfig, zoneConfigId]);
 
-
-
   useEffect(() => {
     fetchAddonData(zoneConfigId).then(({ subcategories, items }) => {
       setAddonSubcategories(subcategories);
@@ -267,7 +245,6 @@ if (cachedAddon) return cachedAddon;
       setAddonSubcategories(subcategories);
       setAllAddonItems(items);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);  
   const findDuplicateCodeItem = (code, excludeId = null) => {
     const codeStr = String(code ?? '').trim();
@@ -316,9 +293,7 @@ if (cachedAddon) return cachedAddon;
   ?? item;
 
     const zonePrices = {};
-    allSiblings
-      .filter(m => m.zone_config_id !== 0)
-      .forEach(m => { zonePrices[m.zone_config_id] = m.unit_price; });
+    allSiblings.filter(m => m.zone_config_id !== 0).forEach(m => { zonePrices[m.zone_config_id] = m.unit_price; });
 
     const resolvedCategoryId =
       categoriesFlat.find(c => c.id === baseRecord.category_id)?.id
@@ -336,11 +311,7 @@ if (cachedAddon) return cachedAddon;
       dietaryOptions.map(d => d.toLowerCase().replace(/[-_\s]/g, ''))
     );
     // CHANGED: parse as array, not single string
-    const timingsFromSlug = rawSuffix
-    .split('+')
-    .filter(Boolean)
-    .filter(tok => tok !== 'unavailable' && tok !== 'allday' && !dietaryKeySet.has(tok));
-
+    const timingsFromSlug = rawSuffix.split('+').filter(Boolean).filter(tok => tok !== 'unavailable' && tok !== 'allday' && !dietaryKeySet.has(tok));
 
     const dietaryFromSlug = getDietaryFromSlug({ ...baseRecord, category_id: resolvedCategoryId },dietaryOptions);
 
@@ -358,39 +329,6 @@ if (cachedAddon) return cachedAddon;
     setShowEditModal(true);
   };
 
-  const flattenCategoryTree = (tree, level = 0, parentId = null) => {
-    let flatList = [];
-    tree.forEach(category => {
-      flatList.push({
-        id: category.id, name: category.name, level, description: category.description || "",
-        parentId, hasChildren: !!(category.subCategories?.length),
-      });
-      if (category.subCategories?.length) {
-        flatList = flatList.concat(flattenCategoryTree(category.subCategories, level + 1, category.id));
-      }
-    });
-    return flatList;
-  };
-
-  const findCategoryNode = (tree, matcher) => {
-    for (const cat of tree) {
-      if (cat.id?.toLowerCase() === matcher.toLowerCase() || cat.name?.toLowerCase() === matcher.toLowerCase()) return cat;
-      if (cat.children?.length) { const found = findCategoryNode(cat.children, matcher); if (found) return found; }
-    }
-    return null;
-  };
-
-  const getCategoriesAtLevel = (node, targetLevel, currentLevel = 0) => {
-    if (!node) return [];
-    if (currentLevel === targetLevel) return [node];
-    let result = [];
-    for (const child of node.children || []) {
-      result = result.concat(getCategoriesAtLevel(child, targetLevel, currentLevel + 1));
-    }
-    return result;
-  };
-
-  // ✅ FIXED — uses the same axios pattern as the rest of MenuManagement
  const fetchUnits = useCallback(async () => {
   const cached = menuCache.get('units', clientId);
   if (cached) { setUnits(cached); return; }
@@ -568,11 +506,9 @@ const slug = (() => {
     } catch (error) {
       console.error("Error adding item:", error);
     } finally {
-    // ✅ Always re-enable, whether it succeeded, threw, or failed category resolution
     isAddingItemRef.current = false;
     setIsAddingItem(false);
   }
-
   };
 
   const handleEditItem = async () => {
@@ -598,7 +534,6 @@ const slug = (() => {
       const finalCategoryId = resolvedCat.id;
       if (!finalCategoryId) return;
 
-      // ✅ Build slug with dietary injected — same pattern as import
       const { dietary_type, zonePrices: zp,rentalTier, ...cleanEditingItem } = editingItem;
       const cleanedTier = buildRentalTier(rentalTier);
       const slug = (() => {
@@ -634,8 +569,6 @@ const slug = (() => {
       
         return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
       })();
-
-      // console.log(`[Edit] slug="${slug}" dietary="${dietary_type}" timing="${editingItem.availability_time}"`);
       const created_by =
       currentUserId || localStorage.getItem("user_id") || "system";
       const basePayload = {
@@ -654,22 +587,18 @@ const slug = (() => {
         availability: Number(editingItem.availability) || 0,
         created_by:created_by,
         updated_by: currentUserId,
-        slug,  // ✅ uses new slug with dietary + timing
+        slug, 
         client_id: clientId,
         inventory_id: editingItem.inventory_id,
         id: Number(editingItem.id),
         recipe: cleanedTier ? [cleanedTier] : null,
       };
 
-      // Always update base record (zone_config_id = 0)
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/update`,
         { ...basePayload, unit_price: Number(editingItem.unit_price) || 0, zone_config_id: 0 },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      // Always sync ALL zone records — category_id, slug, and other fields
-      // must be consistent across every zone variant
       for (const section of sections) {
         const configId = Number(section.id);
 
@@ -677,8 +606,6 @@ const slug = (() => {
           m => Number(m.id) === Number(editingItem.id) && m.zone_config_id === configId
         );
 
-        // Use entered zone price if provided, else keep existing zone price,
-        // else fall back to base unit_price
         const enteredPrice = zp?.[configId];
         const finalPrice =
           enteredPrice !== '' && enteredPrice !== null && enteredPrice !== undefined
@@ -703,10 +630,7 @@ const slug = (() => {
                     `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
                     { ...basePayload, unit_price: parseFloat(enteredPrice), zone_config_id: configId },
                     { headers: { Authorization: `Bearer ${token}` } }
-                  );
-                }
-              }
-      }
+                  );}}}
       if (editingItem?.image_id) {
         imageCache.remove(clientId, editingItem.image_id);
       }
@@ -728,10 +652,7 @@ const slug = (() => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Uses menuInventoryId and root from config — not hardcoded
-
-
-  const getAllDescendantCategoryIds = (categoryId, categoryTree) => {
+const getAllDescendantCategoryIds = (categoryId, categoryTree) => {
     if (!categoryId) return [];
     const descendants = [categoryId];
     const findCategory = (cats, id) => {
@@ -795,7 +716,6 @@ const slug = (() => {
     }
 
     // ── 5. "All zones" dedup — prefer base record (zone_config_id === 0) ──
-    // ── 5. "All zones" dedup ──
     const seen = new Map();
 
     items.forEach(item => {
@@ -803,7 +723,6 @@ const slug = (() => {
       if (!existing) {
         seen.set(item.id, item);
       } else {
-        // base record (zone_config_id === 0) always wins
         if (item.zone_config_id === 0 || item.zone_config_id === null) {
           seen.set(item.id, item);
         }
@@ -818,8 +737,8 @@ const slug = (() => {
   const sortedItems = [...filteredItems].sort((a, b) => {
     const aActive = isItemActive(a.slug, timingOptions);
     const bActive = isItemActive(b.slug, timingOptions);
-    if (bActive !== aActive) return bActive - aActive; // active first
-   return (a.name || '').localeCompare(b.name || '');              // same order within each group
+    if (bActive !== aActive) return bActive - aActive; 
+   return (a.name || '').localeCompare(b.name || '');             
   });
   const uploadImageToDocumentService = async (imageFile) => {
     const formData = new FormData();
@@ -835,23 +754,16 @@ const slug = (() => {
     return response.data.data.id;
   };
 
-  const handleImageFile = (file) => {
-    if (file?.type.startsWith('image/')) { setNewItemImage(file); setNewItemImageUrl(URL.createObjectURL(file)); }
-    else { alert('Please upload a valid image file'); }
-  };
-
   const handleDeleteItem = async () => {
     menuCache.invalidate(clientId);
     try {
       const deletedItemId = deleteTarget.id;
-
       // ✅ Send zone_config_id: 0 — backend will now delete ALL variants for this id
       await axios.post(
         `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
         { id: deletedItemId, zone_config_id: 0 },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       // Clean up line_item_id references in other items
       const itemsToUpdate = menuItems.filter(
         item => Array.isArray(item.line_item_id) && item.line_item_id.includes(deletedItemId)
@@ -870,7 +782,6 @@ const slug = (() => {
       const { subcategories, items } = await fetchAddonData();
       setAddonSubcategories(subcategories);
       setAllAddonItems(items);
-
       setShowDeleteModal(false);
       setDeleteTarget(null);
     } catch (error) {
@@ -1056,404 +967,6 @@ const handleBulkUpdate = async () => {
   }
 };
 
-  const clean = (v) => (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v)) ? null : v);
-  const num = (v) => { if (v === "" || v === undefined || v === null || (typeof v === "number" && isNaN(v))) return 0; const n = Number(v); return isNaN(n) ? 0 : n; };
-  const sectionLabel = (s) => `${s.zone}-${s.section}`.trim().toLowerCase();
-
-  const handleExportToExcel = () => {
-    try {
-      const catNameById = (idOrName) => {
-        if (!idOrName) return "Uncategorized";
-        const found = categoriesFlat.find(
-          c => c.id === idOrName || c.name?.toLowerCase() === String(idOrName).toLowerCase()
-        );
-        return found?.name || idOrName || "Unknown";
-      };
-
-      // Group by item id using allMenuItemsRaw so we get every zone variant
-      const grouped = {};
-      allMenuItemsRaw.forEach(item => {
-        const key = item.id; // group by id, not slug (slug can be same across zones)
-        if (!grouped[key]) {
-          grouped[key] = { baseItem: null, zonePrices: {} };
-        }
-
-        const zid = Number(item.zone_config_id);
-
-        if (zid === 0) {
-          // ✅ This is the true base record — use it as baseItem AND for Unit_Price
-          grouped[key].baseItem = item;
-        } else {
-          // Zone-specific record — store price keyed by section label
-          const sec = sections.find(s => Number(s.id) === zid);
-          if (sec) grouped[key].zonePrices[sectionLabel(sec)] = item.unit_price;
-        }
-      });
-
-      const zoneColumns = sections.map(sectionLabel);
-
-      const exportData = Object.values(grouped)
-        .filter(({ baseItem }) => baseItem !== null) // skip orphaned zone records
-        .map(({ baseItem: item, zonePrices }) => {
-          const dietary = getDietaryFromSlug(item,dietaryOptions);
-const slugTimingPart = item.slug?.includes('__') ? item.slug.split('__')[1] : '';
-const suffixPartsForExport = (slugTimingPart || '').split('+').filter(
-  p => p && p !== 'unavailable' && p !== 'allday' &&
-  !dietaryOptions.some(d => d.toLowerCase().replace(/[-_\s]/g, '') === p.toLowerCase().replace(/[-_\s]/g, ''))
-);
-const availabilityTiming = suffixPartsForExport.join('+') || '';
-
-          const row = {
-            Name: item.name ?? "",
-            Description: item.description ?? "",
-            Category: catNameById(item.category_id) || "Unknown",
-            Dietary_Type: dietary || "",
-            Availability_Timing: availabilityTiming,
-            Image: item.image_id ?? "",
-            Unit: item.unit ?? "",
-            Unit_Price: Number(item.unit_price) || 0, // ✅ always from zone_config_id=0 record
-            Discount: Number(item.discount) || 0,
-            Availability: Number(item.availability) || 0,
-            Code: item.code != null ? String(item.code) : "",
-            Serving_Quantity: item.serving_quantity ?? "",
-            Serving_Unit: item.serving_unit ?? "",
-            Line_Item_IDs: Array.isArray(item.line_item_id) ? item.line_item_id.join(", ") : "",
-          };
-
-          zoneColumns.forEach(col => {
-            row[`Price_${col}`] = zonePrices[col] ?? "";
-          });
-
-          return row;
-        });
-
-      const headers = [
-        "Name", "Description", "Category", "Dietary_Type", "Availability_Timing",
-        "Image", "Unit", "Unit_Price", "Discount", "Availability", "Code",
-        "Serving_Quantity", "Serving_Unit", "Line_Item_IDs",
-        ...zoneColumns.map(c => `Price_${c}`)
-      ];
-
-      const worksheet = XLSX.utils.json_to_sheet(exportData, { header: headers });
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "MenuItems");
-      XLSX.writeFile(workbook, `menu_items_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    } catch (err) {
-      console.error("Export failed:", err);
-    }
-  };
-
-
-  // ─────────────────────────────────────────────────────────────────
-  // CHANGE 3 of 3:  handleImportFromExcel  — full rewrite
-  // ─────────────────────────────────────────────────────────────────
-  const runImport = async ({
-    parsedData, priceColumns, allMenuItems,
-    created_by, updated_by,
-    currentCategoriesFlat, currentSelectedCategoryId, currentSections,
-  }) => {
-    for (const row of parsedData) {
-      if (!row.Name?.trim()) continue;  
-      const existingRecords = allMenuItems.filter(
-        item => item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase()
-      ); 
-      const categoryId =
-        currentCategoriesFlat.find(
-          c => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
-        )?.id || currentSelectedCategoryId;
-
-      const categoryName = currentCategoriesFlat.find(c => c.id === categoryId)?.name || null;
-      if (!categoryName) {
-        console.warn(`[Import] Skipping "${row.Name}" — category not found: "${row.Category}"`);
-        continue;
-      }
-
-      const rawDietary = (row.Dietary_Type || "").trim().toLowerCase().replace(/[-_\s]/g, '');
-      const matchedDietaryOption = dietaryOptions.find(
-        d => d.toLowerCase().replace(/[-_\s]/g, '') === rawDietary
-      );
-      const importedDietary = matchedDietaryOption
-        ? matchedDietaryOption.toLowerCase().replace(/[-_\s]/g, '')
-        : rawDietary;
-
-      const rawTiming = (row.Availability_Timing || "").trim().toLowerCase();
-      const timingPart = rawTiming || null;
-
-      const slug = (() => {
-        const parts = [];
-        let currentId = categoryId;
-        const visited = new Set();
-        while (currentId && !visited.has(currentId)) {
-          visited.add(currentId);
-          const cat = currentCategoriesFlat.find(c => c.id === currentId);
-          if (!cat) break;
-          parts.unshift(toSlugSegment(cat.name));
-          currentId = cat.parentId ?? cat.parent_id ?? null;
-        }
-        const itemPart = toSlugSegment(row.Name);
-        const categoryPathStr = parts.join('_').toLowerCase().replace(/[-_\s]/g, '');
-        const dietaryAlreadyInPath = dietaryOptions.some(
-          d => categoryPathStr.includes(d.toLowerCase().replace(/[-_\s]/g, ''))
-        );
-        const base = [...parts, itemPart].filter(Boolean).join('_');
-const suffixParts = [
-  ...(importedDietary ? [importedDietary] : []),
-  ...(timingPart ? [timingPart] : []),
-].filter(Boolean);
-return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
-      })();
-      const existingImageId = (() => {
-        const match = allMenuItems.find(
-          item =>
-            item.name?.trim().toLowerCase() === row.Name?.trim().toLowerCase() &&
-            (item.zone_config_id === 0 || item.zone_config_id === null)
-        );
-        return match?.image_id ?? null;
-      })();
-      
-      const importedImageId =
-        row.Image && String(row.Image).trim() !== ""
-          ? String(row.Image).trim()
-          : null;
-      
-      const resolvedImageId = importedImageId ?? existingImageId;
-      const basePayload = {
-        client_id: clientId,
-        inventory_id: menuConfig.menuInventoryId,
-        name: row.Name?.trim(),
-        description: row.Description || null,
-        category_id: categoryId,
-        realm: realm || null,
-        code: row.Code ? String(row.Code) : null,
-        serving_quantity: row.Serving_Quantity || null,
-        serving_unit: row.Serving_Unit || null,
-        unit: row.Unit || null,
-        image_id: resolvedImageId,  
-        ...(row.Image && String(row.Image).trim() !== "" && { image_id: String(row.Image).trim() }),
-        discount: Number(row.Discount) || 0,
-        availability: Number(row.Availability) || 0,
-        slug,
-        line_item_id: row.Line_Item_IDs
-          ? row.Line_Item_IDs.split(",").map(v => parseInt(v.trim(), 10)).filter(v => !isNaN(v))
-          : null,
-        created_by,
-        updated_by,
-      };
-
-      const baseUnitPrice = Number(row.Unit_Price) || 0;
-      let sharedId;
-      const existingBase = existingRecords.find(item => item.zone_config_id === 0);
-
-      if (existingBase) {
-        sharedId = existingBase.id;
-  
-        await axios.post(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/delete`,
-          { id: sharedId, zone_config_id: 0 },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-  
-        // ✅ Recreate base record fresh
-        const res = await axios.post(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-          { ...basePayload, id: sharedId, unit_price: baseUnitPrice, zone_config_id: 0 },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        sharedId = res.data.data.id;
-  
-      } else {
-        // ✅ No existing record — create fresh
-        const res = await axios.post(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-          { ...basePayload, unit_price: baseUnitPrice, zone_config_id: 0 },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        sharedId = res.data.data.id;
-      }
-  
-      // ✅ Recreate all zone records fresh — no conflicts possible
-      for (const section of currentSections) {
-        const configId = Number(section.id);
-        if (!configId || configId === 0) continue;
-  
-        const priceCol = priceColumns.find(
-          col => col.replace("Price_", "").trim().toLowerCase() === sectionLabel(section)
-        );
-        const priceVal = priceCol ? row[priceCol] : undefined;
-        const finalPrice =
-          priceVal !== "" && priceVal !== null && priceVal !== undefined
-            ? Number(priceVal)
-            : baseUnitPrice;
-  
-        await axios.post(
-          `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/create`,
-          { ...basePayload, id: sharedId, unit_price: finalPrice, zone_config_id: configId },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      }
-    }
-    menuCache.invalidate(clientId);
-    await fetchData({ silent: false, force: true });
-    setImportSuccess("Import completed successfully");
-    setTimeout(() => setImportSuccess(null), 3000);
-  };
-  const handleImportFromExcel = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    let created_by = "system", updated_by = "system";
-    try {
-      const decoded = jwtDecode(token);
-      created_by = decoded?.user_id || created_by;
-      updated_by = created_by;
-    } catch { }
-
-    const currentCategoriesFlat = [...categoriesFlat];
-    const currentSelectedCategoryId = selectedCategoryId;
-    const currentSections = [...sections];
-
-    let allMenuItems = [];
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          params: { inventory_id: menuConfig.menuInventoryId }
-        }
-      );
-      allMenuItems = res.data.data || [];
-    } catch (err) {
-      console.error("Failed to fetch full menu:", err);
-      return;
-    }
-
-    allMenuItems = allMenuItems.map(item => ({
-      ...item,
-      zone_config_id:
-        item.zone_config_id === null || item.zone_config_id === undefined
-          ? 0 : Number(item.zone_config_id),
-    }));
-
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const workbook = XLSX.read(evt.target.result, { type: "binary" });
-        const parsedData = XLSX.utils.sheet_to_json(
-          workbook.Sheets[workbook.SheetNames[0]],
-          { defval: "" }
-        );
-        if (!parsedData.length) return;
-
-        const allColumns = Object.keys(parsedData[0]);
-        const priceColumns = allColumns.filter(col => col.startsWith("Price_"));
-        const normalize = (str) => (str || '').toLowerCase().replace(/[-_\s]/g, '');
-
-        const invalidDietarySet = new Set();
-        const invalidTimingSet = new Set();
-        const invalidCategorySet = new Set();
-        const duplicateCodeMap = new Map(); 
-        for (const row of parsedData) {
-          if (!row.Name?.trim()) continue;
-          const rawCategory = (row.Category || "").trim();
-          if (rawCategory) {
-            const matched = currentCategoriesFlat.find(
-              c => c.name.trim().toLowerCase() === rawCategory.toLowerCase()
-            );
-            if (!matched) invalidCategorySet.add(rawCategory);
-          }
-          const rawDietary = (row.Dietary_Type || "").trim();
-          if (rawDietary) {
-            const matched = dietaryOptions.find(d => normalize(d) === normalize(rawDietary));
-            if (!matched) invalidDietarySet.add(rawDietary);
-          }
-
-          const rawTiming = (row.Availability_Timing || "").trim();
-          if (rawTiming && rawTiming.toLowerCase() !== 'allday') {
-            const timingKeys = rawTiming.toLowerCase().split('+').map(t => t.trim()).filter(Boolean);
-            for (const key of timingKeys) {
-              const matched = timingOptions.find(o => o.name?.toLowerCase() === key);
-              if (!matched) invalidTimingSet.add(key);
-            }
-          }
-          const rowCode = String(row.Code ?? '').trim();
-          if (rowCode) {
-            // Does this code collide with a DIFFERENT existing item (not this same-named item)?
-            const existingConflict = allMenuItems.find(item => {
-              const isBase = item.zone_config_id === 0 || item.zone_config_id === null;
-              const sameCode = String(item.code ?? '').trim() === rowCode;
-              const differentName = (item.name || '').trim().toLowerCase() !== row.Name.trim().toLowerCase();
-              return isBase && sameCode && differentName;
-            });
-        
-            if (existingConflict) {
-              if (!duplicateCodeMap.has(rowCode)) duplicateCodeMap.set(rowCode, new Set());
-              duplicateCodeMap.get(rowCode).add(row.Name.trim());
-              duplicateCodeMap.get(rowCode).add(existingConflict.name);
-            }
-        
-            // Does this code collide with ANOTHER row in the same file?
-            const otherRowsWithSameCode = parsedData.filter(
-              r => r !== row && String(r.Code ?? '').trim() === rowCode
-            );
-            if (otherRowsWithSameCode.length > 0) {
-              if (!duplicateCodeMap.has(rowCode)) duplicateCodeMap.set(rowCode, new Set());
-              duplicateCodeMap.get(rowCode).add(row.Name.trim());
-              otherRowsWithSameCode.forEach(r => duplicateCodeMap.get(rowCode).add(r.Name.trim()));
-            }
-          }
-        }
-        const invalidCodeDetails = Array.from(duplicateCodeMap.entries()).map(
-          ([code, names]) => `${code} → ${Array.from(names).join(', ')}`
-        );
-        if (invalidDietarySet.size > 0 || invalidCategorySet.size > 0 ||invalidTimingSet.size > 0 || invalidCodeDetails.length > 0) {
-          setImportValidationModal({
-            invalidCategory: [...invalidCategorySet],
-            invalidDietary: [...invalidDietarySet],
-            invalidTiming: [...invalidTimingSet],
-            invalidCode: invalidCodeDetails,  
-            parsedData,
-            priceColumns,
-            allMenuItems,
-            created_by,
-            updated_by,
-            currentCategoriesFlat,
-            currentSelectedCategoryId,
-            currentSections,
-            fileEvent: e,
-          });
-          return;
-        }
-        setImportConfirm({
-          count: parsedData.length,
-          onConfirm: async () => {
-            setImportConfirm(null);
-            try {
-              await runImport({
-                parsedData, priceColumns, allMenuItems,
-                created_by, updated_by,
-                currentCategoriesFlat, currentSelectedCategoryId, currentSections,
-              });
-            } catch (err) {
-              console.error("Import Error:", err);
-              setImportError(err.message || "Something went wrong during import.");
-              setTimeout(() => setImportError(null), 4000);
-            }
-            e.target.value = "";
-          },
-          onCancel: () => {
-            setImportConfirm(null);
-            e.target.value = "";
-          },
-        });
-      } catch (err) {
-        console.error("Import Error:", err);
-        setImportError(err.message || "Something went wrong during import.");
-        setTimeout(() => setImportError(null), 4000);
-        e.target.value = "";
-      }
-    };
-    reader.readAsBinaryString(file);
-  };
-
   const hasRestoredRef = useRef(false);
   useEffect(() => {
     if (hasRestoredRef.current) return; 
@@ -1524,45 +1037,29 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
           {/* Sidebar */}
           <div className="lg:col-span-1">
             <div className="lg:sticky lg:top-2">
-              <MenuCategoryTree
-                categories={categories}
-                selectedCategoryId={selectedCategoryId}
-                onSelectCategory={(id) => {
-                  setSelectedCategoryId(id);
-                  localStorage.setItem("menu_selected_category", id);
-                }}
-                clientId={clientId}
-                token={token}
-                onCategoriesUpdate={() => fetchData({ silent: true })}
-                menuConfig={menuConfig}
-              />
+              <MenuCategoryTree categories={categories}  selectedCategoryId={selectedCategoryId} onSelectCategory={(id) => {
+                                setSelectedCategoryId(id);
+                                localStorage.setItem("menu_selected_category", id);}}
+              clientId={clientId} token={token} onCategoriesUpdate={() => fetchData({ silent: true })} menuConfig={menuConfig} />
             </div>
           </div>
 
           <div className="lg:col-span-3 border-default border-border-default p-3 rounded-lg h-[88.5vh] flex flex-col">
             <div className="mb-3 flex flex-wrap gap-2">
-              <button
-
-                onClick={() => setZoneConfigId(null)}
+              <button  onClick={() => setZoneConfigId(null)}
                 className={`px-3 py-1 rounded-full text-sm border transition
     ${zoneConfigId === null
                     ? "bg-black text-white border-black"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-              >
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
                 All
               </button>
 
               {sections.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setZoneConfigId(s.id)}
+                <button  key={s.id} onClick={() => setZoneConfigId(s.id)}
                   className={`px-3 py-1 rounded-full text-sm border transition
       ${zoneConfigId === s.id
                       ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                >
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
                   {s.zone} - {s.section}
                 </button>
               ))}
@@ -1584,18 +1081,11 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:flex-nowrap lg:gap-2">
                 <div className="relative w-full sm:w-56">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search items…"
-                    className="w-full h-9 pl-10 pr-3 rounded-lg bg-bg-tertiary border border-border-default text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-action-primary/30"
-                  />
+                  <input  ref={searchInputRef}  type="text"  value={searchQuery}  onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Search items…"
+                          className="w-full h-9 pl-10 pr-3 rounded-lg bg-bg-tertiary border border-border-default text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-action-primary/30"/>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end">
-
-                 
                     <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
                       <span>Config</span>
                     </button>
@@ -1605,20 +1095,10 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                   <button onClick={() => setShowBulkModal(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-danger text-text-white border border-border-default text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
                     <Edit size={14} /><span className="hidden sm:inline">Bulk Update</span>
                   </button>
-                  <div className="relative group">
-                    <button className="h-9 px-3 flex items-center gap-2 rounded-lg bg-bg-tertiary border border-border-default text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
-                      <CloudUpload size={14} />
-                    </button>
-                    <div className="absolute right-0 mt-1 w-36 bg-bg-primary border border-border-default rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                      <button onClick={() => document.getElementById('excelInput').click()} className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary">
-                        <Upload size={14} />Import
-                      </button>
-                      <button onClick={handleExportToExcel} className="w-full px-4 py-2 flex items-center gap-2 text-sm hover:bg-bg-secondary">
-                        <Download size={14} />Export
-                      </button>
-                    </div>
-                  </div>
-                  <input type="file" id="excelInput" accept=".xlsx, .xls" className="hidden" onChange={handleImportFromExcel} />
+                  <MenuExcelTools clientId={clientId} token={token} realm={realm} menuConfig={menuConfig}
+                                  categoriesFlat={categoriesFlat} sections={sections} allMenuItemsRaw={allMenuItemsRaw}
+                                  dietaryOptions={dietaryOptions} timingOptions={timingOptions} selectedCategoryId={selectedCategoryId}
+                                  fetchData={fetchData} />
                 </div>
               </div>
             </div>
@@ -1637,7 +1117,6 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
                       className={`relative flex gap-2 items-center bg-bg-primary border rounded-xl p-1 shadow-sm transition group overflow-hidden
                       ${active ? "" : "opacity-40 grayscale"}
                     `}                    >
-
 
                       <div className={`w-[3px] h-full rounded-l-xl ${dietaryColor}`} /> <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] opacity-0 pointer-events-none z-10 group-hover:animate-overlayFade" />
 
@@ -1659,11 +1138,6 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
 
                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleItemClick(item)}>
                         <h3 className="text-[10px] md:text-[16px] font-semibold text-text-primary truncate"title={item.name}>{item.name}</h3>
-                        {/* {!active && (
-                          <p className="text-[10px] text-red-500">
-                            Not available now
-                          </p>
-                        )} */}
                         {item.description && <p className="text-[8px] md:text-[13px] text-text-secondary line-clamp-1">{item.description}</p>}
                         <div className="flex items-center gap-2 mt-1">
                           {discountPercent ? (
@@ -1713,162 +1187,6 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
           </div>
         </div>
       )}
-      {importValidationModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-bg-primary rounded-2xl w-full max-w-md shadow-xl border border-border-default overflow-hidden">
-
-            {/* Header */}
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-border-default bg-yellow-50">
-              <div className="w-9 h-9 rounded-full bg-yellow-100 flex items-center justify-center shrink-0">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                  <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-base font-semibold text-yellow-900">Invalid values detected</h3>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div className="px-5 py-4 space-y-4 max-h-72 overflow-y-auto">
-
-              {/* ── CATEGORY ERRORS ── */}
-              {importValidationModal.invalidCategory?.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
-                    Category — not found
-                  </p>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {importValidationModal.invalidCategory.map(v => (
-                      <span key={v} className="px-2.5 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium">
-                        {v}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-xs text-text-secondary leading-relaxed">
-                    These categories don't exist in your menu tree. Create them first in the sidebar for a smooth import.
-                    {/* Go to the{" "}
-                    <strong className="text-text-primary">category sidebar</strong> and create them first, then re-import.
-                    Items with missing categories will be <strong className="text-text-primary">skipped</strong> during import. */}
-                  </p>
-                </div>
-              )}
-      {/* ── DUPLICATE CODE ERRORS ── */}
-      {importValidationModal.invalidCode?.length > 0 && (
-       <div>
-           <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
-               Duplicate item codes
-           </p>
-        <div className="flex flex-col gap-1.5 mb-2">
-           {importValidationModal.invalidCode.map(v => (
-              <span key={v} className="px-2.5 py-1.5 rounded-lg text-xs bg-red-100 text-red-800 font-medium">
-                {v}
-              </span>
-           ))}
-        </div>
-          <p className="text-xs text-text-secondary leading-relaxed">
-      Two or more items share the same code. Item codes must be unique .
-          </p>
-        </div>
-      )}
-              {/* ── DIETARY ERRORS ── */}
-              {importValidationModal.invalidDietary?.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
-                    Dietary type — not found
-                  </p>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {importValidationModal.invalidDietary.map(v => (
-                      <span key={v} className="px-2.5 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium">
-                        {v}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-xs text-text-secondary">
-                    Valid options:{" "}
-                    {dietaryOptions.length > 0
-                      ? dietaryOptions.map(d => (
-                        <span key={d} className="inline-block mx-0.5 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-medium">{d}</span>
-                      ))
-                      : <span className="italic">none configured</span>}
-                  </p>
-                </div>
-              )}
-
-              {/* ── TIMING ERRORS ── */}
-              {importValidationModal.invalidTiming?.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-2">
-                    Availability timing — not found
-                  </p>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {importValidationModal.invalidTiming.map(v => (
-                      <span key={v} className="px-2.5 py-1 rounded-full text-xs bg-red-100 text-red-800 font-medium">
-                        {v}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-xs text-text-secondary">
-                    Valid options:{" "}
-                    {timingOptions.length > 0
-                      ? timingOptions.map(t => (
-                        <span key={t.name} className="inline-block mx-0.5 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-medium">{t.name}</span>
-                      ))
-                      : <span className="italic">none configured</span>}
-                  </p>
-                </div>
-              )}
-
-            </div>
-
-            {/* Footer buttons */}
-            <div className="flex gap-2 px-5 py-4 border-t border-border-default">
-              <button
-                onClick={() => {
-                  if (importValidationModal.fileEvent) importValidationModal.fileEvent.target.value = "";
-                  setImportValidationModal(null);
-                }}
-                className="flex-1 h-9 rounded-lg border border-border-default text-sm font-semibold bg-bg-tertiary hover:bg-bg-secondary transition-colors"
-              >
-                OK
-              </button>
-              {(!importValidationModal.invalidCode || importValidationModal.invalidCode.length === 0) && (
-    <button
-      onClick={async () => {
-        const {
-          parsedData, priceColumns, allMenuItems,
-          created_by, updated_by,
-          currentCategoriesFlat, currentSelectedCategoryId, currentSections,
-          fileEvent,
-        } = importValidationModal;
-
-        setImportValidationModal(null);
-
-        try {
-          await runImport({
-            parsedData, priceColumns, allMenuItems,
-            created_by, updated_by,
-            currentCategoriesFlat, currentSelectedCategoryId, currentSections,
-          });
-        } catch (err) {
-          console.error("Import Error:", err);
-          setImportError(err.message || "Something went wrong during import.");
-          setTimeout(() => setImportError(null), 4000);
-        }
-
-        if (fileEvent) fileEvent.target.value = "";
-      }}
-      className="flex-1 h-9 rounded-lg bg-action-primary text-text-white text-sm font-semibold hover:opacity-90 transition-opacity"
-    >
-      Import Anyway
-    </button>
-  )}
-            </div>
-
-          </div>
-        </div>
-      )}
       {importSuccess && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-green-600 text-white shadow-lg animate-slideUp">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1878,27 +1196,6 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
           <button
             onClick={() => setImportSuccess(null)}
             className="ml-1 opacity-70 hover:opacity-100 transition-opacity"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-      )}
-      {importError && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-600 text-white shadow-lg animate-slideUp max-w-sm">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold">Import failed</span>
-            <span className="text-xs opacity-80 mt-0.5 leading-snug">{importError}</span>
-          </div>
-          <button
-            onClick={() => setImportError(null)}
-            className="ml-1 opacity-70 hover:opacity-100 transition-opacity shrink-0"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -1941,90 +1238,30 @@ return suffixParts.length > 0 ? `${base}__${suffixParts.join('+')}` : base;
     </div>
   </div>
 )}  
-      {/* Import Confirm Modal */}
-{importConfirm && (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50">
-    <div className="bg-bg-primary rounded-2xl w-full max-w-sm shadow-xl border border-border-default overflow-hidden">
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-border-default bg-blue-50">
-        <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-          <Upload size={16} className="text-blue-700" />
-        </div>
-        <div>
-          <h3 className="text-base font-semibold text-blue-900">Confirm import</h3>
-          <p className="text-xs text-blue-700 mt-0.5">Review before proceeding</p>
-        </div>
-      </div>
+      <UniversalAddModal clientId={clientId}  token={token}  showModal={showAddModal} setShowModal={setShowAddModal} modalType="menu"
+                         newItem={newItem} setNewItem={setNewItem} selectedCategoryId={selectedCategoryId} categories={categories} 
+                         addonSubcategories={addonSubcategories} allAddonItems={allAddonItems}newItemImage={newItemImage} 
+                         setNewItemImage={setNewItemImage} newItemImageUrl={newItemImageUrl} setNewItemImageUrl={setNewItemImageUrl}
+                         handleAddItem={handleAddItem} getCategoryIdByName={getCategoryIdByName} inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
+                         fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
+                         units={units} normalizedRealm={normalizedRealm} isComboCategory={isComboCategory} dedupedMenuItems={dedupedMenuItems}
+                         categoriesFlat={categoriesFlat} dietaryColorMap={dietaryColorMap} isSubmitting={isAddingItem} />
 
-      <div className="px-5 py-4">
-        <p className="text-sm text-text-secondary leading-relaxed">
-          Import <strong className="text-text-primary">{importConfirm.count}</strong> item(s) from this file?
-        </p>
-      </div>
+      <UniversalEditModal showModal={showEditModal} setShowModal={setShowEditModal} modalType="menu" editingItem={editingItem} 
+                          setEditingItem={setEditingItem} categories={categories} addonSubcategories={addonSubcategories} 
+                          allAddonItems={allAddonItems} editItemImage={editItemImage} setEditItemImage={setEditItemImage} 
+                          editItemImageUrl={editItemImageUrl} setEditItemImageUrl={setEditItemImageUrl} handleEditItem={handleEditItem} 
+                          clientId={clientId} token={token} inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
+                          fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
+                          units={units} normalizedRealm={normalizedRealm} dedupedMenuItems={dedupedMenuItems}
+                          categoriesFlat={categoriesFlat}dietaryColorMap={dietaryColorMap}  />
 
-      <div className="flex gap-2 px-5 py-4 border-t border-border-default">
-        <button
-          onClick={importConfirm.onCancel}
-          className="flex-1 h-9 rounded-lg border border-border-default text-sm font-semibold bg-bg-tertiary hover:bg-bg-secondary transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={importConfirm.onConfirm}
-          className="flex-1 h-9 rounded-lg bg-action-primary text-text-white text-sm font-semibold hover:opacity-90 transition-opacity"
-        >
-          Import
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-      <UniversalAddModal clientId={clientId}
-        token={token}
-        showModal={showAddModal} setShowModal={setShowAddModal} modalType="menu"
-        newItem={newItem} setNewItem={setNewItem} selectedCategoryId={selectedCategoryId}
-        categories={categories} addonSubcategories={addonSubcategories} allAddonItems={allAddonItems}
-        newItemImage={newItemImage} setNewItemImage={setNewItemImage}
-        newItemImageUrl={newItemImageUrl} setNewItemImageUrl={setNewItemImageUrl}
-        handleAddItem={handleAddItem} getCategoryIdByName={getCategoryIdByName}
-        inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
-        fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
-        units={units} normalizedRealm={normalizedRealm}
-        isComboCategory={isComboCategory}
-        dedupedMenuItems={dedupedMenuItems}
-        categoriesFlat={categoriesFlat}
-        dietaryColorMap={dietaryColorMap}
-        isSubmitting={isAddingItem}
-      />
-
-      <UniversalEditModal
-        showModal={showEditModal} setShowModal={setShowEditModal} modalType="menu"
-        editingItem={editingItem} setEditingItem={setEditingItem}
-        categories={categories} addonSubcategories={addonSubcategories} allAddonItems={allAddonItems}
-        editItemImage={editItemImage} setEditItemImage={setEditItemImage}
-        editItemImageUrl={editItemImageUrl} setEditItemImageUrl={setEditItemImageUrl}
-        handleEditItem={handleEditItem} clientId={clientId} token={token}
-        inventoryIds={inventoryIds} getAddonCategoryId={getAddonCategoryId}
-        fetchAddonData={fetchAddonData} setAddonSubcategories={setAddonSubcategories} setAllAddonItems={setAllAddonItems}
-        units={units} normalizedRealm={normalizedRealm}
-        dedupedMenuItems={dedupedMenuItems}
-        categoriesFlat={categoriesFlat}dietaryColorMap={dietaryColorMap}
-      />
-
-      <UniversalBulkUpdateModal clientId={clientId}
-        token={token} menuItems={allMenuItemsRaw}
-        showModal={showBulkModal} setShowModal={setShowBulkModal} modalType="menu"
-        filteredItems={filteredItems} selectedRows={selectedRows} setSelectedRows={setSelectedRows}
-        selectAllChecked={selectAllChecked} setSelectAllChecked={setSelectAllChecked}
-        bulkEditData={bulkEditData} setBulkEditData={setBulkEditData}
-        handleBulkUpdate={handleBulkUpdate} handleBulkDelete={handleBulkDelete}
-        addonSubcategories={addonSubcategories} allAddonItems={allAddonItems}
-      />
-      <MenuConfigModal
-        show={showMenuConfig}
-        onClose={() => setShowMenuConfig(false)}
-        clientId={clientId}
-        token={token}
-      />
+      <UniversalBulkUpdateModal clientId={clientId} token={token} menuItems={allMenuItemsRaw} showModal={showBulkModal} 
+                                setShowModal={setShowBulkModal} modalType="menu" filteredItems={filteredItems} selectedRows={selectedRows} 
+                                setSelectedRows={setSelectedRows} selectAllChecked={selectAllChecked} setSelectAllChecked={setSelectAllChecked}
+                                bulkEditData={bulkEditData} setBulkEditData={setBulkEditData} handleBulkUpdate={handleBulkUpdate} 
+                                handleBulkDelete={handleBulkDelete} addonSubcategories={addonSubcategories} allAddonItems={allAddonItems} />
+      <MenuConfigModal  show={showMenuConfig}  onClose={() => setShowMenuConfig(false)}  clientId={clientId}  token={token}/>
     </div>
   );
 };
