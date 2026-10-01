@@ -28,11 +28,11 @@ router = APIRouter()
 def read_billing_documents(
     client_id: str,
     document_type: str = None,
-    status: str = None,
+    status: str = None,order_id: str = None,
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
-    documents = read_documents_service(client_id, document_type, status, db)
+    documents = read_documents_service(client_id, document_type, status, order_id, db)
     return ResponseModel[List[BillingDocument]](
         screen_id=context.screen_id,
         data=documents
