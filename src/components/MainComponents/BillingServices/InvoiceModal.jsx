@@ -834,40 +834,47 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
   // Sets invoice payment_status to "Paid", marks order as "served",
   // and THEN frees the table.
 
-  const handleConfirmPayment = async () => {
-    setSaving(true);
-    try {
-      const invoiceDraft = await fetchInvoiceDraft(selectedOrder.id);
-      const correctInvoiceDraftId = invoiceDraft?.id || invoiceDraftId;
-      if (!correctInvoiceDraftId) throw new Error("No invoice draft found");
-  
-      const updateRes = await axios.post(
-        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
-        { id: correctInvoiceDraftId, client_id: clientId, payment_status: paymentStatus, status: "Issued" },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const updatedInvoice = updateRes?.data?.data;
-  
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-        { id: selectedOrder.id, status: "served", invoice_status: paymentStatus.toLowerCase() },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-  
-      await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
-  
-      setInvoiceDraftId(updatedInvoice?.id || correctInvoiceDraftId);
-      setDocumentNumber(updatedInvoice?.document_number || documentNumber);
-      setPaymentStatus(updatedInvoice?.payment_status || paymentStatus);
-      setStatus(updatedInvoice?.status || "Issued");
-      onClose();
-    } catch (err) {
-      console.error("Payment Confirmation Failed:", err.message);
-      toast.error("Payment confirmation failed");
-    } finally {
-      setSaving(false);
-    }
-  };
+const handleConfirmPayment = async () => {
+  setSaving(true);
+  try {
+    const invoiceDraft = await fetchInvoiceDraft(selectedOrder.id);
+    const correctInvoiceDraftId = invoiceDraft?.id || invoiceDraftId;
+    if (!correctInvoiceDraftId) throw new Error("No invoice draft found");
+
+    const updateRes = await axios.post(
+      `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+      { id: correctInvoiceDraftId, client_id: clientId, payment_status: paymentStatus, status: "Issued" },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const updatedInvoice = updateRes?.data?.data;
+
+    // Only auto-mark "served" for dine-in orders — takeaway/delivery
+    // orders are typically prepaid before the food is even ready.
+    const dineIn = isDineInOrder(selectedOrder, tablesMap);
+    await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+      {
+        id: selectedOrder.id,
+        ...(dineIn ? { status: "served" } : {}),
+        invoice_status: paymentStatus.toLowerCase(),
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
+
+    setInvoiceDraftId(updatedInvoice?.id || correctInvoiceDraftId);
+    setDocumentNumber(updatedInvoice?.document_number || documentNumber);
+    setPaymentStatus(updatedInvoice?.payment_status || paymentStatus);
+    setStatus(updatedInvoice?.status || "Issued");
+    onClose();
+  } catch (err) {
+    console.error("Payment Confirmation Failed:", err.message);
+    toast.error("Payment confirmation failed");
+  } finally {
+    setSaving(false);
+  }
+};
 
   // ─── handlePaymentClick ────────────────────────────────────────────────────
 
