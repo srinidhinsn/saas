@@ -53,6 +53,7 @@ class BillingDocumentEntity(Base):
     approval_date            = Column(DateTime, nullable=True)
     gl_account_code          = Column(Text, nullable=True)
     tax_code                 = Column(Text, nullable=True)
+    gst_number               = Column(Text, nullable=True)
     accounting_period        = Column(Text, nullable=True)
     currency_conversion_rate = Column(Float, nullable=True)
     shipping_address         = Column(Text, nullable=True)

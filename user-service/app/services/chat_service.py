@@ -1,75 +1,76 @@
 import httpx
 import re
-
+from pydantic import BaseModel
+from typing import Optional,Dict,Any
+from openai import OpenAI
+import os
 INVENTORY_URL = "http://inventory-service:8000"
 ORDER_URL = "http://order-service:8000"
 BILLING_URL = "http://billing-service:8000"
 SEARCH_URL = "http://common-lib:8000/search"
 
-class ChatService:
-    async def fetch_menu(self):
-        async with httpx.AsyncClient() as client:
-            return (await client.get(f"{INVENTORY_URL}/menus")).json()
+class ChatRequest(BaseModel):
+    message:str
+class ChatResponse(BaseModel):
+    intent: str
+    reply: str
+    data: Optional[Dict[str, Any]] = None    
+class ChatbotService:
 
-    async def place_order(self, order_data):
-        async with httpx.AsyncClient() as client:
-            return (await client.post(f"{ORDER_URL}/orders", json=order_data)).json()
+    @staticmethod
+    def classify_intent(message: str):
+        msg = message.lower()
 
-    async def generate_bill(self, order_id):
-        async with httpx.AsyncClient() as client:
-            return (await client.get(f"{BILLING_URL}/bill/{order_id}")).json()
+        if any(word in msg for word in ["menu", "items", "food"]):
+            return "SHOW_MENU"
 
-    async def accept_payment(self, order_id, payment_data):
-        async with httpx.AsyncClient() as client:
-            return (await client.post(f"{BILLING_URL}/pay/{order_id}", json=payment_data)).json()
+        if any(word in msg for word in ["order", "ordered", "popular"]):
+            return "ORDER_INFO"
 
-    async def generic_search(self, query: str):
-        async with httpx.AsyncClient() as client:
-            return (await client.get(f"{SEARCH_URL}?q={query}")).json()
+        if any(word in msg for word in ["bill", "invoice"]):
+            return "BILL_INFO"
 
-    def classify_intent(self, msg: str):
-        msg_lower = msg.lower()
-        if "menu" in msg_lower or "show" in msg_lower:
-            return "ShowMenu"
-        elif "order" in msg_lower or "buy" in msg_lower:
-            return "PlaceOrder"
-        elif "bill" in msg_lower or "receipt" in msg_lower:
-            return "GetBill"
-        elif "pay" in msg_lower or "payment" in msg_lower:
-            return "PayBill"
-        else:
-            return "GenericSearch"
+        return "GENERAL"
 
-    async def chat(self, websocket):
-        await websocket.accept()
-        await websocket.send_text("Hello! You can ask naturally: 'show me the menu', 'order a pizza', 'get my bill', 'pay for order 12', or any general question.")
+    @staticmethod
+    def extract_order_id(message: str):
+        match = re.search(r"\d+", message)
+        return int(match.group()) if match else None
 
-        while True:
-            msg = await websocket.receive_text()
-            intent = self.classify_intent(msg)
 
-            if intent == "ShowMenu":
-                menus = await self.fetch_menu()
-                await websocket.send_json(menus)
 
-            elif intent == "PlaceOrder":
-                match = re.search(r"order (.+)", msg.lower())
-                item = match.group(1) if match else "unknown"
-                order = await self.place_order({"item": item})
-                await websocket.send_json(order)
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY")
+)
 
-            elif intent == "GetBill":
-                match = re.search(r"bill (\d+)", msg.lower())
-                order_id = match.group(1) if match else None
-                bill = await self.generate_bill(order_id) if order_id else {"error": "No order id found"}
-                await websocket.send_json(bill)
+async def ask_restaurant_ai(
+    message: str,
+    context: str = ""
+):
 
-            elif intent == "PayBill":
-                match = re.search(r"pay (\d+)", msg.lower())
-                order_id = match.group(1) if match else None
-                payment = await self.accept_payment(order_id, {"method": "card"}) if order_id else {"error": "No order id found"}
-                await websocket.send_json(payment)
+    response = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {
+                "role": "system",
+                "content": f"""
+                You are a restaurant assistant.
 
-            else:
-                result = await self.generic_search(msg)
-                await websocket.send_json(result)
+                Context:
+                {context}
+
+                Rules:
+                - Be short and friendly
+                - Answer restaurant-related questions
+                - If information is not available, say so
+                """
+            },
+            {
+                "role": "user",
+                "content": message
+            }
+        ],
+        temperature=0.3
+    )
+
+    return response.choices[0].message.content
