@@ -7,6 +7,12 @@ import { Search, Calendar, Eye } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import AgGridTable from '../../utils/AgGridTable';
 import { fmt, formatPriceByMode  } from '../../utils/Menu-utils/menuUtils';
+import {
+  OrderRowActions,
+  CancelOrderConfirmModal,
+  OldItemDeleteModal,
+  OrderItemsViewModal,
+} from '../../utils/BillingUtils';
 
 export default function BillingPage({ clientId, token }) {
   const navigate = useNavigate();
@@ -30,6 +36,10 @@ export default function BillingPage({ clientId, token }) {
   const [customTo, setCustomTo] = useState(todayDate);
   const customFromRef = useRef(null);
   const customToRef = useRef(null);
+  const [viewOrder, setViewOrder] = useState(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [cancelOrderModal, setCancelOrderModal] = useState({ isOpen: false, orderId: null });
+  const [itemDeleteModal, setItemDeleteModal] = useState({ isOpen: false, item: null, orderId: null });
 
   useEffect(() => {
     if (hasFetchedRef.current) return;
@@ -139,6 +149,140 @@ export default function BillingPage({ clientId, token }) {
     });
     return Array.from(itemsMap.values());
   };
+
+  const getOrderTotal = (order) =>
+  (order.items || [])
+    .filter(item => !item.parent_item_key)
+    .reduce((sum, item) => sum + (Number(item.unit_price ?? item.price) || 0) * (Number(item.quantity) || 0), 0);
+
+const refetchOrders = async () => {
+  const res = await axios.get(
+    `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return res.data?.data || [];
+};
+
+const handleCancelOrder = async (orderId, reason) => {
+  const order = orders.find(o => o.id === orderId);
+  const tableObj = tablesMap[order?.table_id];
+  try {
+    await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/cancel`,
+      {},
+      { params: { order_id: orderId, reason: reason || '' }, headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (tableObj) {
+      await axios.post(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+        {
+          id: order.table_id,
+          client_id: clientId,
+          name: tableObj.name,
+          table_type: tableObj.table_type,
+          status: 'vacant',
+          location_zone: tableObj.location_zone,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    }
+    setOrders(prev => prev.filter(o => o.id !== orderId));
+    toast.success('Order cancelled and table freed.');
+  } catch {
+    toast.error('Failed to cancel order');
+  }
+};
+
+const handleStatusChange = async (orderId, newStatus) => {
+  const order = orders.find(o => o.id === orderId);
+  if (!order || order.status === 'served') return;
+  const tableObj = tablesMap[order.table_id];
+  try {
+    await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+      { id: orderId, client_id: clientId, status: newStatus },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (tableObj) {
+      await axios.post(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+        {
+          id: order.table_id,
+          client_id: clientId,
+          name: tableObj.name,
+          table_type: tableObj.table_type,
+          status: 'vacant',
+          location_zone: tableObj.location_zone,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    }
+    toast.success('Order status updated');
+    setOrders(prev => prev.map(o => (o.id === orderId ? { ...o, status: newStatus } : o)));
+    setViewOrder(prev => (prev?.id === orderId ? { ...prev, status: newStatus } : prev));
+  } catch {
+    toast.error('Failed to update order status.');
+  }
+};
+
+const handleRequestDeleteItem = (item, orderId) => {
+  setItemDeleteModal({ isOpen: true, item, orderId });
+};
+
+const handleItemRemoveOne = async (transactionType, reason, removeQty) => {
+  const { item, orderId } = itemDeleteModal;
+  setItemDeleteModal({ isOpen: false, item: null, orderId: null });
+  if (!item?.id) { toast.error('Cannot update — item has no DB reference.'); return; }
+  try {
+    await axios.delete(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
+      {
+        params: { client_id: clientId, order_item_id: item.id, quantity: removeQty, transaction_type: transactionType, reason: reason || undefined },
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    const newQty = item.quantity - removeQty;
+    toast.success(newQty > 0 ? `Quantity reduced to ${newQty}.` : 'Item removed.');
+    const allOrders = await refetchOrders();
+    setOrders(allOrders);
+    const fresh = allOrders.find(o => o.id === orderId);
+    if (fresh && viewOrder?.id === orderId) {
+      setViewOrder({ ...fresh, _tableName: tablesMap[fresh.table_id]?.name || String(fresh.table_id) });
+    } else if (!fresh && viewOrder?.id === orderId) {
+      setViewOrder(null);
+      setShowViewModal(false);
+    }
+  } catch {
+    toast.error('Failed to update item.');
+  }
+};
+
+const handleItemRemoveAll = async (transactionType, reason) => {
+  const { item, orderId } = itemDeleteModal;
+  setItemDeleteModal({ isOpen: false, item: null, orderId: null });
+  if (!item?.id) { toast.error('Cannot delete — item has no DB reference.'); return; }
+  try {
+    await axios.delete(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
+      {
+        params: { client_id: clientId, order_item_id: item.id, transaction_type: transactionType, reason: reason || undefined },
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    toast.success('Item removed.');
+    const allOrders = await refetchOrders();
+    setOrders(allOrders);
+    const fresh = allOrders.find(o => o.id === orderId);
+    if (fresh && viewOrder?.id === orderId) {
+      setViewOrder({ ...fresh, _tableName: tablesMap[fresh.table_id]?.name || String(fresh.table_id) });
+    } else if (!fresh && viewOrder?.id === orderId) {
+      setViewOrder(null);
+      setShowViewModal(false);
+    }
+  } catch {
+    toast.error('Failed to remove item.');
+  }
+};
 
   const handleSelectOrder = async (order) => {
     if (!order) return;
@@ -254,6 +398,18 @@ export default function BillingPage({ clientId, token }) {
       ),
     },
     {
+  headerName: 'Invoice #',
+  colId: 'invoice_number',
+  minWidth: 140,
+  sortable: false,
+  valueGetter: (params) => billingDocMap[params.data?.id?.toString()]?.document_number || '',
+  cellRenderer: (params) => (
+    <span className="text-sm font-medium text-text-primary">
+      {params.value || '—'}
+    </span>
+  ),
+},
+    {
       headerName: 'Payment Status',
       colId: 'payment_status',
       minWidth: 160,
@@ -278,24 +434,25 @@ export default function BillingPage({ clientId, token }) {
       },
     },
     {
-      headerName: 'Action',
-      colId: 'actions',
-      minWidth: 140,
-      sortable: false,
-      filter: false,
-      floatingFilter: false,
-      cellRenderer: (params) => (
-        <div className="flex items-center justify-center w-full">
-          <button
-            onClick={() => handleSelectOrder(params.data)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-action-primary hover:bg-action-primary/90 text-text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
-          >
-            <Eye size={16} />
-            View
-          </button>
-        </div>
-      ),
-    },
+  headerName: 'Actions',
+  colId: 'actions',
+  minWidth: 240,
+  sortable: false,
+  filter: false,
+  floatingFilter: false,
+  cellRenderer: (params) => (
+    <OrderRowActions
+      order={params.data}
+      onView={(order) => {
+        setViewOrder({ ...order, _tableName: tablesMap[order.table_id]?.name || String(order.table_id) });
+        setShowViewModal(true);
+      }}
+      onPrint={(order) => handleSelectOrder(order)}
+      onCancel={(order) => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+      onMarkServed={(order) => handleStatusChange(order.id, 'served')}
+    />
+  ),
+},
   ];
 
   return (
@@ -406,6 +563,27 @@ export default function BillingPage({ clientId, token }) {
             onSave={handleInvoiceSave}
           />
         )}
+        <OrderItemsViewModal
+  isOpen={showViewModal}
+  onClose={() => { setShowViewModal(false); setViewOrder(null); }}
+  order={viewOrder}
+  onRequestDeleteItem={(item) => handleRequestDeleteItem(item, viewOrder?.id)}
+  getOrderTotal={getOrderTotal}
+/>
+
+<CancelOrderConfirmModal
+  isOpen={cancelOrderModal.isOpen}
+  onClose={() => setCancelOrderModal({ isOpen: false, orderId: null })}
+  onConfirm={(reason) => { if (cancelOrderModal.orderId) handleCancelOrder(cancelOrderModal.orderId, reason); }}
+/>
+
+<OldItemDeleteModal
+  isOpen={itemDeleteModal.isOpen}
+  item={itemDeleteModal.item}
+  onClose={() => setItemDeleteModal({ isOpen: false, item: null, orderId: null })}
+  onRemoveOne={handleItemRemoveOne}
+  onRemoveAll={handleItemRemoveAll}
+/>
       </div>
     </div>
   );

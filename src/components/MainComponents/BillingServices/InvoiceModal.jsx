@@ -46,6 +46,21 @@ async function freeTable({ clientId, token, tableId, tablesMap }) {
   }
 }
 
+// Only dine-in orders should be auto-marked "served" when payment is
+// confirmed — a takeaway/delivery (prepaid) order may not have been
+// served yet, so its status must be left alone.
+function isDineInOrder(order, tablesMap) {
+  if (!order) return true; // conservative default: behave as before
+  if (order._fixedOrderMode) return order._fixedOrderMode === 'dinein';
+  if (order.mode) {
+    const m = order.mode.toLowerCase();
+    if (m === 'takeaway' || m === 'delivery') return false;
+    if (m === 'dinein' || m === 'dine-in') return true;
+  }
+  const tableName = (tablesMap?.[order.table_id]?.name || '').toLowerCase();
+  return !tableName.includes('takeaway');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main InvoiceModal
 // ─────────────────────────────────────────────────────────────────────────────
@@ -816,17 +831,23 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
       },
       { headers: { Authorization: `Bearer ${token}` } }
     );
+
+    // Only auto-mark "served" for dine-in orders — takeaway/delivery
+    // orders are typically prepaid before the food is even ready, so
+    // payment being confirmed says nothing about serve status for them.
+    const dineIn = isDineInOrder(selectedOrder, tablesMap);
     await axios.post(
       `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
       {
         id: selectedOrder.id,
-        status: "served",
+        ...(dineIn ? { status: "served" } : {}),
         invoice_status: paymentStatus.toLowerCase(),
       },
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
-    // Table is freed for both full and partial payment
+    // Table is freed for both full and partial payment (no-op for
+    // takeaway orders since they have no table_id)
     await freeTable({
       clientId,
       token,
@@ -840,7 +861,7 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
   } finally {
     setSaving(false);
   }
-};
+};  
 
   // ─── handlePaymentClick ────────────────────────────────────────────────────
 
