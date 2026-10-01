@@ -4,9 +4,19 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import InvoiceModal from './InvoiceModal';
 import { Search, Calendar, Eye } from 'lucide-react';
+import { menuCache } from '../../utils/Menu-utils/menuCache';
+import AgGridTable from '../../utils/AgGridTable';
+import { fmt, formatPriceByMode  } from '../../utils/Menu-utils/menuUtils';
+import {
+  OrderRowActions,
+  CancelOrderConfirmModal,
+  OldItemDeleteModal,
+  OrderItemsViewModal,
+} from '../../utils/BillingUtils';
 
 export default function BillingPage({ clientId, token }) {
   const navigate = useNavigate();
+  const hasFetchedRef = useRef(false);
   const [searchParams] = useSearchParams();
 
   const [orders, setOrders] = useState([]);
@@ -26,28 +36,47 @@ export default function BillingPage({ clientId, token }) {
   const [customTo, setCustomTo] = useState(todayDate);
   const customFromRef = useRef(null);
   const customToRef = useRef(null);
+  const [viewOrder, setViewOrder] = useState(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [cancelOrderModal, setCancelOrderModal] = useState({ isOpen: false, orderId: null });
+  const [itemDeleteModal, setItemDeleteModal] = useState({ isOpen: false, item: null, orderId: null });
 
   useEffect(() => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
     async function fetchAll() {
       try {
         setLoading(true);
-        const [ordersRes, tablesRes, invRes, billingRes] = await Promise.all([
+
+        const cachedTables = menuCache.get('billing_tablesMap', clientId);
+        const cachedMenu = menuCache.get('billing_menuMap', clientId);
+
+        const [ordersRes, billingRes, tablesRes, invRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
           axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, { headers: { Authorization: `Bearer ${token}` } }),
+          cachedTables ? Promise.resolve(null) : axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`, { headers: { Authorization: `Bearer ${token}` } }),
+          cachedMenu ? Promise.resolve(null) : axios.get(`${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory/read`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-        
-        const allOrders = ordersRes.data?.data || [];
-        setOrders(allOrders);
-        
-        const tMap = {};
-        (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
-        setTablesMap(tMap);
-        
-        const iMap = {};
-        (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
-        setInventoryMap(iMap);
+
+        setOrders(ordersRes.data?.data || []);
+
+        if (cachedTables) {
+          setTablesMap(cachedTables);
+        } else {
+          const tMap = {};
+          (tablesRes.data?.data || []).forEach((t) => (tMap[t.id] = t));
+          setTablesMap(tMap);
+          menuCache.set('billing_tablesMap', clientId, tMap);
+        }
+
+        if (cachedMenu) {
+          setInventoryMap(cachedMenu);
+        } else {
+          const iMap = {};
+          (invRes.data?.data || []).forEach((i) => (iMap[i.id] = i));
+          setInventoryMap(iMap);
+          menuCache.set('billing_menuMap', clientId, iMap);
+        }
 
         const bMap = {};
         (billingRes.data?.data || []).forEach((doc) => {
@@ -85,6 +114,8 @@ export default function BillingPage({ clientId, token }) {
   useEffect(() => {
     let filtered = [...orders];
 
+    filtered = filtered.filter(order => order.status?.toLowerCase() !== 'cancelled');
+
     // Date filter
     const { from, to } = getDateRange();
     filtered = filtered.filter(order => {
@@ -118,6 +149,140 @@ export default function BillingPage({ clientId, token }) {
     });
     return Array.from(itemsMap.values());
   };
+
+  const getOrderTotal = (order) =>
+  (order.items || [])
+    .filter(item => !item.parent_item_key)
+    .reduce((sum, item) => sum + (Number(item.unit_price ?? item.price) || 0) * (Number(item.quantity) || 0), 0);
+
+const refetchOrders = async () => {
+  const res = await axios.get(
+    `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  return res.data?.data || [];
+};
+
+const handleCancelOrder = async (orderId, reason) => {
+  const order = orders.find(o => o.id === orderId);
+  const tableObj = tablesMap[order?.table_id];
+  try {
+    await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/cancel`,
+      {},
+      { params: { order_id: orderId, reason: reason || '' }, headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (tableObj) {
+      await axios.post(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+        {
+          id: order.table_id,
+          client_id: clientId,
+          name: tableObj.name,
+          table_type: tableObj.table_type,
+          status: 'vacant',
+          location_zone: tableObj.location_zone,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    }
+    setOrders(prev => prev.filter(o => o.id !== orderId));
+    toast.success('Order cancelled and table freed.');
+  } catch {
+    toast.error('Failed to cancel order');
+  }
+};
+
+const handleStatusChange = async (orderId, newStatus) => {
+  const order = orders.find(o => o.id === orderId);
+  if (!order || order.status === 'served') return;
+  const tableObj = tablesMap[order.table_id];
+  try {
+    await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+      { id: orderId, client_id: clientId, status: newStatus },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (tableObj) {
+      await axios.post(
+        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/update`,
+        {
+          id: order.table_id,
+          client_id: clientId,
+          name: tableObj.name,
+          table_type: tableObj.table_type,
+          status: 'vacant',
+          location_zone: tableObj.location_zone,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    }
+    toast.success('Order status updated');
+    setOrders(prev => prev.map(o => (o.id === orderId ? { ...o, status: newStatus } : o)));
+    setViewOrder(prev => (prev?.id === orderId ? { ...prev, status: newStatus } : prev));
+  } catch {
+    toast.error('Failed to update order status.');
+  }
+};
+
+const handleRequestDeleteItem = (item, orderId) => {
+  setItemDeleteModal({ isOpen: true, item, orderId });
+};
+
+const handleItemRemoveOne = async (transactionType, reason, removeQty) => {
+  const { item, orderId } = itemDeleteModal;
+  setItemDeleteModal({ isOpen: false, item: null, orderId: null });
+  if (!item?.id) { toast.error('Cannot update — item has no DB reference.'); return; }
+  try {
+    await axios.delete(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
+      {
+        params: { client_id: clientId, order_item_id: item.id, quantity: removeQty, transaction_type: transactionType, reason: reason || undefined },
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    const newQty = item.quantity - removeQty;
+    toast.success(newQty > 0 ? `Quantity reduced to ${newQty}.` : 'Item removed.');
+    const allOrders = await refetchOrders();
+    setOrders(allOrders);
+    const fresh = allOrders.find(o => o.id === orderId);
+    if (fresh && viewOrder?.id === orderId) {
+      setViewOrder({ ...fresh, _tableName: tablesMap[fresh.table_id]?.name || String(fresh.table_id) });
+    } else if (!fresh && viewOrder?.id === orderId) {
+      setViewOrder(null);
+      setShowViewModal(false);
+    }
+  } catch {
+    toast.error('Failed to update item.');
+  }
+};
+
+const handleItemRemoveAll = async (transactionType, reason) => {
+  const { item, orderId } = itemDeleteModal;
+  setItemDeleteModal({ isOpen: false, item: null, orderId: null });
+  if (!item?.id) { toast.error('Cannot delete — item has no DB reference.'); return; }
+  try {
+    await axios.delete(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_item/delete`,
+      {
+        params: { client_id: clientId, order_item_id: item.id, transaction_type: transactionType, reason: reason || undefined },
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    toast.success('Item removed.');
+    const allOrders = await refetchOrders();
+    setOrders(allOrders);
+    const fresh = allOrders.find(o => o.id === orderId);
+    if (fresh && viewOrder?.id === orderId) {
+      setViewOrder({ ...fresh, _tableName: tablesMap[fresh.table_id]?.name || String(fresh.table_id) });
+    } else if (!fresh && viewOrder?.id === orderId) {
+      setViewOrder(null);
+      setShowViewModal(false);
+    }
+  } catch {
+    toast.error('Failed to remove item.');
+  }
+};
 
   const handleSelectOrder = async (order) => {
     if (!order) return;
@@ -190,6 +355,105 @@ export default function BillingPage({ clientId, token }) {
       toast.error("Failed to refresh billing data");
     }
   };
+
+  const billingColumnDefs = [
+    {
+      headerName: 'Order ID',
+      field: 'id',
+      minWidth: 120,
+      cellRenderer: (params) => (
+        <div className="text-sm font-semibold text-text-primary">#{params.value}</div>
+      ),
+    },
+    {
+      headerName: 'Table',
+      field: 'table_id',
+      minWidth: 150,
+      valueGetter: (params) => tablesMap[params.data?.table_id]?.name || `Table ${params.data?.table_id}`,
+      cellRenderer: (params) => (
+        <div>
+          <div className="text-sm font-medium text-text-primary">{params.value}</div>
+          <div className="text-xs text-text-secondary">{params.data?.mode || "Dine-In"}</div>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Items',
+      field: 'items',
+      minWidth: 100,
+      valueGetter: (params) => `${params.data?.items?.length || 0} items`,
+    },
+    {
+      headerName: 'Total Amount',
+      colId: 'total_amount',
+      minWidth: 150,
+      valueGetter: (params) => {
+        const billingDoc = billingDocMap[params.data?.id?.toString()];
+        return billingDoc ? Number(billingDoc.total_amount) : null;
+      },
+      cellRenderer: (params) => (
+        <div className="text-sm font-bold text-action-primary">
+          {params.value != null ? `₹${formatPriceByMode(params.value, clientId)}` : "—"}
+        </div>
+      ),
+    },
+    {
+  headerName: 'Invoice #',
+  colId: 'invoice_number',
+  minWidth: 140,
+  sortable: false,
+  valueGetter: (params) => billingDocMap[params.data?.id?.toString()]?.document_number || '',
+  cellRenderer: (params) => (
+    <span className="text-sm font-medium text-text-primary">
+      {params.value || '—'}
+    </span>
+  ),
+},
+    {
+      headerName: 'Payment Status',
+      colId: 'payment_status',
+      minWidth: 160,
+      sortable: false,
+      valueGetter: (params) => billingDocMap[params.data?.id?.toString()]?.payment_status || '',
+      cellRenderer: (params) => {
+        const billingDoc = billingDocMap[params.data?.id?.toString()];
+        return billingDoc ? (
+          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${billingDoc.payment_status === "Paid"
+              ? "bg-green-100 text-green-700"
+              : billingDoc.status === "partial"
+                ? "bg-yellow-100 text-yellow-700"
+                : "bg-red-100 text-red-700"
+            }`}>
+            {billingDoc.payment_status?.toUpperCase() ?? "UNKNOWN"}
+          </span>
+        ) : (
+          <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+            NOT BILLED
+          </span>
+        );
+      },
+    },
+    {
+  headerName: 'Actions',
+  colId: 'actions',
+  minWidth: 240,
+  sortable: false,
+  filter: false,
+  floatingFilter: false,
+  cellRenderer: (params) => (
+    <OrderRowActions
+      order={params.data}
+      onView={(order) => {
+        setViewOrder({ ...order, _tableName: tablesMap[order.table_id]?.name || String(order.table_id) });
+        setShowViewModal(true);
+      }}
+      onPrint={(order) => handleSelectOrder(order)}
+      onCancel={(order) => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+      onMarkServed={(order) => handleStatusChange(order.id, 'served')}
+    />
+  ),
+},
+  ];
 
   return (
     <div className="min-h-screen bg-bg-primary p-4 md:p-6">
@@ -283,88 +547,7 @@ export default function BillingPage({ clientId, token }) {
           </div>
         ) : (
           <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-bg-tertiary border-b border-border-default">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Order ID</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Table</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Items</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total Amount</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Payment Status</th>
-                    <th className="px-6 py-4 text-center text-xs font-bold text-text-primary uppercase tracking-wider">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default">
-                  {filteredOrders.map((order, index) => {
-                    const tableName = tablesMap[order.table_id]?.name || `Table ${order.table_id}`;
-                    const orderTotal = Number(order.total_price ?? 0);
-
-                    return (
-                      <tr 
-                        key={order.id} 
-                        className="hover:bg-bg-tertiary transition-colors"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-text-primary">#{order.id}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-text-primary">{tableName}</div>
-                          <div className="text-xs text-text-secondary">{order.mode || "Dine-In"}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-text-primary">{order.items?.length || 0} items</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-bold text-action-primary">₹{orderTotal.toFixed(2)}</div>
-                        </td>
-                        {(() => {
-                          const billingDoc = billingDocMap[order.id.toString()];
-                          return (
-                            <>
-                              {/* Total Amount */}
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-bold text-action-primary">
-                                  {billingDoc ? `₹${Number(billingDoc.total_amount).toFixed(2)}` : "—"}
-                                </div>
-                              </td>
-
-                              {/* Payment Status */}
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {billingDoc ? (
-                                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${billingDoc.payment_status === "paid"
-                                      ? "bg-green-100 text-green-700"
-                                      : billingDoc.status === "partial"
-                                        ? "bg-yellow-100 text-yellow-700"
-                                        : "bg-red-100 text-red-700"
-                                    }`}>
-                                    {billingDoc.payment_status?.toUpperCase() ?? "UNKNOWN"}
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
-                                    NOT BILLED
-                                  </span>
-                                )}
-                              </td>
-                            </>
-                          );
-                        })()}
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <button
-                            onClick={() => handleSelectOrder(order)}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-action-primary hover:bg-action-primary/90 text-text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
-                          >
-                            <Eye size={16} />
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <AgGridTable columnDefs={billingColumnDefs} rowData={filteredOrders} domLayout="normal" height={600} />
           </div>
         )}
 
@@ -380,6 +563,27 @@ export default function BillingPage({ clientId, token }) {
             onSave={handleInvoiceSave}
           />
         )}
+        <OrderItemsViewModal
+  isOpen={showViewModal}
+  onClose={() => { setShowViewModal(false); setViewOrder(null); }}
+  order={viewOrder}
+  onRequestDeleteItem={(item) => handleRequestDeleteItem(item, viewOrder?.id)}
+  getOrderTotal={getOrderTotal}
+/>
+
+<CancelOrderConfirmModal
+  isOpen={cancelOrderModal.isOpen}
+  onClose={() => setCancelOrderModal({ isOpen: false, orderId: null })}
+  onConfirm={(reason) => { if (cancelOrderModal.orderId) handleCancelOrder(cancelOrderModal.orderId, reason); }}
+/>
+
+<OldItemDeleteModal
+  isOpen={itemDeleteModal.isOpen}
+  item={itemDeleteModal.item}
+  onClose={() => setItemDeleteModal({ isOpen: false, item: null, orderId: null })}
+  onRemoveOne={handleItemRemoveOne}
+  onRemoveAll={handleItemRemoveAll}
+/>
       </div>
     </div>
   );

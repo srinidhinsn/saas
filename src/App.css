@@ -30,7 +30,7 @@
 
   /* Scrollbar styles */
   ::-webkit-scrollbar {
-    width: 1px;
+    width: 8px;
     height: 8px;
   }
 
@@ -39,7 +39,7 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--border-color);
+    background: var(--text-muted);
     border-radius: 4px;
   }
 

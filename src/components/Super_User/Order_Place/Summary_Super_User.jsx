@@ -7,6 +7,7 @@ import {
   Users, Package, Truck, Eye, AlertTriangle,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
+import AgGridTable from '../../utils/AgGridTable';
 
 Modal.setAppElement("#root");
 
@@ -1370,6 +1371,88 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   };
   const getOrderModeLabel = (mode) => { if (mode === 'takeaway') return 'Takeaway'; if (mode === 'delivery') return 'Delivery'; return 'Dine In'; };
 
+  const orderColumnDefs = [
+    {
+      headerName: 'Order #',
+      field: 'id',
+      minWidth: 130,
+      cellRenderer: (params) => (
+        <div className="flex items-center gap-1.5">
+          <span className="font-bold text-action-primary">#{params.value}</span>
+          {params.data?.has_new_items && <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">New</span>}
+        </div>
+      ),
+    },
+    {
+      headerName: 'Table / Customer',
+      colId: 'table_customer',
+      minWidth: 160,
+      sortable: false,
+      cellRenderer: () => <span>Takeaway</span>,
+    },
+    {
+      headerName: 'Mode',
+      field: '_fixedOrderMode',
+      minWidth: 140,
+      sortable: false,
+      cellRenderer: (params) => (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">
+          {getOrderModeIcon(params.data?._fixedOrderMode)}Takeaway
+        </span>
+      ),
+    },
+    {
+      headerName: 'Items',
+      field: 'items',
+      minWidth: 100,
+      valueGetter: (params) => params.data?.items?.length || 0,
+    },
+    {
+      headerName: 'Total Price',
+      field: 'total_price',
+      minWidth: 140,
+      valueGetter: (params) => getOrderTotal(params.data || {}),
+      valueFormatter: (params) => `₹${(params.value || 0).toFixed(2)}`,
+    },
+    {
+      headerName: 'Status',
+      field: 'status',
+      minWidth: 130,
+      cellRenderer: (params) => <StatusBadge status={params.value} />,
+    },
+    {
+      headerName: 'Actions',
+      colId: 'actions',
+      minWidth: 260,
+      sortable: false,
+      filter: false,
+      floatingFilter: false,
+      cellRenderer: (params) => {
+        const order = params.data;
+        if (!order) return null;
+        const status = order.status?.toLowerCase();
+        return (
+          <div className="flex items-center justify-center gap-4 flex-wrap h-full">
+            <button
+              onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
+              className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors" title="View items"
+            ><Eye size={15} /></button>
+            {status === 'ready' && (
+              <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark As Served</button>
+            )}
+            {status === 'served' && (
+              <button onClick={() => handleGenerateBill(order)} className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap">Generate Bill</button>
+            )}
+            <button
+              onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+              className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors" title="Cancel order"
+            ><Trash2 size={15} /></button>
+          </div>
+        );
+      },
+    },
+  ];
+
   // ─────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────
@@ -1448,59 +1531,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
           <div className="rounded-xl p-16 text-center bg-bg-primary border border-border-default shadow-card"><ShoppingBag size={40} className="mx-auto mb-3 text-text-secondary opacity-40" /><p className="text-text-secondary text-base font-medium">No orders found</p></div>
         ) : (
           <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
-            <div className="w-full overflow-x-auto">
-              <table className="min-w-[1100px] w-full">
-                <thead className="bg-bg-tertiary border-b border-border-default">
-                  <tr>
-                    {['Order #', 'Table / Customer', 'Mode', 'Items', 'Total Price', 'Status', 'Actions'].map(h => (
-                      <th key={h} className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default">
-                  {filteredOrders.map((order, rowIdx) => {
-                    const status = order.status?.toLowerCase();
-                    const orderTotal = getOrderTotal(order);
-                    return (
-                      <tr key={order.id} className={`hover:bg-bg-tertiary transition-colors ${rowIdx % 2 === 0 ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-action-primary">#{order.id}</span>
-                            {order.has_new_items && <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">New</span>}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">Takeaway</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">{getOrderModeIcon(order._fixedOrderMode)}Takeaway</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">{order.items.length}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">₹{orderTotal.toFixed(2)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={order.status} /></td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-4 flex-wrap">
-                            <button
-                              onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
-                              className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors" title="View items"
-                            ><Eye size={15} /></button>
-                            {status === 'ready' && (
-                              <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark As Served</button>
-                            )}
-                            {status === 'served' && (
-                              <button onClick={() => handleGenerateBill(order)} className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap">Generate Bill</button>
-                            )}
-                            {/* REQ: trash now opens CancelOrderConfirmModal */}
-                            <button
-                              onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
-                              className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors" title="Cancel order"
-                            ><Trash2 size={15} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <AgGridTable columnDefs={orderColumnDefs} rowData={filteredOrders} domLayout="normal" height={600} gridOptions={{ getRowId: (params) => String(params.data.id) }} />
           </div>
         )}
       </div>
