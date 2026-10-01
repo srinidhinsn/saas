@@ -7,7 +7,8 @@ import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-
 import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import { parseISTTimestamp, getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
-import { isPackagingMenuRecord } from '../../utils/Menu-utils/menuUtils';
+import { isPackagingMenuRecord  } from '../../utils/Menu-utils/menuUtils';
+import { returnRentalItems } from '../../utils/Menu-utils/rentalReturn';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 
@@ -988,16 +989,15 @@ useEffect(() => {                                      // ← add
       parent_item_key: item.id !== targetItem.id ? targetItem.frontend_unique_key : null,
     });
 
-      if (isRental) {
-        await axios.post(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/dinein/cancel`,
-          {},
-          {
-            params: { client_id: clientIdRef.current, order_id: card.sub_order_id, reason: 'Rental item returned' },
-            headers: { Authorization: `Bearer ${tokenRef.current}` },
-          }
-        );
-      } else {
+    if (isRental) {
+      const nextMap = await returnRentalItems({
+        items: [targetItem, ...packagingChildren],
+        menuItemsMap,
+        clientId: clientIdRef.current,
+        token: tokenRef.current,
+      });
+      if (nextMap) setMenuItemsMap(nextMap);
+    } else {
         const itemsPayload = [targetItem, ...packagingChildren].map(buildPayload);
         await axios.post(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/order_items/update?order_id=${card.sub_order_id}`,

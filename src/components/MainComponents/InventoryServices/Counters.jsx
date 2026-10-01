@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import {X} from 'lucide-react';
+import { menuCache } from "../../utils/Menu-utils/menuCache";
 
 const API = import.meta.env.VITE_API_INVENTORY_SERVICE_URL;
 const defaultRoot = import.meta.env.VITE_MENU_DEFAULT_ROOT;
@@ -136,6 +137,7 @@ export default function CounterManager({ clientId, token }) {
       setShowCreateModal(false);
       setNewCounterId("");
       setNewCounterName("");
+      menuCache.remove('counterTree', clientId);
       fetchCounters();
     } catch (err) {
       console.error("Error creating counter:", err);
@@ -165,6 +167,7 @@ export default function CounterManager({ clientId, token }) {
 
       setEditingCounter(null);
       setEditCounterName("");
+      menuCache.remove('counterTree', clientId);
       fetchCounters();
     } catch (err) {
       console.error("Error updating counter:", err);
@@ -219,6 +222,7 @@ export default function CounterManager({ clientId, token }) {
       );
 
       setDeletingCounter(null);
+      menuCache.remove('counterTree', clientId);
       fetchCounters();
     } catch (err) {
       console.error("Error deleting counter:", err);
@@ -244,18 +248,43 @@ export default function CounterManager({ clientId, token }) {
 
       setSelectedCounter(null);
       setSelectedCategories([]);
+      menuCache.remove('counterTree', clientId);
       fetchCounters();
     } catch (err) {
       console.error("Error assigning categories:", err);
     }
   };
 
+  // ================= Cross-counter lock helpers =================
+  // Flattens a counter's nested subCategories tree into a plain list of ids
+  const collectCategoryIds = (nodes = []) => {
+    let ids = [];
+    nodes.forEach((n) => {
+      ids.push(n.id);
+      if (n.subCategories?.length) ids = ids.concat(collectCategoryIds(n.subCategories));
+    });
+    return ids;
+  };
+
+  // category id -> the OTHER counter that already owns it (excludes the
+  // counter currently open in the Assign modal, so its own picks stay editable)
+  const categoryOwnerMap = useMemo(() => {
+    const map = {};
+    counters.forEach((c) => {
+      if (selectedCounter && c.id === selectedCounter.id) return;
+      collectCategoryIds(c.subCategories || []).forEach((id) => {
+        map[id] = c;
+      });
+    });
+    return map;
+  }, [counters, selectedCounter]);
+
   // ================= Selection Helpers =================
   // A parent is "fully checked" if its own id is selected, OR every one of
   // its children is individually selected (both states mean the same thing
   // for KOT routing, but we want the checkbox to reflect either path).
   const isParentChecked = (group) => {
-    const children = group.subCategories || [];
+    const children = (group.subCategories || []).filter((c) => !categoryOwnerMap[c.id]);
     if (selectedCategories.includes(group.id)) return true;
     if (children.length === 0) return false;
     return children.every((c) => selectedCategories.includes(c.id));
@@ -264,7 +293,7 @@ export default function CounterManager({ clientId, token }) {
   // Parent is "partially checked" (indeterminate) if some but not all
   // children are selected, and the parent itself isn't directly selected.
   const isParentIndeterminate = (group) => {
-    const children = group.subCategories || [];
+    const children = (group.subCategories || []).filter((c) => !categoryOwnerMap[c.id]);
     if (selectedCategories.includes(group.id)) return false;
     if (children.length === 0) return false;
     const checkedCount = children.filter((c) =>
@@ -277,7 +306,11 @@ export default function CounterManager({ clientId, token }) {
   // KOT differentiation, since printKOT walks the full ancestor chain) and
   // also checks every child for clarity in the UI. Unchecking clears both.
   const toggleParent = (group, checked) => {
-    const childIds = (group.subCategories || []).map((c) => c.id);
+    if (categoryOwnerMap[group.id]) return; // group already fully assigned elsewhere — no-op
+
+    const childIds = (group.subCategories || [])
+      .filter((c) => !categoryOwnerMap[c.id])
+      .map((c) => c.id);
 
     setSelectedCategories((prev) => {
       const withoutGroup = prev.filter(
@@ -296,6 +329,7 @@ export default function CounterManager({ clientId, token }) {
   // parent id too — otherwise the parent id alone would still imply ALL
   // children are assigned, silently re-including the one just unchecked.
   const toggleChild = (group, cat, checked) => {
+    if (categoryOwnerMap[cat.id]) return;
     setSelectedCategories((prev) => {
       let next = checked
         ? [...prev, cat.id]
@@ -499,15 +533,17 @@ export default function CounterManager({ clientId, token }) {
               {allCategories.map((group) => {
                 const parentChecked = isParentChecked(group);
                 const parentIndeterminate = isParentIndeterminate(group);
+                const groupLockedBy = categoryOwnerMap[group.id];
 
                 return (
                   <div key={group.id}>
 
                     {/* Level One Heading - now also a checkbox */}
-                    <label className="flex items-center gap-2 font-semibold text-lg mb-2 border-b pb-1 cursor-pointer">
+                    <label className={`flex items-center gap-2 font-semibold text-lg mb-2 border-b pb-1 ${groupLockedBy ? "text-gray-400 cursor-not-allowed" : "cursor-pointer"}`}>
                       <input
                         type="checkbox"
                         checked={parentChecked}
+                        disabled={!!groupLockedBy}
                         ref={(el) => {
                           if (el) el.indeterminate = parentIndeterminate;
                         }}
@@ -521,28 +557,44 @@ export default function CounterManager({ clientId, token }) {
                           (all items in this category differentiated)
                         </span>
                       )}
+                      {groupLockedBy && (
+                        <span className="text-xs font-normal italic">
+                          Assigned to {groupLockedBy.name}
+                        </span>
+                      )}
                     </label>
 
                     {/* Child Categories */}
                     <div className="space-y-2 pl-4">
-                      {group.subCategories?.map((cat) => (
-                        <label
-                          key={cat.id}
-                          className="flex items-center gap-2 border p-2 rounded-lg"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={
-                              parentChecked ||
-                              selectedCategories.includes(cat.id)
-                            }
-                            onChange={(e) =>
-                              toggleChild(group, cat, e.target.checked)
-                            }
-                          />
-                          {cat.name}
-                        </label>
-                      ))}
+                      {group.subCategories?.map((cat) => {
+                        const lockedBy = categoryOwnerMap[cat.id];
+                        return (
+                          <label
+                            key={cat.id}
+                            className={`flex items-center gap-2 border p-2 rounded-lg ${
+                              lockedBy ? "bg-gray-50 text-gray-400 cursor-not-allowed" : ""
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={
+                                parentChecked ||
+                                selectedCategories.includes(cat.id)
+                              }
+                              disabled={!!lockedBy}
+                              onChange={(e) =>
+                                toggleChild(group, cat, e.target.checked)
+                              }
+                            />
+                            {cat.name}
+                            {lockedBy && (
+                              <span className="text-xs italic ml-auto">
+                                Assigned to {lockedBy.name}
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })}
                     </div>
 
                   </div>

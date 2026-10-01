@@ -1500,14 +1500,34 @@ export function getDraftTableIdsFromOrders(allOrders) {
 }
 
 export async function upsertBillingDocumentForCustomer({
-  clientId,
-  token,
-  orderId,
-  tableRef,
-  customerDetails,
-  orderSubtotal = 0,
+  clientId, token, orderId, tableRef, customerDetails, orderSubtotal = 0,
 }) {
   try {
+    const existingRes = await axios.get(
+      `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
+      { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId } }
+    );
+    const existing = (existingRes.data?.data || [])
+      .find(d => d.order_id?.toString() === orderId.toString());
+
+    if (existing) {
+      // Just refresh customer info — never touch payment_status/status/document_number
+      await axios.post(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+        {
+          id: existing.id,
+          client_id: clientId,
+          customer_id: customerDetails.customer_id || '',
+          contact_email: customerDetails.contact_email || '',
+          contact_phone: customerDetails.contact_phone || '',
+          shipping_address: customerDetails.shipping_address || '',
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return existing.id;
+    }
+
+    // No existing doc — create as before
     const payload = {
       client_id: clientId,
       document_type: 'Invoice',
@@ -1525,7 +1545,7 @@ export async function upsertBillingDocumentForCustomer({
       customer_id: customerDetails.customer_id || '',
       contact_email: customerDetails.contact_email || '',
       contact_phone: customerDetails.contact_phone || '',
-      shipping_address: customerDetails.shipping_address || '', 
+      shipping_address: customerDetails.shipping_address || ''
     };
 
     const res = await axios.post(
