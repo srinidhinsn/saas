@@ -416,6 +416,13 @@ DEFAULT_CLIENT_CATEGORIES = [
         "sub_categories": ["General"],
         "slug": "_Zones",
     },
+     {
+        "id": "units",
+        "name": "Units",
+        "description": "Unit Selection",
+        "sub_categories": ["kg", "g", "litre", "ml", "pcs"],
+        "slug": "_Zones",
+    },
 ]
 
 def seed_default_categories(client_id: str, created_by: str, db: Session, admin_role: str = "admin"):
@@ -463,6 +470,13 @@ def seed_default_categories(client_id: str, created_by: str, db: Session, admin_
             "sub_categories": ["General"],
             "slug": "_Zones",
         },
+        {
+        "id": "units",
+        "name": "Units",
+        "description": "Unit Selection",
+        "sub_categories": ["kg", "g", "litre", "ml", "pcs"],
+        "slug": "_Zones",
+    },
     ]
 
     for cat in categories:
