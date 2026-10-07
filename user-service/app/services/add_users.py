@@ -416,6 +416,55 @@ DEFAULT_CLIENT_CATEGORIES = [
         "sub_categories": ["General"],
         "slug": "_Zones",
     },
+     {
+        "id": "units",
+        "name": "Units",
+        "description": "Unit Selection",
+        "sub_categories": ["kg", "g", "litre", "ml", "pcs"],
+        "slug": "_units",
+    },
+    {
+        "id": "counter",
+        "name": "Counters",
+        "description": "Kitchen Counters",
+        "sub_categories": [],
+        "slug": "_Counters",
+    },
+    {
+        "id": "price_rounding",
+        "name": "Price Rounding",
+        "description": "Price Selection",
+        "sub_categories": ["exact", "round_up", "round_down"],
+        "slug": "_price_rounding",
+    },
+    {
+        "id": "inventory",
+        "name": "Inventory",
+        "description": "Inventory items",
+        "sub_categories": [],
+        "slug": "_inventory",
+    },
+     {
+        "id": "combos",
+        "name": "Combos",
+        "description": "Combos",
+        "sub_categories": [],
+        "slug": "_combos",
+    },
+     {
+        "id": "addons",
+        "name": "Add-ons",
+        "description": "Add ons",
+        "sub_categories": ["packaging"],
+        "slug": "_addons",
+    },
+    {
+        "id": "packaging",
+        "name": "Packaging-Add-ons",
+        "description": "Add ons",
+        "sub_categories": [],
+        "slug": "_packing_addons",
+    },
 ]
 
 def seed_default_categories(client_id: str, created_by: str, db: Session, admin_role: str = "admin"):
@@ -463,6 +512,55 @@ def seed_default_categories(client_id: str, created_by: str, db: Session, admin_
             "sub_categories": ["General"],
             "slug": "_Zones",
         },
+        {
+        "id": "units",
+        "name": "Units",
+        "description": "Unit Selection",
+        "sub_categories": ["kg", "g", "litre", "ml", "pcs"],
+        "slug": "_units",
+    },
+            {
+        "id": "counter",
+        "name": "Counters",
+        "description": "Kitchen Counters",
+        "sub_categories": [],
+        "slug": "_counter",
+    },
+    {
+        "id": "price_rounding",
+        "name": "Price Rounding",
+        "description": "Price Selection",
+        "sub_categories": ["exact", "round_up", "round_down"],
+        "slug": "_price_rounding",
+    },
+    {
+        "id": "inventory",
+        "name": "Inventory",
+        "description": "Inventory items",
+        "sub_categories": [],
+        "slug": "_inventory",
+    },
+    {
+        "id": "combos",
+        "name": "Combos",
+        "description": "Combos",
+        "sub_categories": [],
+        "slug": "_combos",
+    },
+     {
+        "id": "addons",
+        "name": "Add-ons",
+        "description": "Add ons",
+        "sub_categories": ["packaging"],
+        "slug": "_addons",
+    },
+    {
+        "id": "packaging",
+        "name": "Packaging-Add-ons",
+        "description": "Add ons",
+        "sub_categories": [],
+        "slug": "_packing_addons",
+    },
     ]
 
     for cat in categories:
@@ -494,7 +592,7 @@ async def register_client_service(reg_type: str,user: UserModel,address: Address
     
     if reg_type == "merchant":
         roles = user.roles or ["admin"]
-        grants = user.grants or ["admin"]
+        grants = [client.realm]
         realm = client.realm
     else:
         roles =  [SUPER_USER_REALM]
