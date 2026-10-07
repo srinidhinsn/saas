@@ -423,6 +423,41 @@ DEFAULT_CLIENT_CATEGORIES = [
         "sub_categories": ["kg", "g", "litre", "ml", "pcs"],
         "slug": "_Zones",
     },
+    {
+        "id": "counter",
+        "name": "Counters",
+        "description": "Kitchen Counters",
+        "sub_categories": [],
+        "slug": "_Zones",
+    },
+    {
+        "id": "price_rounding",
+        "name": "Price Rounding",
+        "description": "Price Selection",
+        "sub_categories": ["exact", "round_up", "round_down"],
+        "slug": "_Zones",
+    },
+    {
+        "id": "inventory",
+        "name": "Inventory",
+        "description": "Inventory items",
+        "sub_categories": [],
+        "slug": "_Zones",
+    },
+     {
+        "id": "combos",
+        "name": "Combos",
+        "description": "Combos",
+        "sub_categories": [],
+        "slug": "_Zones",
+    },
+     {
+        "id": "addons",
+        "name": "Add-ons",
+        "description": "Add ons",
+        "sub_categories": [],
+        "slug": "_Zones",
+    },
 ]
 
 def seed_default_categories(client_id: str, created_by: str, db: Session, admin_role: str = "admin"):
@@ -475,6 +510,41 @@ def seed_default_categories(client_id: str, created_by: str, db: Session, admin_
         "name": "Units",
         "description": "Unit Selection",
         "sub_categories": ["kg", "g", "litre", "ml", "pcs"],
+        "slug": "_Zones",
+    },
+            {
+        "id": "counter",
+        "name": "Counters",
+        "description": "Kitchen Counters",
+        "sub_categories": [],
+        "slug": "_Zones",
+    },
+    {
+        "id": "price_rounding",
+        "name": "Price Rounding",
+        "description": "Price Selection",
+        "sub_categories": ["exact", "round_up", "round_down"],
+        "slug": "_Zones",
+    },
+    {
+        "id": "inventory",
+        "name": "Inventory",
+        "description": "Inventory items",
+        "sub_categories": [],
+        "slug": "_Zones",
+    },
+    {
+        "id": "combos",
+        "name": "Combos",
+        "description": "Combos",
+        "sub_categories": [],
+        "slug": "_Zones",
+    },
+     {
+        "id": "addons",
+        "name": "Add-ons",
+        "description": "Add ons",
+        "sub_categories": [],
         "slug": "_Zones",
     },
     ]
