@@ -592,7 +592,7 @@ async def register_client_service(reg_type: str,user: UserModel,address: Address
     
     if reg_type == "merchant":
         roles = user.roles or ["admin"]
-        grants = user.grants or ["admin"]
+        grants = [client.realm]
         realm = client.realm
     else:
         roles =  [SUPER_USER_REALM]
