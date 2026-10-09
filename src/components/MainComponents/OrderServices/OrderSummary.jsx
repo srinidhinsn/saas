@@ -21,6 +21,7 @@ import {
   OrderItemsViewModal,
   StatusBadge,
   getInitialOrderMode,
+  hasInvoiceBeenGenerated
 } from '../../utils/BillingUtils';
 
 const normaliseItem = (item) => {
@@ -732,6 +733,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   cellRenderer: (params) => (
     <OrderRowActions
       order={params.data}
+      invoiceGenerated={hasInvoiceBeenGenerated(params.data, billingDocMap)}
       onView={(order) => {
         setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) });
         setShowViewModal(true);

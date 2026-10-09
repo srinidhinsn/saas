@@ -12,6 +12,7 @@ import {
   CancelOrderConfirmModal,
   OldItemDeleteModal,
   OrderItemsViewModal,
+  hasInvoiceBeenGenerated
 } from '../../utils/BillingUtils';
 
 export default function BillingPage({ clientId, token }) {
@@ -443,6 +444,7 @@ const handleItemRemoveAll = async (transactionType, reason) => {
   cellRenderer: (params) => (
     <OrderRowActions
       order={params.data}
+      invoiceGenerated={hasInvoiceBeenGenerated(params.data, billingDocMap)}
       onView={(order) => {
         setViewOrder({ ...order, _tableName: tablesMap[order.table_id]?.name || String(order.table_id) });
         setShowViewModal(true);
