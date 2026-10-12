@@ -4,7 +4,7 @@ import MenuImagePreview from '../../MainComponents/InventoryServices/Tree&Catego
 import AddonSelectionPopup from './AddonSelection';
 import ComboSelectionPopup from './CombosSelectionPopup';
 import axios from 'axios';
-
+import {isRentalRealm} from '../Menu-utils/menuUtils'
 const UniversalEditModal = ({
   // Common props
   showModal,
@@ -28,7 +28,7 @@ const UniversalEditModal = ({
   fetchAddonData, setAddonSubcategories, setAllAddonItems, units,
   // Combo props
   dedupedMenuItems, categoriesFlat,
-
+  dietaryColorMap,
   // Table-specific props
   editRowId,
   setEditRowId,
@@ -296,6 +296,65 @@ const UniversalEditModal = ({
                     rows="3"
                   />
                 </div>
+            {isRentalRealm(normalizedRealm) && (
+                <div>
+                     <label className="block text-sm font-medium mb-2 text-text-primary">
+                           Rental Tier <span className="text-red-600">*</span>
+                     </label>
+                     <div className="flex gap-2 items-center bg-bg-tertiary border border-border-default rounded-lg p-2">
+                         <input  value={editingItem?.rentalTier?.label || ''} placeholder="e.g. Half Day"
+                                 onChange={(e) => setEditingItem(prev => ({ ...prev,
+                                                  rentalTier: { ...(prev?.rentalTier || {}), label: e.target.value } }))}
+                                 className="flex-1 px-3 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                         <input type="number" min="0" value={editingItem?.rentalTier?.days ?? ''} placeholder="Days"
+                                onChange={(e) => setEditingItem(prev => ({...prev,
+                                                 rentalTier: { ...(prev?.rentalTier || {}), days: e.target.value }}))}
+                                className="w-16 px-2 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                         <input type="number" min="0" value={editingItem?.rentalTier?.hours ?? ''} placeholder="Hrs"
+                                onChange={(e) => setEditingItem(prev => ({ ...prev,
+                                                 rentalTier: { ...(prev?.rentalTier || {}), hours: e.target.value }}))}
+                                className="w-16 px-2 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                         <input type="number" min="0" value={editingItem?.rentalTier?.minutes ?? ''} placeholder="Min"
+                                onChange={(e) => setEditingItem(prev => ({ ...prev,
+                                                 rentalTier: { ...(prev?.rentalTier || {}), minutes: e.target.value }}))}
+                                className="w-16 px-2 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                     </div>
+                {!editingItem?.rentalTier?.label && ( <p className="text-xs text-red-500 mt-1">Enter rental tier details</p> )}
+                </div> )}
+                {normalizedRealm === 'restaurant' && (
+  <div>
+    <label className="block text-sm font-medium mb-1 text-gray-700">
+      Dietary Type
+    </label>
+    <div className="flex flex-wrap gap-2">
+    {dietaryOptions.map((d) => {
+  const key = (d || '').toLowerCase().replace(/[-_\s]/g, '');
+  const selected = (editingItem?.dietary_type || '').toLowerCase().replace(/[-_\s]/g, '') === key;
+  const colorClass = dietaryColorMap?.[d] || dietaryColorMap?.[key] || 'border-gray-300';
+  return (
+    <button
+      key={d}
+      type="button"
+      onClick={() =>
+        setEditingItem(prev => ({ ...prev, dietary_type: selected ? '' : d }))
+      }
+      className={`px-3 py-1.5 rounded-lg text-sm border transition-all capitalize flex items-center gap-2 ${
+        selected
+          ? 'bg-red-700 text-text-white border-red-600 shadow-sm'
+          : 'bg-gray-50 border-gray-300 text-gray-700'
+      }`}
+    >
+      <span className={`w-2.5 h-2.5 rounded-full ${colorClass}`} />
+      {d}
+    </button>
+  );
+})}
+    </div>
+    {!editingItem?.dietary_type && (
+      <p className="text-xs text-gray-400 mt-1">No dietary type selected</p>
+    )}
+  </div>
+)}
                 {normalizedRealm === 'restaurant' && (
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">

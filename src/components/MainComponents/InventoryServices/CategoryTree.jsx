@@ -28,7 +28,7 @@ const OrderTreeNode = ({ category, level = 0, isExpanded, hasChildren, isSelecte
           <span className="w-4 flex-shrink-0" />
         )}
         <span className={`text-sm font-medium truncate ${isSelected ? "text-white" : "text-text-primary"}`}>
-          {category.name}
+        {category.displayName || category.name}
         </span>
       </div>
     </div>
@@ -207,7 +207,7 @@ useEffect(() => {
                   ? 'bg-action-primary text-white'
                   : 'bg-bg-primary border-2 border-border-default hover:border-action-primary'}`}
             >
-              {cat.name}
+              {cat.displayName || cat.name}
             </button>
           ))}
         </div>

@@ -7,6 +7,7 @@ import UniversalBulkUpdateModal from "../../utils/Modals/UniversalBulkUpdateModa
 import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModal";
 import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
 import TableConfigModal from "../../utils/Modals/TableConfigModal";
+import { menuCache } from '../../utils/Menu-utils/menuCache'; 
 
 const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
 
@@ -194,20 +195,8 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
         }
     };
     const fetchConfigs = async () => {
-        try {
-            const res = await axios.get(
-                `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
-                {
-                    params: { client_id: clientId },
-                    headers: { Authorization: `Bearer ${token}` }
-                }
-            );
-
-            setConfigs(res.data || []);
-        } catch (err) {
-            console.error("Error fetching configs", err);
-            setConfigs([]);
-        }
+     const { sections } = await menuCache.fetchTablesConfig(clientId, token);
+     setConfigs(sections);
     };
     const fetchMasterValues = async (categoryId, setter) => {
         try {
@@ -266,18 +255,10 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
         generatingRef.current = true;
         setIsGenerating(true);
         try {
-            let freshConfigs = configs;
-            try{
-                const res = await axios.get(`${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/config`,
-                    {headers:{Authorization: `Bearer ${token}`}}
-                );
-                freshConfigs = res.data || [];
-                setConfigs(freshConfigs);
-            }
-            catch(err){
-                console.log("Failed to refresh configs" , err);
-                
-            }
+            // Force a fresh fetch before generating so new configs are always picked up
+          menuCache.remove('zoneConfig', clientId);
+          const { sections: freshConfigs } = await menuCache.fetchTablesConfig(clientId, token);
+          setConfigs(freshConfigs);
             for (let row of tableRanges) {
                 if (!row.range || !row.config_id || !row.table_type) {
                     generatingRef.current = false;

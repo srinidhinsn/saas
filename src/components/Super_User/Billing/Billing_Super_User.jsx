@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import InvoiceModal from "../../MainComponents/BillingServices/InvoiceModal";
 import { Search, Calendar, Eye } from 'lucide-react';
 import { useTenant } from "../../../context/TenantContext";
+import AgGridTable from '../../utils/AgGridTable';
 export default function BillingPage_Super_User({  token }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -132,6 +133,64 @@ export default function BillingPage_Super_User({  token }) {
     console.log('Invoice saved with ID:', draftId);
   };
 
+  const billingColumnDefs = [
+    {
+      headerName: 'Order ID',
+      field: 'id',
+      minWidth: 120,
+      cellRenderer: (params) => (
+        <div className="text-sm font-semibold text-text-primary">#{params.value}</div>
+      ),
+    },
+    {
+      headerName: 'Table',
+      field: 'table_id',
+      minWidth: 150,
+      valueGetter: (params) => tablesMap[params.data?.table_id]?.name || `Table ${params.data?.table_id}`,
+      cellRenderer: (params) => (
+        <div>
+          <div className="text-sm font-medium text-text-primary">{params.value}</div>
+          <div className="text-xs text-text-secondary">{params.data?.mode || "Dine-In"}</div>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Items',
+      field: 'items',
+      minWidth: 100,
+      valueGetter: (params) => `${params.data?.items?.length || 0} items`,
+    },
+    {
+      headerName: 'Total',
+      field: 'total_price',
+      minWidth: 130,
+      valueGetter: (params) => Number(params.data?.total_price ?? 0),
+      valueFormatter: (params) => `₹${(params.value || 0).toFixed(2)}`,
+      cellRenderer: (params) => (
+        <div className="text-sm font-bold text-action-primary">₹{Number(params.value || 0).toFixed(2)}</div>
+      ),
+    },
+    {
+      headerName: 'Action',
+      colId: 'actions',
+      minWidth: 140,
+      sortable: false,
+      filter: false,
+      floatingFilter: false,
+      cellRenderer: (params) => (
+        <div className="flex items-center justify-center w-full">
+          <button
+            onClick={() => handleSelectOrder(params.data)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-action-primary hover:bg-action-primary/90 text-text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+          >
+            <Eye size={16} />
+            View
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-bg-primary p-4 md:p-6">
       <div className="max-w-[1800px] mx-auto">
@@ -189,53 +248,14 @@ export default function BillingPage_Super_User({  token }) {
         ) : (
           <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-bg-tertiary border-b border-border-default">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Order ID</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Table</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Items</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">Total</th>
-                    <th className="px-6 py-4 text-center text-xs font-bold text-text-primary uppercase tracking-wider">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-default">
-                  {filteredOrders.map((order, index) => {
-                    const tableName = tablesMap[order.table_id]?.name || `Table ${order.table_id}`;
-                    const orderTotal = Number(order.total_price ?? 0);
-
-                    return (
-                      <tr 
-                        key={order.id} 
-                        className="hover:bg-bg-tertiary transition-colors"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-text-primary">#{order.id}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-text-primary">{tableName}</div>
-                          <div className="text-xs text-text-secondary">{order.mode || "Dine-In"}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-text-primary">{order.items?.length || 0} items</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-bold text-action-primary">₹{orderTotal.toFixed(2)}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <button
-                            onClick={() => handleSelectOrder(order)}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-action-primary hover:bg-action-primary/90 text-text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
-                          >
-                            <Eye size={16} />
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <AgGridTable
+                columnDefs={billingColumnDefs}
+                rowData={filteredOrders}
+                domLayout="normal"
+                height={600}
+                exportFileName="billing_super_user"
+                gridOptions={{ getRowId: (params) => String(params.data.id) }}
+              />
             </div>
           </div>
         )}

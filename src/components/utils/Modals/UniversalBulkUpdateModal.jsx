@@ -811,7 +811,7 @@ const UniversalBulkUpdateModal = ({
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
               <div className="flex justify-between items-center">
                 <p className="text-sm text-gray-600">
-                  💡 Use the global add-ons section at the top to apply add-ons to all selected items at once, or edit individual items below
+                  For better experience use a large devices !!!
                 </p>
                 <button
                   onClick={handleBulkUpdate}
