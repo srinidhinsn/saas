@@ -8,6 +8,7 @@ from typing import Optional
 import uuid
 from pydantic import BaseModel
 from entity.inventory_entity import InventoryEntity
+from models.saas_context import SaasContext;
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared transaction helpers — used by order_service and order_router
 # ─────────────────────────────────────────────────────────────────────────────
@@ -104,9 +105,12 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
 def create_transaction(
     db: Session,
     *,
-    client_id: str,
+    context: SaasContext,
     payload: TxPayload
 ):
+    client_id = context.client_id
+    created_by = context.user_id 
+    
     item_id       = payload.item_id
     tx_type       = payload.tx_type
     ref_id        = payload.ref_id
@@ -130,66 +134,44 @@ def create_transaction(
     tx_type_str = str(tx_type).upper()
 
     # =========================================================
-    # ✅ 1. PRIORITY: Explicit after_stock (used in adjustments)
+    # Movement resolution — switch-style via match/case
     # =========================================================
+    # ✅ 1. PRIORITY: Explicit after_stock (used in adjustments)
     if after_stock is not None:
         after = Decimal(str(after_stock))
 
-        if after > before:
-            movement = "IN"
-        elif after < before:
-            movement = "OUT"
-        else:
-            movement = "NONE"
+        match True:
+            case _ if after > before:
+                movement = MovementTypeEnum.in_
+            case _ if after < before:
+                movement = MovementTypeEnum.out
+            case _:
+                movement = MovementTypeEnum.none
 
-    # =========================================================
-    # ✅ 2. PRIORITY: Explicit movement_type (inventory service)
-    # =========================================================
-    elif movement_type:
-        movement = movement_type.upper()
-
-        if movement == "IN":
-            after = before + qty
-        elif movement == "OUT":
-            after = before - qty
-        else:
-            after = before
-
-    # =========================================================
-    # ✅ 3. FALLBACK: Order-service logic (existing behavior)
-    # =========================================================
+    # ✅ 2. FALLBACK: Order-service logic (existing behavior)
     else:
-        if tx_type_str in ["WASTAGE"]:
-         if before <= 0:
-           movement = "out"
-           after = before
-         else:
-           movement = "OUT"
-           after = before
+        match tx_type_str:
+            case "WASTAGE":
+                movement = MovementTypeEnum.out
+                after = before
 
-        elif tx_type_str in ["ITEM_CANCELLED"]:
-            movement = "NONE"
-            after = before
+            case "ITEM_CANCELLED":
+                movement = MovementTypeEnum.none
+                after = before
 
-        # =====================================================
-        # ✅ 4. GENERIC DEFAULT (inventory-safe fallback)
-        # =====================================================
-        elif tx_type_str in ["STOCK_IN", "RETURN"]:
-            movement = "IN"
-            after = before + qty
+            # ✅ 3. GENERIC DEFAULT (inventory-safe fallback)
+            case "STOCK_IN" | "RETURN":
+                movement = MovementTypeEnum.in_
+                after = before + qty
 
-        elif tx_type_str in ["ORDER_DEDUCTION", "STOCK_OUT", "CANCELLATION"]:
-            if before <= 0:
-             movement = "OUT"
-             after = before
-            else:
-             movement = "OUT"
-             after = before - qty
+            case "ORDER_DEDUCTION" | "STOCK_OUT" | "CANCELLATION":
+                movement = MovementTypeEnum.out
+                after = before - qty
 
-        else:
-            # safest fallback
-            movement = "NONE"
-            after = before
+            case _:
+                # safest fallback
+                movement = MovementTypeEnum.none
+                after = before
 
     # =========================================================
     # 🔹 Create transaction
@@ -203,7 +185,7 @@ def create_transaction(
         name=item.name,
 
         transaction_type=tx_type_str,
-        movement_type=movement,
+        movement_type=movement.value,
 
         quantity=qty,
         unit=item.unit or "pcs",
@@ -214,6 +196,7 @@ def create_transaction(
         reference_id=str(ref_id),
         reference_type="order",  # you can override later if needed
         remarks=remarks or tx_type_str,
+        created_by=created_by,
     )
 
     db.add(tx)
@@ -238,7 +221,9 @@ def record_partial_transaction(
     transaction_type: TransactionTypeEnum,
     reason: Optional[str],
     order_id: int,
+    context: SaasContext, 
 ) -> None:
+    client_id = context.client_id
 
     menu_item = db.query(InventoryEntity).filter(
         InventoryEntity.id == item.item_id,
@@ -256,7 +241,7 @@ def record_partial_transaction(
 
     # 🔹 ITEM CANCELLED (no stock change)
     if transaction_type == TransactionTypeEnum.item_cancelled:
-        create_transaction(db=db, client_id=client_id,
+        create_transaction(db=db, context=context,
     payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.item_cancelled,
         ref_id=order_id, qty=remove_qty,
         remarks=build_remark(TransactionTypeEnum.item_cancelled.value, order_id, item.item_name, remove_qty, effective_reason),
@@ -267,7 +252,7 @@ def record_partial_transaction(
     elif transaction_type == TransactionTypeEnum.wastage:
 
         # 🔸 Always record wastage transaction
-        create_transaction(db=db, client_id=client_id,
+        create_transaction(db=db, context=context,
             payload=TxPayload(item_id=menu_item.id, tx_type=TransactionTypeEnum.wastage,
                 ref_id=order_id, qty=remove_qty,
                 remarks=build_remark(TransactionTypeEnum.wastage.value, order_id, item.item_name, remove_qty, effective_reason),
@@ -295,7 +280,7 @@ def record_partial_transaction(
                 reversal = _convert(recipe_qty, recipe_unit, ing_stock_unit) * remove_qty
                 reversal_qty = round(reversal, 6)
 
-                create_transaction(db=db, client_id=client_id,
+                create_transaction(db=db, context=context,
                     payload=TxPayload(item_id=stock_item.id, tx_type=TransactionTypeEnum.wastage,
         ref_id=order_id, qty=reversal_qty,
         remarks=build_remark(TransactionTypeEnum.wastage.value, order_id, item.item_name, remove_qty, effective_reason),

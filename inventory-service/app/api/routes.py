@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional, Dict, Any
 from decimal import Decimal, getcontext
 from database.postgres import get_db
 from models.inventory_model import Inventory, Category, InventoryTransaction
+from models.order_model import TransactionTypeEnum
 from entity.inventory_entity import InventoryEntity, CategoryEntity, InventoryTransactionEntity
 from models.response_model import ResponseModel
 from models.saas_context import SaasContext
@@ -70,13 +71,55 @@ def create_inventory(item: Inventory, client_id: str, context: SaasContext = Dep
     return ResponseModel[Inventory](screen_id=context.screen_id,status="success",message="Inventory item created",data=model)
 
 
-@router.post("/update", response_model=ResponseModel[Inventory])
+@router.post("/update", response_model=ResponseModel)
 def update_inventory(
     client_id: str,
-    updates: Inventory,
+    payload: Dict[str, Any] = Body(),
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db)
 ):
+    if "items" in payload:
+        items = payload.get("items") or []
+        if not items:
+            raise HTTPException(status_code=400, detail="Missing items")
+
+        updated = []
+        for item in items:
+            item_id = item.get("id")
+            new_availability = item.get("availability")
+            if item_id is None or new_availability is None:
+                continue
+
+            record = db.query(InventoryEntity).filter(
+                InventoryEntity.id == int(item_id),
+                InventoryEntity.client_id == client_id,
+            ).first()
+            if not record:
+                continue
+
+            new_qty = Decimal(str(new_availability))
+            before_stock = Decimal(str(record.availability or 0))
+
+            if new_qty != before_stock:
+                create_transaction(
+                    db=db, context=context,
+                    payload=TxPayload(
+                        item_id=record.id,tx_type=TransactionTypeEnum.menu_availability_adjustment.value,
+                        ref_id=record.id, qty=abs(new_qty - before_stock),
+                        after_stock=new_qty,
+                        remarks=f"Bulk availability update for '{record.name}'",
+                    ),
+                )
+            record.availability = new_qty
+            updated.append(item_id)
+
+        db.commit()
+        return ResponseModel(
+            screen_id=context.screen_id, status="success",
+            message="Bulk availability updated",
+            data={"updated_ids": updated},
+        )    
+    updates = Inventory(**payload)
     if not updates.id:
         raise HTTPException(status_code=400, detail="Missing item ID")
 
@@ -141,7 +184,7 @@ def update_inventory(
         before_stock = Decimal(str(record.availability or 0))
 
         if new_qty != before_stock:
-            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,
+            create_transaction(db=db, context=context, payload=TxPayload(item_id=record.id,
                                 tx_type="MENU_AVAILABILITY_ADJUSTMENT",ref_id=record.id,qty=abs(new_qty - before_stock),
                                 after_stock=new_qty,remarks=f"Manual availability update for '{record.name}'",))
 
@@ -353,7 +396,7 @@ def create_stock_item(
 
     # 🔥 Use unified transaction engine
     if opening_qty != Decimal("0"):
-        create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=db_item.id,tx_type="STOCK_IN",
+        create_transaction(db=db, context=context, payload=TxPayload(item_id=db_item.id,tx_type="STOCK_IN",
                            ref_id=db_item.id,qty=opening_qty,movement_type="IN",remarks="Opening stock on item creation",))
 
     db.commit()
@@ -398,7 +441,7 @@ def add_stock_quantity(
     if qty <= 0:
         raise HTTPException(status_code=400, detail="Quantity must be greater than 0")
 
-    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type="STOCK_IN",
+    create_transaction(db=db, context=context, payload=TxPayload(item_id=record.id,tx_type="STOCK_IN",
                        ref_id=reference_id or record.id,qty=qty,movement_type="IN",remarks=remarks or "Stock replenishment",))
 
     db.commit()
@@ -451,7 +494,7 @@ def deduct_stock_quantity(
         )
 
     # 🔥 Unified transaction
-    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type=transaction_type,
+    create_transaction(db=db, context=context, payload=TxPayload(item_id=record.id,tx_type=transaction_type,
                     ref_id=reference_id or record.id,qty=qty,after_stock=after_stock,
                     remarks=remarks or f"Stock deduction ({transaction_type})",))
 
@@ -530,7 +573,7 @@ def manual_deduct_stock(
         )
 
     # 🔥 Unified transaction
-    create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type=tx_type,ref_id=record.id,
+    create_transaction(db=db, context=context, payload=TxPayload(item_id=record.id,tx_type=tx_type,ref_id=record.id,
                         qty=converted_qty,after_stock=after_stock,remarks=remarks or f"Manual deduction ({tx_type})",))
 
     db.commit()
@@ -587,7 +630,7 @@ def update_stock_item(
         delta = new_qty - before_stock
  
         if delta != Decimal("0"):
-            create_transaction(db=db, client_id=client_id, payload=TxPayload(item_id=record.id,tx_type="ADJUSTMENT",ref_id=record.id,
+            create_transaction(db=db, context=context, payload=TxPayload(item_id=record.id,tx_type="ADJUSTMENT",ref_id=record.id,
                                qty=abs(delta),after_stock=new_qty,remarks="Manual stock adjustment via update",))
 
     db.commit()
