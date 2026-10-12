@@ -465,6 +465,13 @@ DEFAULT_CLIENT_CATEGORIES = [
         "sub_categories": [],
         "slug": "_packing_addons",
     },
+    {
+        "id": "dietary_type",
+        "name": "Dietary_type",
+        "description": "Dietary_types",
+        "sub_categories": ["veg","non_veg","egg"],
+        "slug": "_dietary_types",
+    },
 ]
 
 def seed_default_categories(client_id: str, created_by: str, db: Session, admin_role: str = "admin"):
@@ -560,6 +567,13 @@ def seed_default_categories(client_id: str, created_by: str, db: Session, admin_
         "description": "Add ons",
         "sub_categories": [],
         "slug": "_packing_addons",
+    },
+        {
+        "id": "dietary_type",
+        "name": "Dietary_type",
+        "description": "Dietary_types",
+        "sub_categories": ["veg","non_veg","egg"],
+        "slug": "_dietary_types",
     },
     ]
 
