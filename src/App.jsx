@@ -18,6 +18,8 @@ import { NAV_TABS } from './components/Constants/Headers/Navtabs';
 import { useClient } from './context/ClientContext.jsx';
 import RegisterPage from './components/MainComponents/UserServices/ClientRegister/Register';
 import { useIdleLogout, clearIdleActivity, markIdleActivity } from './components/utils/hooks/useIdleLogout.js';
+import Application from '../src/FrontDesk/Application.jsx'
+
 const IDLE_TIMEOUT_MS = Number(import.meta.env.VITE_IDLE_TIMEOUT_MS) || 15 * 60 * 1000;
 const getVisibleNav = (token) => {
   try {
@@ -117,7 +119,7 @@ const FallbackPreserveClient = () => {
     return <Navigate to={`/saas/${parts[1]}/login`} replace />;
   }
 
-  return <Navigate to={`/saas/${localStorage.getItem('client_id') || 'easyfood'}/login`} replace />;
+  return <Navigate to="/" replace />;
 };
 
 // ─── Root App ─────────────────────────────────────────────────────────────────
@@ -249,7 +251,10 @@ if (validToken) {
       isAuthenticated: true,
     });
   };
-
+  const HomeRoute = ({ authState }) =>
+    authState.isAuthenticated
+      ? <NavigateAfterLogin authState={authState} />
+      : <Application />;
   const handleLogout = () => {
     const clientId = localStorage.getItem('client_id');
     if (clientId) menuCache.invalidate(clientId);
@@ -298,15 +303,7 @@ if (validToken) {
             }
           />
 
-          <Route
-            path="/"
-            element={
-              <Navigate
-                to={`/saas/${authState.clientId || 'easyfood'}/login`}
-                replace
-              />
-            }
-          />
+          <Route path="/" element={<HomeRoute authState={authState} />} />
 
           <Route path="*" element={<FallbackPreserveClient />} />
         </Routes>
