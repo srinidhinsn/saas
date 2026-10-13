@@ -1,423 +1,414 @@
-import { useEffect, useRef, useState } from 'react';
-import { toast } from 'react-toastify';
-import ClientIdModal from './ClientIdModal';
+import { useEffect, useState } from 'react'
+import { toast } from 'react-toastify'
+import ClientIdModal from './ClientIdModal'
 
-const WRAP = 'mx-auto max-w-7xl px-5 sm:px-8';
-const NAV = [['about', 'About'], ['products', 'Products'], ['why', 'Why TEKHAWK'], ['support', 'Support'], ['contact', 'Contact']];
-const SECTIONS = ['home', 'about', 'products', 'why', 'demo', 'support', 'contact'];
-const REDUCE = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Logo lives in the /public folder
+const logo = '/logo.png'
 
-const ICONS = {
-  eye: 'M2.04 12.32a1 1 0 010-.64C3.42 7.51 7.36 4.5 12 4.5s8.57 3 9.96 7.18a1 1 0 010 .64C20.58 16.49 16.64 19.5 12 19.5s-8.57-3-9.96-7.18zM15 12a3 3 0 11-6 0 3 3 0 016 0z',
-  bolt: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z',
-  check: 'M4.5 12.75l6 6 9-13.5',
-  chart: 'M3 13.1c0-.6.5-1.1 1.1-1.1h2.3c.6 0 1.1.5 1.1 1.1v6.8c0 .6-.5 1.1-1.1 1.1H4.1A1.1 1.1 0 013 19.9v-6.8zM9.75 8.6c0-.6.5-1.1 1.1-1.1h2.3c.6 0 1.1.5 1.1 1.1v11.3c0 .6-.5 1.1-1.1 1.1h-2.3a1.1 1.1 0 01-1.1-1.1V8.6zM16.5 4.1c0-.6.5-1.1 1.1-1.1h2.3c.6 0 1.1.5 1.1 1.1v15.8c0 .6-.5 1.1-1.1 1.1h-2.3a1.1 1.1 0 01-1.1-1.1V4.1z',
-};
-const Icon = ({ name, className = 'h-5 w-5' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-    <path d={ICONS[name]} />
-  </svg>
-);
-
-/* ───────── scroll helpers ───────── */
-function useScroll() {
-  const [s, setS] = useState({ y: 0, p: 0 });
-  useEffect(() => {
-    let raf = 0;
-    const on = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const max = document.documentElement.scrollHeight - window.innerHeight;
-        setS({ y: window.scrollY, p: max > 0 ? window.scrollY / max : 0 });
-      });
-    };
-    on();
-    window.addEventListener('scroll', on, { passive: true });
-    return () => { window.removeEventListener('scroll', on); cancelAnimationFrame(raf); };
-  }, []);
-  return s;
+/* =====================================================================
+   EDIT THESE: your contact details and your demo videos
+   ===================================================================== */
+const contactInfo = {
+  email: 'hello@tekhawk.com',          // placeholder: put your real email
+  phone: '+91 00000 00000',            // placeholder: the number shown on the page
+  phoneLink: '+910000000000',          // same number, digits only (used by the Call button)
+  hours: 'Mon – Sat, 9:00 AM – 6:00 PM IST',
 }
 
-function Reveal({ children, delay = 0, className = '' }) {
-  const ref = useRef(null);
-  const [on, setOn] = useState(REDUCE);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || REDUCE) return;
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setOn(true); io.disconnect(); } }, { threshold: 0.12 });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-  return (
-    <div ref={ref} style={{ transitionDelay: `${delay}ms` }}
-      className={`transition-all duration-700 ease-out ${on ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'} ${className}`}>
-      {children}
-    </div>
-  );
-}
+// Videos play automatically (muted, looping). To add a video:
+//   1) put the file in the  public  folder (next to package.json, NOT inside src)
+//   2) set src below, e.g.  src: '/placeorder.webm'
+// The first video sits at the back (top-left), the second overlaps it in front (bottom-right).
+const demoVideos = [
+  { src: '/Demo.webm', poster: '' },
+  { src: '/placeorder.webm', poster: '' },
+]
 
-function CountUp({ to, prefix = '' }) {
-  const ref = useRef(null);
-  const [n, setN] = useState(REDUCE ? to : 0);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || REDUCE) return;
-    const io = new IntersectionObserver(([e]) => {
-      if (!e.isIntersecting) return;
-      io.disconnect();
-      const t0 = performance.now();
-      const tick = (t) => {
-        const p = Math.min((t - t0) / 1400, 1);
-        setN(Math.round(to * (1 - Math.pow(1 - p, 3))));
-        if (p < 1) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    }, { threshold: 0.5 });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [to]);
-  return <span ref={ref}>{prefix}{n.toLocaleString('en-IN')}</span>;
-}
+const contactTabs = [
+  { id: 'enquiry', label: 'Enquiry' },
+  { id: 'email', label: 'Email us' },
+  { id: 'phone', label: 'Call us' },
+]
 
-const Heading = ({ label, title, children, className = '' }) => (
-  <div className={className}>
-    <p className="text-sm font-bold text-bg-secondary">{label}</p>
-    <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h2>
-    {children}
-  </div>
-);
-
-/* ───────── page ───────── */
 export default function Application() {
-  const [showClientModal, setShowClientModal] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [active, setActive] = useState('home');
-  const { y, p } = useScroll();
-  const k = REDUCE ? 0 : 1;
+  const [scrolled, setScrolled] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [tab, setTab] = useState('enquiry')
+  const [showClientModal, setShowClientModal] = useState(false)
 
+  // Smooth anchor scrolling (only while this page is mounted, and only if motion is allowed)
   useEffect(() => {
-    document.documentElement.style.scrollBehavior = 'smooth';
-    const io = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && setActive(e.target.id)), { rootMargin: '-45% 0px -50% 0px' });
-    SECTIONS.forEach((id) => { const el = document.getElementById(id); if (el) io.observe(el); });
-    return () => { io.disconnect(); document.documentElement.style.scrollBehavior = ''; };
-  }, []);
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!reduce) document.documentElement.style.scrollBehavior = 'smooth'
+    return () => { document.documentElement.style.scrollBehavior = '' }
+  }, [])
 
-  const onSubmit = (e) => {
-    e.preventDefault();
-    toast.success('Thanks! Your enquiry has been noted. Backend connection will be added later.');
-    e.target.reset();
-  };
+  // Header shadow + thin scroll-progress line
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY
+      const max = document.documentElement.scrollHeight - window.innerHeight
+      setScrolled(y > 10)
+      setProgress(max > 0 ? (y / max) * 100 : 0)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
-  const field = 'mt-2 w-full rounded-input border border-border-default bg-bg-primary px-4 py-3 text-text-primary outline-none transition focus:border-bg-secondary focus:ring-2 focus:ring-bg-secondary/30';
-  const scrolled = y > 20;
-  const btnPrimary = 'rounded-button bg-bg-secondary font-bold text-text-primary shadow-button transition hover:brightness-95';
-  const btnGhost = 'rounded-button border border-border-default bg-bg-primary font-medium text-text-primary transition hover:bg-bg-tertiary';
+  // Scroll reveal: any element with class "lp-reveal" fades up when it enters the screen
+  useEffect(() => {
+    const items = document.querySelectorAll('.lp-reveal')
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible')
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.15 }
+    )
+    items.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
+
+  // Enquiry form (connect to your backend later)
+  const handleEnquiry = (e) => {
+    e.preventDefault()
+    toast.success('Thanks! Your enquiry has been noted. Backend connection will be added later.')
+    e.target.reset()
+  }
+
+  // Email form: opens the visitor's email app with everything filled in
+  const handleEmail = (e) => {
+    e.preventDefault()
+    const data = new FormData(e.target)
+    const subject = encodeURIComponent(data.get('subject') || 'Enquiry from website')
+    const body = encodeURIComponent(
+      `Name: ${data.get('name')}\nEmail: ${data.get('email')}\n\n${data.get('message')}`
+    )
+    window.location.href = `mailto:${contactInfo.email}?subject=${subject}&body=${body}`
+  }
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-bg-primary font-sans text-text-primary">
-      {/* scroll progress */}
-      <div className="fixed inset-x-0 top-0 z-[60] h-[3px]">
-        <div className="h-full bg-bg-secondary" style={{ width: `${p * 100}%` }} />
-      </div>
-
-      {/* header */}
-      <header className={`fixed inset-x-0 top-0 z-50 border-b transition-all duration-300 ${scrolled || menuOpen ? 'border-border-default bg-bg-primary/90 backdrop-blur-xl' : 'border-transparent bg-transparent'}`}>
-        <div className={`${WRAP} flex items-center justify-between transition-all duration-300 ${scrolled ? 'py-3' : 'py-5'}`}>
-          <a href="#home" className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-button bg-bg-secondary text-lg font-bold">T</span>
-            <span>
-              <span className="block text-lg font-bold leading-none tracking-[0.14em]">TEKHAWK</span>
-              <span className="mt-1 block text-[10px] leading-none text-text-secondary">Software Solutions</span>
-            </span>
+    <div className="lp-root">
+      {/* ---------- HEADER ---------- */}
+      <header className={`fixed inset-x-0 top-0 z-50 border-b border-line bg-surface/80 backdrop-blur-xl transition-shadow duration-300 ${scrolled ? 'shadow-soft' : ''}`}>
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-2 lg:px-8">
+          <a href="#home" className="flex items-center p-1">
+            <img src={logo} alt="TEKHAWK Software Solutions" width="900" height="450" className="lp-logo animate-pop motion-reduce:animate-none" />
           </a>
 
-          <nav className="hidden items-center gap-7 text-sm md:flex">
-            {NAV.map(([id, label]) => (
-              <a key={id} href={`#${id}`} className={`relative py-1 font-medium transition ${active === id ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}>
-                {label}
-                <span className={`absolute inset-x-0 -bottom-1 h-0.5 origin-left rounded-full bg-bg-secondary transition-transform duration-300 ${active === id ? 'scale-x-100' : 'scale-x-0'}`} />
-              </a>
-            ))}
+          <nav className="hidden items-center gap-8 text-sm font-bold text-copy md:flex">
+            <a className="lp-nav-link" href="#products">Products</a>
+            <a className="lp-nav-link" href="#support">Support</a>
+            <a className="lp-nav-link" href="#contact">Contact</a>
+            <a className="lp-nav-link" href="#why">Why Us</a>
+            <a className="lp-nav-link" href="#about">About Us</a>
           </nav>
 
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setShowClientModal(true)} className={`${btnGhost} hidden px-4 py-2 text-sm sm:inline-flex`}>Login</button>
-            <a href="#contact" className={`${btnPrimary} hidden px-4 py-2 text-sm sm:inline-flex`}>Request Demo</a>
-            <button type="button" aria-label="Toggle menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}
-              className="flex h-10 w-10 items-center justify-center rounded-button border border-border-default md:hidden">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                {menuOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
-              </svg>
+          <div className="flex items-center gap-3">
+            {/* Login opens the Client ID popup */}
+            <button type="button" onClick={() => setShowClientModal(true)} className="lp-btn-secondary px-4 py-2 text-sm">
+              Login
             </button>
-          </div>
-        </div>
-
-        {menuOpen && (
-          <div className="animate-slideUp border-t border-border-default bg-bg-primary md:hidden">
-            <div className={`${WRAP} flex flex-col gap-1 py-4`}>
-              {NAV.map(([id, label]) => (
-                <a key={id} href={`#${id}`} onClick={() => setMenuOpen(false)} className="rounded-button px-3 py-3 font-medium hover:bg-bg-tertiary">{label}</a>
-              ))}
-              <div className="mt-2 grid grid-cols-2 gap-3">
-                <button type="button" onClick={() => { setMenuOpen(false); setShowClientModal(true); }} className={`${btnGhost} py-3`}>Login</button>
-                <a href="#contact" onClick={() => setMenuOpen(false)} className={`${btnPrimary} py-3 text-center`}>Request Demo</a>
-              </div>
+            <div className="relative hidden sm:block">
+              <a href="#demo" className="lp-btn-primary animate-press px-4 py-2 text-sm motion-reduce:animate-none">Request Demo</a>
+              {/* click ripple */}
+              <span aria-hidden="true" className="pointer-events-none absolute inset-0 animate-ripple rounded-btn border-2 border-brand-400 motion-reduce:hidden"></span>
+              {/* animated cursor */}
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="pointer-events-none absolute left-1/2 top-1/2 z-10 h-6 w-6 animate-cursor drop-shadow motion-reduce:hidden">
+                <path d="M5 3l14 7-6 2-2 6z" className="fill-ink stroke-surface" strokeWidth="1.5" strokeLinejoin="round" />
+              </svg>
             </div>
           </div>
-        )}
+        </div>
+        {/* scroll progress line */}
+        <div aria-hidden="true" className="absolute bottom-0 left-0 h-0.5 bg-brand-600" style={{ width: `${progress}%` }}></div>
       </header>
 
       <main>
-        {/* hero */}
-        <section id="home" className="scroll-mt-20 bg-gradient-to-b from-cardBackgrounds-bg1 to-bg-primary pt-28 sm:pt-36">
-          <div className={`${WRAP} grid items-center gap-14 pb-20 lg:grid-cols-[1.05fr_.95fr] lg:pb-28`}>
-            <div>
-              <Reveal>
-                <span className="inline-flex rounded-badge border border-border-default bg-bg-primary px-4 py-1.5 text-sm text-text-secondary">Practical SaaS for modern businesses</span>
-              </Reveal>
-              <Reveal delay={80}>
-                <h1 className="mt-6 text-5xl font-bold leading-[1.08] tracking-tight sm:text-6xl">
-                  Build smarter.<br />Operate faster.<br />Grow stronger.
-                </h1>
-              </Reveal>
-              <Reveal delay={160}>
-                <p className="mt-6 max-w-xl text-lg leading-8 text-text-secondary">
-                  TEKHAWK builds powerful, easy-to-use SaaS applications that simplify everyday operations, improve visibility, and help businesses make faster decisions.
-                </p>
-              </Reveal>
-              <Reveal delay={240} className="mt-9 flex flex-wrap gap-4">
-                <a href="#products" className={`${btnPrimary} px-6 py-3.5`}>Explore Products</a>
-                <a href="#contact" className={`${btnGhost} px-6 py-3.5`}>Book a Demo</a>
-              </Reveal>
-              <Reveal delay={320} className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-text-secondary">
-                {['Restaurant POS', 'Retail SaaS', 'Cloud Ready', 'Built to Scale'].map((t) => (
-                  <span key={t} className="flex items-center gap-2"><Icon name="check" className="h-4 w-4 text-bg-secondary" />{t}</span>
-                ))}
-              </Reveal>
+        {/* ---------- HERO ---------- */}
+        <section id="home" className="relative overflow-hidden bg-gradient-to-b from-brand-50 to-page pt-32">
+          {/* soft drifting glow */}
+          <div aria-hidden="true" className="pointer-events-none absolute -right-24 top-24 h-96 w-96 animate-drift rounded-full bg-brand-200/60 blur-3xl motion-reduce:animate-none"></div>
+
+          <div className="relative mx-auto grid max-w-7xl gap-14 px-6 py-12 lg:grid-cols-[1.08fr_.92fr] lg:px-8 lg:py-8">
+            <div className="flex flex-col justify-center">
+              <h1 className="lp-reveal max-w-4xl text-5xl leading-[1.08] tracking-tight [--d:100ms] sm:text-6xl">
+                Build smarter.<br />
+                Operate faster.<br />
+                <span className="italic text-brand-600">Grow stronger.</span>
+              </h1>
+              <p className="lp-reveal mt-7 max-w-2xl text-lg leading-8 [--d:200ms]">
+                TEKHAWK builds powerful, easy-to-use SaaS applications that simplify everyday operations, improve visibility, and help businesses make faster decisions.
+              </p>
+              <div className="lp-reveal mt-9 flex flex-wrap gap-4 [--d:300ms]">
+                <a href="#products" className="lp-btn-primary">Explore Products</a>
+                <a href="#demo" className="lp-btn-secondary">Book a Demo</a>
+              </div>
+              <div className="lp-reveal mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-muted [--d:400ms]">
+                <span>Restaurant POS</span><span>Retail SaaS</span><span>Cloud Ready</span><span>Built to Scale</span>
+              </div>
             </div>
 
-            {/* dashboard preview, drifts slightly on scroll */}
-            <div className="relative" style={{ transform: `translateY(${-y * 0.05 * k}px)` }}>
-              <div className="rounded-card-lg border border-border-default bg-bg-primary p-4 shadow-modal sm:p-5">
-                <div className="rounded-card bg-bg-tertiary p-5 sm:p-6">
-                  <div className="mb-6 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-xs font-medium text-text-secondary">TEKHAWK</div>
-                      <div className="mt-1 text-xl font-bold">Business Overview</div>
-                    </div>
-                    <div className="flex items-center gap-2 rounded-badge bg-bg-primary px-3 py-1.5 text-xs font-medium">
-                      <span className="h-2 w-2 rounded-full bg-action-success" />Live Operations
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="rounded-card border border-border-default bg-bg-primary p-4 sm:p-5">
-                      <div className="text-xs text-text-secondary">Today’s Sales</div>
-                      <div className="mt-2 text-xl font-bold sm:text-2xl"><CountUp to={84260} prefix="₹" /></div>
-                      <div className="mt-2 text-xs font-medium text-action-success">↑ 12.4% today</div>
-                    </div>
-                    <div className="rounded-card border border-border-default bg-bg-primary p-4 sm:p-5">
-                      <div className="text-xs text-text-secondary">Orders</div>
-                      <div className="mt-2 text-xl font-bold sm:text-2xl"><CountUp to={326} /></div>
-                      <div className="mt-2 text-xs text-text-secondary">Across active counters</div>
-                    </div>
-                    <div className="col-span-2 rounded-card border border-border-default bg-bg-primary p-5">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <div className="text-xs text-text-secondary">Business Visibility</div>
-                          <div className="mt-1 font-medium">Everything important. One clear view.</div>
+            {/* Two overlapping demo videos (edit the list at the top of this file) */}
+            <div className="relative flex items-center justify-center">
+              <div className="relative aspect-[7/5] w-full max-w-xl">
+                {demoVideos.map((video, i) => (
+                  <div
+                    key={i}
+                    className={`lp-reveal absolute w-[72%] ${i === 0 ? 'left-0 top-0 z-10 [--d:300ms]' : 'bottom-0 right-0 z-20 [--d:450ms]'}`}
+                  >
+                    <div className="group aspect-video overflow-hidden rounded-card-lg border-4 border-surface bg-brand-900 shadow-soft transition duration-300 hover:-translate-y-1">
+                      {video.src ? (
+                        <video
+                          className="h-full w-full object-cover"
+                          src={video.src}
+                          poster={video.poster || undefined}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                        />
+                      ) : (
+                        <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${i === 0 ? 'from-brand-900 via-brand-800 to-brand-600' : 'from-brand-700 via-brand-600 to-brand-400'}`}>
+                          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface/90 text-brand-800 shadow-soft transition duration-300 group-hover:scale-110">
+                            <svg aria-hidden="true" viewBox="0 0 24 24" className="ml-1 h-6 w-6 fill-current"><path d="M8 5v14l11-7z" /></svg>
+                          </span>
                         </div>
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card bg-cardBackgrounds-bg1 text-bg-secondary"><Icon name="chart" /></span>
-                      </div>
-                      <div className="mt-5 h-2 overflow-hidden rounded-badge bg-bg-tertiary">
-                        <div className="h-full rounded-badge bg-bg-secondary transition-all duration-1000" style={{ width: y > -1 ? '78%' : '0%' }} />
-                      </div>
+                      )}
                     </div>
                   </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
         </section>
 
-        {/* about */}
-        <section id="about" className="scroll-mt-16 border-y border-border-default bg-bg-primary">
-          <div className={`${WRAP} grid gap-10 py-20 sm:py-24 lg:grid-cols-2 lg:gap-16`}>
-            <Reveal><Heading label="About TEKHAWK" title="Software built around the way businesses actually work." /></Reveal>
-            <Reveal delay={100} className="space-y-5 text-lg leading-8 text-text-secondary">
-              <p>TEKHAWK Software Solutions develops modern SaaS applications for growing businesses. We focus on solutions that reduce effort, improve control, and make important business information easier to understand.</p>
-              <p>Our approach combines practical business thinking with thoughtful product design, reliable technology, and continuous improvement.</p>
-            </Reveal>
+        {/* ---------- PRODUCTS ---------- */}
+        <section id="products" className="mx-auto max-w-7xl px-6 py-24 lg:px-8">
+          <div className="lp-reveal max-w-3xl">
+            <p className="lp-eyebrow">Products</p>
+            <h2 className="mt-4 text-4xl tracking-tight sm:text-5xl">Focused products. Real operational value.</h2>
+            <p className="mt-5 text-lg">Our first SaaS products are designed around two industries where speed, visibility, and operational control matter every day.</p>
           </div>
-        </section>
 
-        {/* products */}
-        <section id="products" className="scroll-mt-16 bg-bg-tertiary">
-          <div className={`${WRAP} py-20 sm:py-24`}>
-            <Reveal>
-              <Heading label="Products" title="Focused products. Real operational value." className="max-w-3xl">
-                <p className="mt-4 text-lg leading-8 text-text-secondary">Our first SaaS products are designed around two industries where speed, visibility, and operational control matter every day.</p>
-              </Heading>
-            </Reveal>
-            <div className="mt-12 grid gap-6 lg:grid-cols-2">
-              {[
-                { badge: 'Restaurant SaaS', live: true, title: 'TEKHAWK Restaurant POS', text: 'A modern POS and restaurant operations platform for billing, orders, tables, menus, kitchen workflow, payments, reporting, and more.', tags: ['POS Billing', 'Order Management', 'Kitchen Workflow', 'Reports'], cta: 'Request Restaurant Demo', href: '#contact' },
-                { badge: 'Coming Next', live: false, title: 'TEKHAWK Retail', text: 'A retail SaaS platform for billing, products, inventory, purchases, suppliers, customers, store controls, and business dashboards.', tags: ['Retail POS', 'Inventory', 'Suppliers', 'Multi-store'], cta: 'Join Early Access', href: '#contact' },
-              ].map((c, i) => (
-                <Reveal key={c.title} delay={i * 120}>
-                  <article className="group flex h-full flex-col rounded-card-lg border border-border-default bg-bg-primary p-7 shadow-card transition duration-300 hover:-translate-y-1 hover:shadow-card-hover sm:p-8">
-                    <span className={`inline-flex w-fit items-center gap-2 rounded-badge px-3 py-1 text-xs font-bold ${c.live ? 'bg-cardBackgrounds-bg6' : 'bg-cardBackgrounds-bg5'}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${c.live ? 'bg-action-success' : 'bg-bg-secondary'}`} />{c.badge}
-                    </span>
-                    <h3 className="mt-6 text-2xl font-bold sm:text-3xl">{c.title}</h3>
-                    <p className="mt-3 leading-7 text-text-secondary">{c.text}</p>
-                    <div className="mt-6 flex flex-wrap gap-2 text-sm">
-                      {c.tags.map((t) => <span key={t} className="rounded-button bg-bg-tertiary px-3 py-1.5">{t}</span>)}
-                    </div>
-                    <a href={c.href} className="mt-auto inline-flex items-center gap-2 pt-8 font-bold transition group-hover:text-bg-secondary">
-                      {c.cta}<span className="transition group-hover:translate-x-1">→</span>
-                    </a>
-                  </article>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* why */}
-        <section id="why" className="scroll-mt-16 border-b border-border-default bg-bg-primary">
-          <div className={`${WRAP} grid gap-12 py-20 sm:py-24 lg:grid-cols-[.85fr_1.15fr]`}>
-            <div className="self-start lg:sticky lg:top-28">
-              <Reveal>
-                <Heading label="Why TEKHAWK" title="Sharp focus. Practical technology.">
-                  <p className="mt-4 max-w-lg leading-7 text-text-secondary">Like a hawk, strong businesses need clarity, speed, awareness, and precision. Those qualities shape how we think about our software.</p>
-                </Heading>
-              </Reveal>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {[
-                ['eye', 'Clear Visibility', 'Useful dashboards and reporting for better business awareness.'],
-                ['bolt', 'Faster Operations', 'Reduce repetitive steps and streamline day-to-day workflows.'],
-                ['check', 'Simple Experience', 'Clean interfaces designed for quick adoption by real teams.'],
-                ['chart', 'Built to Scale', 'A SaaS foundation designed to grow with your business.'],
-              ].map(([icon, t, d], i) => (
-                <Reveal key={t} delay={(i % 2) * 100}>
-                  <div className="h-full rounded-card border border-border-default bg-bg-tertiary p-6 transition duration-300 hover:border-bg-secondary hover:bg-bg-primary hover:shadow-card-hover">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-button bg-cardBackgrounds-bg1 text-bg-secondary"><Icon name={icon} /></span>
-                    <h3 className="mt-4 text-lg font-bold">{t}</h3>
-                    <p className="mt-2 text-sm leading-6 text-text-secondary">{d}</p>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* vision & mission */}
-        <section className={`${WRAP} py-20 sm:py-24`}>
-          <div className="grid gap-6 md:grid-cols-2">
-            {[
-              ['Vision', 'To become a trusted SaaS technology partner by creating intelligent, reliable, and easy-to-use software that improves the way businesses operate and grow.'],
-              ['Mission', 'To simplify operations, improve productivity, provide better visibility, and enable confident business decisions through practical SaaS products.'],
-            ].map(([t, d], i) => (
-              <Reveal key={t} delay={i * 120}>
-                <div className="h-full rounded-card-lg border border-border-default border-t-4 border-t-bg-secondary bg-bg-primary p-8 shadow-card">
-                  <h3 className="text-sm font-bold text-bg-secondary">{t}</h3>
-                  <p className="mt-4 text-xl leading-relaxed sm:text-2xl">{d}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </section>
-
-        {/* demo */}
-        <section id="demo" className={`${WRAP} scroll-mt-16 pb-20 sm:pb-24`}>
-          <Reveal>
-            <div className="rounded-card-lg bg-text-primary px-7 py-12 sm:px-12 sm:py-14 lg:px-16">
-              <div className="max-w-3xl">
-                <p className="text-sm font-bold text-bg-secondary">See TEKHAWK in action</p>
-                <h2 className="mt-3 text-3xl font-bold tracking-tight text-text-white sm:text-4xl">Experience the software before you decide.</h2>
-                <p className="mt-5 text-lg leading-8 text-border-default">Request a guided demo and see how TEKHAWK can simplify your daily operations. Demo booking and product trials can be connected here next.</p>
-                <a href="#contact" className={`${btnPrimary} mt-8 inline-flex px-6 py-3.5`}>Request a Demo</a>
+          <div className="mt-14 grid gap-6 lg:grid-cols-2">
+            <article className="lp-card lp-reveal group p-8 transition hover:-translate-y-1 hover:shadow-soft">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-card-lg bg-brand-50 text-2xl transition duration-300 group-hover:-rotate-6 group-hover:scale-110">🍽️</div>
+                <span className="lp-badge-success">Restaurant SaaS</span>
               </div>
-            </div>
-          </Reveal>
+              <h3 className="mt-8 text-3xl">TEKHAWK Restaurant POS</h3>
+              <p className="mt-4 leading-7">A modern POS and restaurant operations platform for billing, orders, tables, menus, kitchen workflow, payments, reporting, and more.</p>
+              <div className="mt-7 flex flex-wrap gap-2 text-sm">
+                <span className="lp-chip">POS Billing</span><span className="lp-chip">Order Management</span><span className="lp-chip">Kitchen Workflow</span><span className="lp-chip">Reports</span>
+              </div>
+              <a href="#demo" className="mt-9 inline-flex font-medium text-brand-700 transition group-hover:text-brand-900">
+                Request Restaurant Demo <span className="ml-1 inline-block transition-transform duration-300 group-hover:translate-x-1.5">→</span>
+              </a>
+            </article>
+
+            <article className="lp-card lp-reveal group p-8 transition hover:-translate-y-1 hover:shadow-soft [--d:150ms]">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-card-lg bg-brand-50 text-2xl transition duration-300 group-hover:-rotate-6 group-hover:scale-110">🛍️</div>
+                <span className="lp-badge-warning">Coming Next</span>
+              </div>
+              <h3 className="mt-8 text-3xl">TEKHAWK Retail</h3>
+              <p className="mt-4 leading-7">A retail SaaS platform for billing, products, inventory, purchases, suppliers, customers, store controls, and business dashboards.</p>
+              <div className="mt-7 flex flex-wrap gap-2 text-sm">
+                <span className="lp-chip">Retail POS</span><span className="lp-chip">Inventory</span><span className="lp-chip">Suppliers</span><span className="lp-chip">Multi-store</span>
+              </div>
+              <a href="#contact" className="mt-9 inline-flex font-medium text-brand-700 transition group-hover:text-brand-900">
+                Join Early Access <span className="ml-1 inline-block transition-transform duration-300 group-hover:translate-x-1.5">→</span>
+              </a>
+            </article>
+          </div>
         </section>
 
-        {/* support */}
-        <section id="support" className="scroll-mt-16 border-y border-border-default bg-bg-tertiary">
-          <div className={`${WRAP} grid gap-10 py-20 sm:py-24 lg:grid-cols-2 lg:gap-16`}>
-            <Reveal>
-              <Heading label="Support" title="We’re here when you need us.">
-                <p className="mt-4 max-w-xl leading-7 text-text-secondary">From onboarding and setup to product guidance and technical support, our goal is to help customers get lasting value from TEKHAWK products.</p>
-              </Heading>
-            </Reveal>
+        {/* ---------- DEMO BANNER ---------- */}
+        <section id="demo" className="mx-auto max-w-7xl px-6 pb-24 lg:px-8">
+          <div className="lp-reveal relative overflow-hidden rounded-panel bg-brand-900 px-8 py-14 sm:px-12 lg:px-16">
+            {/* soft drifting glow */}
+            <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-24 h-80 w-80 animate-drift rounded-full bg-brand-500/30 blur-3xl motion-reduce:animate-none"></div>
+            <div className="relative max-w-3xl">
+              <p className="text-sm font-medium uppercase tracking-[.2em] text-brand-200">See TEKHAWK in action</p>
+              <h2 className="mt-4 text-4xl tracking-tight text-white sm:text-5xl">Experience the software before you decide.</h2>
+              <p className="mt-5 text-lg leading-8 text-brand-100">Request a guided demo and see how TEKHAWK can simplify your daily operations. Demo booking and product trials can be connected here next.</p>
+              <a href="#contact" className="lp-btn-light mt-8">Request a Demo</a>
+            </div>
+          </div>
+        </section>
+
+        {/* ---------- SUPPORT ---------- */}
+        <section id="support" className="lp-section-alt">
+          <div className="mx-auto grid max-w-7xl gap-10 px-6 py-24 lg:grid-cols-2 lg:px-8">
+            <div className="lp-reveal">
+              <p className="lp-eyebrow">Support</p>
+              <h2 className="mt-4 text-4xl tracking-tight">We’re here when you need us.</h2>
+              <p className="mt-5 max-w-xl leading-7">From onboarding and setup to product guidance and technical support, our goal is to help customers get lasting value from TEKHAWK products.</p>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {['Product Onboarding', 'Setup Assistance', 'Knowledge Base', 'Technical Support'].map((t, i) => (
-                <Reveal key={t} delay={i * 80}>
-                  <div className="flex items-center gap-3 rounded-card border border-border-default bg-bg-primary p-5 font-medium shadow-button">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-cardBackgrounds-bg1 text-bg-secondary"><Icon name="check" className="h-4 w-4" /></span>{t}
-                  </div>
-                </Reveal>
-              ))}
+              <div className="lp-card-soft lp-reveal p-5 text-ink">Product Onboarding</div>
+              <div className="lp-card-soft lp-reveal p-5 text-ink [--d:100ms]">Setup Assistance</div>
+              <div className="lp-card-soft lp-reveal p-5 text-ink [--d:200ms]">Knowledge Base</div>
+              <div className="lp-card-soft lp-reveal p-5 text-ink [--d:300ms]">Technical Support</div>
             </div>
           </div>
         </section>
 
-        {/* contact */}
-        <section id="contact" className={`${WRAP} scroll-mt-16 py-20 sm:py-24`}>
+        {/* ---------- CONTACT ---------- */}
+        <section id="contact" className="mx-auto max-w-7xl px-6 py-24 lg:px-8">
           <div className="grid gap-12 lg:grid-cols-[.85fr_1.15fr]">
-            <Reveal>
-              <Heading label="Contact" title="Let’s build a smarter way to work.">
-                <p className="mt-4 leading-7 text-text-secondary">Use this section for demo requests, product enquiries, partnerships, support, and general enquiries. We can connect the form to your backend or email workflow later.</p>
-              </Heading>
-            </Reveal>
-            <Reveal delay={100}>
-              <form onSubmit={onSubmit} className="rounded-card-lg border border-border-default bg-bg-primary p-6 shadow-card sm:p-8">
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <label className="text-sm font-medium">Name<input required name="name" className={field} placeholder="Your name" /></label>
-                  <label className="text-sm font-medium">Business<input name="business" className={field} placeholder="Company / Business" /></label>
-                  <label className="text-sm font-medium">Email<input required type="email" name="email" className={field} placeholder="you@example.com" /></label>
-                  <label className="text-sm font-medium">Enquiry
-                    <select name="enquiry" className={field}>
-                      {['Request a Demo', 'Restaurant POS', 'Retail SaaS', 'Partnership', 'Support', 'General Enquiry'].map((o) => <option key={o}>{o}</option>)}
-                    </select>
-                  </label>
-                </div>
-                <label className="mt-5 block text-sm font-medium">Message
-                  <textarea name="message" rows="5" className={field} placeholder="Tell us what you are looking for..." />
-                </label>
-                <button className={`${btnPrimary} mt-6 w-full px-6 py-3 sm:w-auto`}>Send Enquiry</button>
-              </form>
-            </Reveal>
+            <div className="lp-reveal">
+              <p className="lp-eyebrow">Contact</p>
+              <h2 className="mt-4 text-4xl tracking-tight sm:text-5xl">Let’s build a smarter way to work.</h2>
+              <p className="mt-5 leading-7">Choose the way that suits you best: send us an enquiry, write to us by email, or call our customer care team.</p>
+            </div>
+
+            <div className="lp-reveal [--d:150ms]">
+              {/* tabs */}
+              <div role="tablist" className="mb-4 flex w-full gap-1 rounded-btn border border-line bg-surface p-1 sm:inline-flex sm:w-auto">
+                {contactTabs.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === t.id}
+                    onClick={() => setTab(t.id)}
+                    className={`lp-tab flex-1 sm:flex-none ${tab === t.id ? 'lp-tab-active' : ''}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              <div key={tab} className="lp-card animate-fade-up p-6 shadow-soft motion-reduce:animate-none sm:p-8">
+                {/* 1. ENQUIRY */}
+                {tab === 'enquiry' && (
+                  <form onSubmit={handleEnquiry}>
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <div><label className="lp-label">Name</label><input name="name" className="lp-input" placeholder="Your name" /></div>
+                      <div><label className="lp-label">Business</label><input name="business" className="lp-input" placeholder="Company / Business" /></div>
+                      <div><label className="lp-label">Email</label><input name="email" type="email" className="lp-input" placeholder="you@example.com" /></div>
+                      <div><label className="lp-label">Enquiry</label>
+                        <select name="enquiry" className="lp-input">
+                          <option>Request a Demo</option><option>Restaurant POS</option><option>Retail SaaS</option><option>Partnership</option><option>Support</option><option>General Enquiry</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="mt-5"><label className="lp-label">Message</label><textarea name="message" rows="5" className="lp-input" placeholder="Tell us what you are looking for..."></textarea></div>
+                    <button className="lp-btn-primary mt-5 !py-3">Send Enquiry</button>
+                  </form>
+                )}
+
+                {/* 2. EMAIL */}
+                {tab === 'email' && (
+                  <form onSubmit={handleEmail}>
+                    <p className="mb-5 text-sm">
+                      Write to us at{' '}
+                      <a className="font-medium text-brand-700 hover:text-brand-900" href={`mailto:${contactInfo.email}`}>{contactInfo.email}</a>
+                      , or fill in the details below and your email app will open with the message ready to send.
+                    </p>
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <div><label className="lp-label">Name</label><input name="name" required className="lp-input" placeholder="Your name" /></div>
+                      <div><label className="lp-label">Your email</label><input name="email" type="email" required className="lp-input" placeholder="you@example.com" /></div>
+                    </div>
+                    <div className="mt-5"><label className="lp-label">Subject</label><input name="subject" className="lp-input" placeholder="How can we help?" /></div>
+                    <div className="mt-5"><label className="lp-label">Message</label><textarea name="message" rows="4" required className="lp-input" placeholder="Write your message..."></textarea></div>
+                    <button className="lp-btn-primary mt-5 !py-3">Send Email</button>
+                  </form>
+                )}
+
+                {/* 3. PHONE */}
+                {tab === 'phone' && (
+                  <div>
+                    <p className="lp-eyebrow">Customer care</p>
+                    <a href={`tel:${contactInfo.phoneLink}`} className="mt-3 block font-serif text-4xl font-semibold text-ink transition hover:text-brand-700">
+                      {contactInfo.phone}
+                    </a>
+                    <p className="mt-3">{contactInfo.hours}</p>
+                    <p className="mt-6 text-sm">Speak to our team about demos, setup, or technical help. Tap the button on a phone to call directly.</p>
+                    <a href={`tel:${contactInfo.phoneLink}`} className="lp-btn-primary mt-6">Call now</a>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ---------- WHY US ---------- */}
+        <section id="why" className="lp-section-alt">
+          <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8">
+            <div className="grid gap-12 lg:grid-cols-[.85fr_1.15fr]">
+              <div className="lp-reveal">
+                <p className="lp-eyebrow">Why TEKHAWK</p>
+                <h2 className="mt-4 text-4xl tracking-tight">Sharp focus.<br />Practical technology.</h2>
+                <p className="mt-5 max-w-lg leading-7">Like a hawk, strong businesses need clarity, speed, awareness, and precision. Those qualities shape how we think about our software.</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="lp-card-soft lp-reveal p-6"><h3 className="text-lg">Clear Visibility</h3><p className="mt-2 text-sm leading-6">Useful dashboards and reporting for better business awareness.</p></div>
+                <div className="lp-card-soft lp-reveal p-6 [--d:100ms]"><h3 className="text-lg">Faster Operations</h3><p className="mt-2 text-sm leading-6">Reduce repetitive steps and streamline day-to-day workflows.</p></div>
+                <div className="lp-card-soft lp-reveal p-6 [--d:200ms]"><h3 className="text-lg">Simple Experience</h3><p className="mt-2 text-sm leading-6">Clean interfaces designed for quick adoption by real teams.</p></div>
+                <div className="lp-card-soft lp-reveal p-6 [--d:300ms]"><h3 className="text-lg">Built to Scale</h3><p className="mt-2 text-sm leading-6">A SaaS foundation designed to grow with your business.</p></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ---------- ABOUT US ---------- */}
+        <section id="about" className="mx-auto grid max-w-7xl gap-12 px-6 pb-14 pt-24 lg:grid-cols-2 lg:px-8">
+          <div className="lp-reveal">
+            <p className="lp-eyebrow">About TEKHAWK</p>
+            <h2 className="mt-4 text-4xl tracking-tight sm:text-5xl">Software built around the way businesses actually work.</h2>
+          </div>
+          <div className="lp-reveal space-y-6 text-lg leading-8 [--d:150ms]">
+            <p>TEKHAWK Software Solutions develops modern SaaS applications for growing businesses. We focus on solutions that reduce effort, improve control, and make important business information easier to understand.</p>
+            <p>Our approach combines practical business thinking with thoughtful product design, reliable technology, and continuous improvement.</p>
+          </div>
+        </section>
+
+        {/* ---------- VISION & MISSION (part of About Us) ---------- */}
+        <section className="mx-auto max-w-7xl px-6 pb-24 lg:px-8">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="lp-card lp-reveal p-8">
+              <div className="lp-eyebrow">Vision</div>
+              <p className="mt-5 font-serif text-2xl leading-relaxed text-ink">To become a trusted SaaS technology partner by creating intelligent, reliable, and easy-to-use software that improves the way businesses operate and grow.</p>
+            </div>
+            <div className="lp-card lp-reveal p-8 [--d:150ms]">
+              <div className="lp-eyebrow">Mission</div>
+              <p className="mt-5 font-serif text-2xl leading-relaxed text-ink">To simplify operations, improve productivity, provide better visibility, and enable confident business decisions through practical SaaS products.</p>
+            </div>
           </div>
         </section>
       </main>
 
-      {/* footer */}
-      <footer className="bg-text-primary text-text-white">
-        <div className={`${WRAP} flex flex-col gap-8 py-10 lg:flex-row lg:items-center lg:justify-between`}>
+      {/* ---------- FOOTER ---------- */}
+      <footer className="border-t border-line bg-surface">
+        <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-10 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div>
-            <div className="text-xl font-bold tracking-[0.14em]">TEKHAWK</div>
-            <div className="mt-2 text-sm text-border-default">Smarter Software. Sharper Business.</div>
+            <img src={logo} alt="TEKHAWK Software Solutions" width="900" height="450" className="lp-logo" />
+            <div className="mt-2 text-sm text-muted">Smarter Software. Sharper Business.</div>
           </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-border-default">
-            {[['products', 'Products'], ['about', 'About'], ['demo', 'Demo'], ['support', 'Support'], ['contact', 'Contact']].map(([id, l]) => (
-              <a key={id} href={`#${id}`} className="transition hover:text-text-white">{l}</a>
-            ))}
-            <a href="#" className="transition hover:text-text-white">Privacy</a>
-            <a href="#" className="transition hover:text-text-white">Terms</a>
+          <div className="flex flex-wrap gap-5 text-sm text-muted">
+            <a className="hover:text-ink" href="#products">Products</a>
+            <a className="hover:text-ink" href="#demo">Demo</a>
+            <a className="hover:text-ink" href="#support">Support</a>
+            <a className="hover:text-ink" href="#contact">Contact</a>
+            <a className="hover:text-ink" href="#why">Why Us</a>
+            <a className="hover:text-ink" href="#about">About Us</a>
+            <a className="hover:text-ink" href="#">Privacy</a>
+            <a className="hover:text-ink" href="#">Terms</a>
           </div>
-          <div className="text-sm text-border-default">© 2026 TEKHAWK Software Solutions.</div>
+          <div className="text-sm text-muted">© 2026 TEKHAWK Software Solutions.</div>
         </div>
       </footer>
 
-      {/* back to top */}
-      <a href="#home" aria-label="Back to top"
-        className={`fixed bottom-6 right-6 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-bg-secondary font-bold shadow-card-hover transition duration-300 ${y > 600 ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'}`}>
-        ↑
-      </a>
-
+      {/* ---------- CLIENT ID POPUP (Login) ---------- */}
       <ClientIdModal open={showClientModal} onClose={() => setShowClientModal(false)} />
     </div>
-  );
+  )
 }
