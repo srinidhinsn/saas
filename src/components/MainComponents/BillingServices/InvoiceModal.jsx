@@ -677,7 +677,7 @@ const handleConfirmPayment = async () => {
                   </p>
                 </div>
               </div>
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mr-10">
                 <div className="text-text-white">
                   <div className="text-sm font-medium">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
                   <div className="text-xs text-text-white/80">Order #{selectedOrder.id}</div>
@@ -753,11 +753,11 @@ const handleConfirmPayment = async () => {
                   {/* Totals */}
                   <div className="border-t border-border-default bg-bg-tertiary px-5 py-4 rounded-b-xl">
                     <div className="space-y-2">
-                      <div className="flex justify-between text-text-secondary">
+                      <div className="flex justify-between text-text-primary">
                         <span>Subtotal</span>
                         <span className="font-semibold">₹{formatPriceByMode(orderSubtotal, clientId)}</span>
                       </div>
-                      <div className="flex justify-between text-action-danger">
+                      <div className="flex justify-between text-buttons-delete">
                         <span>Discount</span>
                         <span className="font-semibold">-₹{formatPriceByMode(calculatedDiscount, clientId)}</span>
                       </div>
@@ -910,8 +910,8 @@ const handleConfirmPayment = async () => {
                             key={statusOption}
                             type="button"
                             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${paymentStatus === statusOption
-                              ? "bg-action-primary text-text-white shadow-md"
-                              : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary border border-border-default"
+                              ? "bg-buttons-add text-text-white shadow-md"
+                              : "bg-bg-tertiary text-text-secondary hover:bg-buttons-configure hover:text-text-white border border-border-default"
                               }`}
                             onClick={() => setPaymentStatus(statusOption)}
                           >
