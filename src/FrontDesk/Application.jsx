@@ -21,7 +21,6 @@ const contactInfo = {
 // The first video sits at the back (top-left), the second overlaps it in front (bottom-right).
 const demoVideos = [
   { src: '/Demo.webm', poster: '' },
-  { src: '/placeorder.webm', poster: '' },
 ]
 
 const contactTabs = [
@@ -154,35 +153,43 @@ export default function Application() {
               </div>
             </div>
 
-            {/* Two overlapping demo videos (edit the list at the top of this file) */}
-            <div className="relative flex items-center justify-center">
-              <div className="relative aspect-[7/5] w-full max-w-xl">
-                {demoVideos.map((video, i) => (
-                  <div
-                    key={i}
-                    className={`lp-reveal absolute w-[72%] ${i === 0 ? 'left-0 top-0 z-10 [--d:300ms]' : 'bottom-0 right-0 z-20 [--d:450ms]'}`}
-                  >
-                    <div className="group aspect-video overflow-hidden rounded-card-lg border-4 border-surface bg-brand-900 shadow-soft transition duration-300 hover:-translate-y-1">
-                      {video.src ? (
-                        <video
-                          className="h-full w-full object-cover"
-                          src={video.src}
-                          poster={video.poster || undefined}
-                          autoPlay
-                          muted
-                          loop
-                          playsInline
-                        />
-                      ) : (
-                        <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${i === 0 ? 'from-brand-900 via-brand-800 to-brand-600' : 'from-brand-700 via-brand-600 to-brand-400'}`}>
-                          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface/90 text-brand-800 shadow-soft transition duration-300 group-hover:scale-110">
-                            <svg aria-hidden="true" viewBox="0 0 24 24" className="ml-1 h-6 w-6 fill-current"><path d="M8 5v14l11-7z" /></svg>
-                          </span>
-                        </div>
-                      )}
-                    </div>
+            {/* Monitor showing the demo video (edit the video at the top of this file) */}
+            <div className="reveal relative isolate flex items-center justify-center [--d:300ms]">
+              {/* soft glow behind the monitor */}
+              <div aria-hidden="true" className="absolute inset-x-6 top-4 -z-10 h-3/4 rounded-full bg-brand-300/40 blur-3xl"></div>
+
+              <div className="w-full">
+                {/* screen + bezel */}
+                <div className="relative rounded-card bg-ink px-3 pb-6 pt-3 shadow-soft sm:px-4 sm:pt-4">
+                  <div className="relative aspect-video overflow-hidden rounded-btn bg-brand-900">
+                    {demoVideo.src ? (
+                      <video
+                        className="h-full w-full object-cover"
+                        src={demoVideo.src}
+                        poster={demoVideo.poster || undefined}
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-brand-900 via-brand-800 to-brand-600">
+                        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface/90 text-brand-800 shadow-soft">
+                          <svg aria-hidden="true" viewBox="0 0 24 24" className="ml-1 h-6 w-6 fill-current"><path d="M8 5v14l11-7z" /></svg>
+                        </span>
+                      </div>
+                    )}
+                    {/* glass reflection */}
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-surface/10 via-transparent to-transparent"></div>
                   </div>
-                ))}
+                  {/* power light */}
+                  <span aria-hidden="true" className="absolute bottom-2 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-brand-400"></span>
+                </div>
+
+                {/* stand: neck, base and floor shadow */}
+                <div aria-hidden="true" className="mx-auto h-10 w-24 bg-gradient-to-b from-line-strong to-line [clip-path:polygon(14%_0,86%_0,100%_100%,0_100%)]"></div>
+                <div aria-hidden="true" className="mx-auto h-2.5 w-48 rounded-full bg-gradient-to-b from-line-strong to-muted/50 sm:w-60"></div>
+                <div aria-hidden="true" className="mx-auto mt-1 h-3 w-52 rounded-full bg-ink/10 blur-md sm:w-64"></div>
               </div>
             </div>
           </div>
