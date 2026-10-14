@@ -106,8 +106,9 @@ export default {
         },
         status: {
           new: 'lightpink',
-          pending: 'yellow',
-          preparing: 'blue',
+          pending: 'blue',
+          preparing: 'orange',
+          ready: '#ef4444',
           served: 'green'
         },
         bulkActions: {

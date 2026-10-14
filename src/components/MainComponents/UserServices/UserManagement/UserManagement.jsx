@@ -465,7 +465,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
       field: 'role',
       minWidth: 140,
       cellRenderer: (params) => (
-        <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-buttons-add text-text-white">
+        <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-action-primary text-text-white">
           {params.value}
         </span>
       ),
@@ -863,8 +863,8 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Username */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaUser className="text-buttons-add text-xs" />
-              Username <span className="text-action-danger">*</span>
+              <FaUser className="text-action-primary text-xs" />
+              Username <span className="text-action-primary">*</span>
             </label>
             <input
               name="username"
@@ -873,7 +873,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
               value={formData.username}
               onChange={handleChange}
               required
-              className={`w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary ${isEdit ? 'bg-gray-100 cursor-not-allowed' : ''
+              className={`w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-primary focus:outline-none transition-colors text-text-primary placeholder-text-secondary ${isEdit ? 'bg-gray-100 cursor-not-allowed' : ''
                 }`}
               placeholder="Enter username"
             />
@@ -882,15 +882,15 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Email */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaEnvelope className="text-buttons-add text-xs" />
-              Email <span className="text-action-danger">*</span>
+              <FaEnvelope className="text-action-primary text-xs" />
+              Email <span className="text-action-primary">*</span>
             </label>
             <input
               name="email"
               type="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
+              className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-action-primary focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
               placeholder="Enter email"
             />
           </div>
@@ -898,7 +898,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* First Name */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaUser className="text-buttons-add text-xs" />
+              <FaUser className="text-action-primary text-xs" />
               First Name
             </label>
             <input
@@ -906,7 +906,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
               type="text"
               value={formData.firstName}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
+              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-primary focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
               placeholder="Enter first name"
             />
           </div>
@@ -914,7 +914,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Last Name */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaUser className="text-buttons-add text-xs" />
+              <FaUser className="text-action-primary text-xs" />
               Last Name
             </label>
             <input
@@ -922,7 +922,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
               type="text"
               value={formData.lastName}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
+              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-primary focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
               placeholder="Enter last name"
             />
           </div>
@@ -930,7 +930,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Date of Birth */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaCalendar className="text-buttons-add text-xs" />
+              <FaCalendar className="text-action-primary text-xs" />
               Date of Birth
             </label>
             <input
@@ -938,14 +938,14 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
               type="date"
               value={formData.dob}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary"
+              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-primary focus:outline-none transition-colors text-text-primary"
             />
           </div>
 
           {/* Phone */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaPhone className="text-buttons-add text-xs" />
+              <FaPhone className="text-action-primary text-xs" />
               Phone
             </label>
             <input
@@ -953,7 +953,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
               type="text"
               value={formData.phone}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-gray-400"
+              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-primary focus:outline-none transition-colors text-text-primary placeholder-gray-400"
               placeholder="Enter phone number"
             />
           </div>
@@ -962,8 +962,8 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Password */}
 <div>
   <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-    <FaLock className="text-buttons-add text-xs" />
-    {isEdit ? "New Password" : "Password"} {!isEdit && <span className="text-action-danger">*</span>}
+    <FaLock className="text-action-primary text-xs" />
+    {isEdit ? "New Password" : "Password"} {!isEdit && <span className="text-action-primary">*</span>}
   </label>
   <input
     name="password"
@@ -971,7 +971,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
     value={formData.password}
     onChange={handleChange}
     required={!isEdit}
-    className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
+    className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-primary focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
     placeholder={isEdit ? "Leave blank to keep current password" : "Enter password"}
   />
 </div>
@@ -979,8 +979,8 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
 {/* Confirm Password */}
 <div>
   <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-    <FaLock className="text-buttons-add text-xs" />
-    Confirm Password {!isEdit && <span className="text-action-danger">*</span>}
+    <FaLock className="text-action-primary text-xs" />
+    Confirm Password {!isEdit && <span className="text-action-primary">*</span>}
   </label>
   <input
     name="confirmPassword"
@@ -988,7 +988,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
     value={formData.confirmPassword}
     onChange={handleChange}
     required={!isEdit || !!formData.password}
-    className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
+    className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-primary focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
     placeholder={isEdit ? "Confirm new password" : "Re-enter password"}
   />
 </div>
@@ -997,15 +997,15 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Role */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaUserShield className="text-buttons-add text-xs" />
-              Role <span className="text-action-danger">*</span>
+              <FaUserShield className="text-action-primary text-xs" />
+              Role <span className="text-action-primary">*</span>
             </label>
             <select
               name="role"
               value={formData.role}
               onChange={handleChange}
               required
-              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary"
+              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-primary focus:outline-none transition-colors text-text-primary"
             >
               <option value="">Select Role</option>
               {roles.map((roleName) => (
@@ -1029,7 +1029,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 px-4 py-2.5 rounded-lg bg-buttons-add text-text-white hover:bg-green-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-2.5 rounded-lg bg-action-primary text-text-white hover:bg-brand-500 hover:text-text-primary transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading
               ? (isEdit ? "Updating User..." : "Adding User...")
