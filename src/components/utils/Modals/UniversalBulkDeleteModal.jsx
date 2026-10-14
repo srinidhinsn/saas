@@ -55,17 +55,17 @@ const UniversalBulkDeleteModal = ({
         <div className="bg-white rounded-lg w-full max-w-2xl shadow-xl max-h-[90vh] overflow-hidden flex flex-col">
           
           {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 bg-red-500">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">Delete Tables</h2>
               <button 
-                className="w-8 h-8 rounded hover:bg-gray-100 flex items-center justify-center" 
+                className="w-8 h-8 rounded bg-text-white hover:bg-gray-100 flex items-center justify-center" 
                 onClick={handleClose}
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-5 h-5 text-text-primary" />
               </button>
             </div>
-            <p className="text-sm text-gray-600 mt-1">Select tables to remove from the system</p>
+            <p className="text-sm text-text-white mt-1">Select tables to remove from the system</p>
           </div>
 
           {/* Search Bar */}
@@ -162,7 +162,7 @@ const UniversalBulkDeleteModal = ({
                 Cancel
               </button>
               <button
-                className="px-4 py-2 text-white bg-red-600 rounded-md hover:bg-red-700 font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-white bg-red-500 rounded-md hover:bg-red-700 font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
                 onClick={handleContinueToFirstConfirm}
                 disabled={selectedDeleteTables.length === 0}
               >

@@ -5,6 +5,20 @@ import AddonSelectionPopup from './AddonSelection';
 import ComboSelectionPopup from './CombosSelectionPopup';
 import axios from 'axios';
 import {isRentalRealm} from '../Menu-utils/menuUtils'
+const getDietaryStyle = (name = '') => {
+  const k = name.toLowerCase().replace(/[-_\s]/g, '');
+  if (k.includes('nonveg'))
+    return { selected: 'bg-red-100 text-red-800 border-red-500', dot: 'bg-red-500' };
+  if (k.includes('egg'))
+    return { selected: 'bg-amber-100 text-amber-800 border-amber-500', dot: 'bg-amber-500' };
+  if (k.includes('vegan'))
+    return { selected: 'bg-emerald-100 text-emerald-800 border-emerald-500', dot: 'bg-emerald-500' };
+  if (k.includes('jain'))
+    return { selected: 'bg-teal-100 text-teal-800 border-teal-500', dot: 'bg-teal-500' };
+  if (k.includes('veg'))
+    return { selected: 'bg-green-100 text-green-800 border-green-600', dot: 'bg-green-600' };
+  return { selected: 'bg-slate-200 text-slate-800 border-slate-500', dot: 'bg-slate-500' };
+};
 const UniversalEditModal = ({
   // Common props
   showModal,
@@ -248,7 +262,7 @@ const UniversalEditModal = ({
                   <p className="text-xs text-violet-600 mt-0.5">Combo price is fixed — component items are informational</p>
                 )}
               </div>
-              <button onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90"><X className="w-5 h-5" /></button>
+              <button onClick={handleClose} className="p-1.5 rounded-lg bg-red-500 text-text-white hover:opacity-90"><X className="w-5 h-5" /></button>
             </div>
 
             {/* Content */}
@@ -260,7 +274,7 @@ const UniversalEditModal = ({
                   <select
                     value={editingItem.category_id || ''}
                     onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     required
                   >
                     <option value="">Select a category</option>
@@ -281,7 +295,7 @@ const UniversalEditModal = ({
                     type="text"
                     value={editingItem.name}
                     onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     required
                   />
                 </div>
@@ -292,7 +306,7 @@ const UniversalEditModal = ({
                   <textarea
                     value={editingItem.description || ""}
                     onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     rows="3"
                   />
                 </div>
@@ -327,28 +341,32 @@ const UniversalEditModal = ({
       Dietary Type
     </label>
     <div className="flex flex-wrap gap-2">
-    {dietaryOptions.map((d) => {
-  const key = (d || '').toLowerCase().replace(/[-_\s]/g, '');
-  const selected = (editingItem?.dietary_type || '').toLowerCase().replace(/[-_\s]/g, '') === key;
-  const colorClass = dietaryColorMap?.[d] || dietaryColorMap?.[key] || 'border-gray-300';
-  return (
-    <button
-      key={d}
-      type="button"
-      onClick={() =>
-        setEditingItem(prev => ({ ...prev, dietary_type: selected ? '' : d }))
-      }
-      className={`px-3 py-1.5 rounded-lg text-sm border transition-all capitalize flex items-center gap-2 ${
-        selected
-          ? 'bg-red-700 text-text-white border-red-600 shadow-sm'
-          : 'bg-gray-50 border-gray-300 text-gray-700'
-      }`}
-    >
-      <span className={`w-2.5 h-2.5 rounded-full ${colorClass}`} />
-      {d}
-    </button>
-  );
-})}
+    <div className="flex flex-wrap gap-2">
+  {dietaryOptions.map((d) => {
+    const key = (d || '').toLowerCase().replace(/[-_\s]/g, '');
+    const selected = (editingItem?.dietary_type || '').toLowerCase().replace(/[-_\s]/g, '') === key;
+    const style = getDietaryStyle(d);
+    const dotClass = dietaryColorMap?.[d] || dietaryColorMap?.[key] || style.dot;
+    return (
+      <button
+        key={d}
+        type="button"
+        onClick={() =>
+          setEditingItem(prev => ({ ...prev, dietary_type: selected ? '' : d }))
+        }
+        className={`px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-all capitalize flex items-center gap-2 ${
+          selected
+            ? `${style.selected} shadow-sm`
+            : 'bg-bg-tertiary text-text-primary border-border-default hover:border-slate-400'
+        }`}
+      >
+        <span className={`w-2.5 h-2.5 rounded-full ${dotClass}`} />
+        {d}
+        {selected && <span className="text-xs font-bold">✓</span>}
+      </button>
+    );
+  })}
+</div>
     </div>
     {!editingItem?.dietary_type && (
       <p className="text-xs text-gray-400 mt-1">No dietary type selected</p>
@@ -361,7 +379,6 @@ const UniversalEditModal = ({
                       Availability Timing
                     </label>
 
-                    {/* ✅ Show unavailable banner if slug ends with __unavailable */}
                     {(editingItem?.slug || '').includes('__unavailable') && (
                       <div className="flex items-center justify-between mb-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
                         <div className="flex items-center gap-2">
@@ -413,8 +430,8 @@ const UniversalEditModal = ({
                             className={`px-3 py-1.5 rounded-lg text-sm border transition-all
               ${isUnavailable ? 'opacity-40 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400' :
                                 selected
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'bg-gray-50 border-gray-300 text-gray-700 hover:border-blue-500'
+                                  ? 'bg-amber-500 text-text-white border-amber-500'
+                                  : 'bg-gray-50 border-gray-300 text-text-primary hover:border-amber-600'
                               }`}
                           >
                             {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
@@ -441,7 +458,7 @@ const UniversalEditModal = ({
                       type="number"
                       value={editingItem.unit_price}
                       onChange={(e) => setEditingItem({ ...editingItem, unit_price: e.target.value })}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                       required
                     />
                   </div>
@@ -452,7 +469,7 @@ const UniversalEditModal = ({
                       type="number"
                       value={editingItem.discount}
                       onChange={(e) => setEditingItem({ ...editingItem, discount: e.target.value })}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -469,7 +486,7 @@ const UniversalEditModal = ({
                         className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-gray-200 bg-gray-50"
                       >
                         <span className="text-sm font-medium text-gray-700">
-                          <span className="font-semibold text-blue-600">{c.section}</span>
+                          <span className="font-semibold text-amber-600">{c.section}</span>
                           <span className="text-gray-400 mx-1">—</span>
                           <span>{c.zone}</span>
                         </span>
@@ -484,7 +501,7 @@ const UniversalEditModal = ({
                               ...prev,
                               zonePrices: { ...(prev.zonePrices || {}), [c.id]: e.target.value }
                             }))}
-                            className="w-24 px-2 py-1 rounded-lg border border-gray-300 bg-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-24 px-2 py-1 rounded-lg border border-gray-300 bg-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-500"
                           />
                         </div>
                       </div>
@@ -508,7 +525,7 @@ const UniversalEditModal = ({
                         })
                       }
                       className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900
-                        focus:outline-none focus:ring-2 focus:ring-action-primary"
+                        focus:outline-none focus:ring-2 focus:ring-amber-500"
                       placeholder="Item Code"
                       required
                     />
@@ -525,14 +542,14 @@ const UniversalEditModal = ({
                           ...editingItem,
                           availability: e.target.value
                         })
-                      } className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      } className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
                     <select value={editingItem.unit}
                       onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary">
+                      className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-amber-500">
                     <option value="">Select unit</option>
                     {(units || []).map((u) => (
                       <option key={u} value={u}>{u}</option>
@@ -542,13 +559,13 @@ const UniversalEditModal = ({
                   <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Serving Quantity</label>
                   <input type="number" value={editingItem.serving_quantity ?? ''} onChange={e => setEditingItem({ ...editingItem, serving_quantity: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="0" />
                 </div>
                 <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Serving Unit</label>
                     <select value={editingItem.serving_unit}
                       onChange={(e) => setEditingItem({ ...editingItem, serving_unit: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary">
+                      className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-amber-500">
                     <option value="">Select unit</option>
                     {(units || []).map((u) => (
                       <option key={u} value={u}>{u}</option>
@@ -597,7 +614,7 @@ const UniversalEditModal = ({
                     </div>
                   )}
                   <div
-                    className={`relative border-2 border-dashed rounded-md p-6 transition-colors ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
+                    className={`relative border-2 border-dashed rounded-md p-6 transition-colors ${dragActive ? 'border-amber -500 bg-blue-50' : 'border-gray-300 bg-gray-50'
                       }`}
                     onDragEnter={handleEditDrag}
                     onDragLeave={handleEditDrag}
@@ -618,7 +635,7 @@ const UniversalEditModal = ({
                       />
                       <label
                         htmlFor="editImageUpload"
-                        className="inline-block px-4 py-2 bg-blue-600 text-white rounded-md cursor-pointer hover:bg-blue-700 text-sm font-medium"
+                        className="inline-block px-4 py-2 bg-amber-500 text-white rounded-md cursor-pointer text-sm font-medium"
                       >
                         Choose File
                       </label>
@@ -671,7 +688,7 @@ const UniversalEditModal = ({
                       {editingItem.line_item_id?.length > 0 && (
                         <div className="mb-3 flex flex-wrap gap-2">
                           {editingItem.line_item_id.map(addonId => (
-                            <div key={addonId} className="flex items-center gap-2 bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm">
+                            <div key={addonId} className="flex items-center gap-2 bg-amber-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm">
                               <span>{getAddonNameById(addonId)}</span>
                               <button type="button" onClick={() => removeAddon(addonId)} className="hover:bg-blue-200 rounded-full p-0.5"><X size={14} /></button>
                             </div>
@@ -679,7 +696,7 @@ const UniversalEditModal = ({
                         </div>
                       )}
                       <button type="button" onClick={() => setShowAddonPopup(true)}
-                        className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-gray-300 text-gray-700 hover:border-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-medium">
+                        className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-amber-300 text-gray-700 hover:border-amber-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 font-medium">
                         <Plus size={18} />
                         <span>{editingItem.line_item_id?.length > 0 ? `Manage Add-ons (${editingItem.line_item_id.length} selected)` : 'Select Add-ons'}</span>
                       </button>
@@ -699,7 +716,7 @@ const UniversalEditModal = ({
               </button>
               <button
                 onClick={handleEditItem}
-                className="px-6 py-2 rounded-md bg-action-primary text-text-white font-medium"
+                className="px-6 py-2 rounded-md bg-amber-500 text-text-white font-medium"
               >
                 Save Changes
               </button>

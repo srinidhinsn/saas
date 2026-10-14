@@ -8,6 +8,7 @@ import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModa
 import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
 import TableConfigModal from "../../utils/Modals/TableConfigModal";
 import { menuCache } from '../../utils/Menu-utils/menuCache'; 
+import { IoSettingsOutline } from "react-icons/io5";
 
 const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
 
@@ -673,30 +674,29 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
                             </div>
 
 
-                            <div className="flex flex-wrap gap-2 justify-center">
+                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:justify-center">
                                 <button
-                                    className="flex items-center gap-2 px-4 py-2 bg-action-success text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
+                                    className="flex items-center gap-2 px-4 py-2 bg-slate-500 hover:bg-slate-600 text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
                                     onClick={() => setShowConfig(true)}
                                 >
-                                    <FaEdit />   <span className="hidden md:inline">Config</span>
+                                    <IoSettingsOutline />   Config
                                 </button>
 
                                 <button
-                                    className="flex items-center gap-2 px-4 py-2 bg-action-primary text-text-white rounded-lg hover:bg-bulkActionsHover-updateHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
+                                    className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
                                     onClick={openBulkUpdate}
                                 >
-                                    <FaEdit />
-                                    <span className="hidden md:inline">Bulk Update</span>
+                                    <FaEdit />Bulk Update
                                 </button>
 
                                 <button
-                                    className="flex items-center gap-2 px-4 py-2 bg-bulkActions-delete text-text-white rounded-lg hover:bg-bulkActionsHover-deleteHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
+                                    className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-700 text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
                                     onClick={openBulkDelete}
                                 >
-                                    <FaTrash /> <span className="hidden md:inline">Bulk Delete</span>
+                                    <FaTrash />Bulk Delete
                                 </button>
                                 <button
-                                    className="flex items-center gap-2 px-4 py-2 bg-bulkActions-adding text-text-white rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-semibold text-sm shadow-md"
+                                    className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-700 text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
                                     onClick={() => {
                                         setShowAddTable(true);
                                         setTableRanges([{
@@ -715,7 +715,7 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
                                         setFieldErrors([{}]);
                                     }}
                                 >
-                                    <FaPlus /> <span className="hidden md:inline">Add Table</span>
+                                    <FaPlus /> Add Table
                                 </button>
                             </div>
                         </div>
@@ -784,7 +784,7 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
                                                         key={table.id}
                                                         className={`border-2 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition
                                                             ${table.status === "vacant" ? "border-border-default" :
-                                                                table.status === "Occupied" ? "border-red-400" :
+                                                                table.status === "Occupied" ? "border-brand-800" :
                                                                     "border-blue-400"}`}
                                                     >
                                                         {/* HEADER */}

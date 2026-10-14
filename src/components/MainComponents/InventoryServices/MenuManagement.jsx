@@ -13,6 +13,7 @@ import { menuCache } from '../../utils/Menu-utils/menuCache';
 import { getDietaryFromSlug, isItemActive, toSlugSegment, isPackagingCategoryId,buildRentalTier} from '../../utils/Menu-utils/menuUtils';
 import {useDietaryTypes, useTimings, useZoneConfig, useMenuData} from '../../utils/Menu-utils/useMenuData';
 import MenuExcelTools from './MenuExcelTools';
+import { IoSettingsOutline } from "react-icons/io5";
 
 const MenuManagement = ({ clientId, token,screenIds, userId, realm }) => {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -790,9 +791,8 @@ const getAllDescendantCategoryIds = (categoryId, categoryTree) => {
   };
 
   const handleBulkDelete = async () => {
+    if (selectedRows.length === 0) return;
     menuCache.invalidate(clientId);
-    if (selectedRows.length === 0) { alert('No items selected'); return; }
-    if (!window.confirm(`Delete ${selectedRows.length} selected items?`)) return;
 
     try {
       selectedRows.forEach(id => {
@@ -1049,7 +1049,7 @@ const handleBulkUpdate = async () => {
               <button  onClick={() => setZoneConfigId(null)}
                 className={`px-3 py-1 rounded-full text-sm border transition
     ${zoneConfigId === null
-                    ? "bg-black text-white border-black"
+                    ? "bg-action-primary text-text-white"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
                 All
               </button>
@@ -1058,7 +1058,7 @@ const handleBulkUpdate = async () => {
                 <button  key={s.id} onClick={() => setZoneConfigId(s.id)}
                   className={`px-3 py-1 rounded-full text-sm border transition
       ${zoneConfigId === s.id
-                      ? "bg-blue-600 text-white border-blue-600"
+                      ? "bg-action-primary text-text-white"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
                   {s.zone} - {s.section}
                 </button>
@@ -1086,13 +1086,13 @@ const handleBulkUpdate = async () => {
                           className="w-full h-9 pl-10 pr-3 rounded-lg bg-bg-tertiary border border-border-default text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-action-primary/30"/>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end">
-                    <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-success text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
-                      <span>Config</span>
+                    <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-slate-500 hover:bg-slate-600 text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
+                    <IoSettingsOutline /> <span>Config</span>
                     </button>
-                  <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-primary text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
+                  <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-green-500 hover:bg-green-700 text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
                     <Plus size={14} /><span>{isComboCategory ? 'Add Combo' : 'Add Item'}</span>
                   </button>
-                  <button onClick={() => setShowBulkModal(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-action-danger text-text-white border border-border-default text-sm font-semibold hover:border-action-primary hover:bg-bg-secondary">
+                  <button onClick={() => setShowBulkModal(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-700 text-text-white border-border-default text-sm font-semibold hover:border-action-primary">
                     <Edit size={14} /><span className="hidden sm:inline">Bulk Update</span>
                   </button>
                   <MenuExcelTools clientId={clientId} token={token} realm={realm} menuConfig={menuConfig}
@@ -1154,11 +1154,11 @@ const handleBulkUpdate = async () => {
                       </div>
 
                       <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20">
-                        <button className="bg-action-primary text-text-white p-1 rounded-full hover:scale-110"
+                        <button className="bg-green-500 text-text-white p-1 rounded-full hover:scale-110"
                           onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}>
                           <Edit size={10} />
                         </button>
-                        <button className="bg-action-danger text-text-white p-1 rounded-full hover:scale-110"
+                        <button className="bg-red-500 text-text-white p-1 rounded-full hover:scale-110"
                           onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); setShowDeleteModal(true); }}>
                           <Trash2 size={10} />
                         </button>
@@ -1181,8 +1181,8 @@ const handleBulkUpdate = async () => {
               Are you sure you want to delete <strong className="text-text-primary">{deleteTarget.name}</strong>? This action cannot be undone.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors">Cancel</button>
-              <button onClick={handleDeleteItem} className="flex-1 px-4 py-2 rounded-lg bg-action-danger text-text-white hover:opacity-90 transition-opacity">Delete</button>
+              <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-slate-200 transition-colors">Cancel</button>
+              <button onClick={handleDeleteItem} className="flex-1 px-4 py-2 rounded-lg bg-red-500 text-text-white hover:opacity-90 hover:bg-red-600 transition-opacity">Delete</button>
             </div>
           </div>
         </div>
