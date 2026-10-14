@@ -2211,7 +2211,7 @@ const handleBillFromCart = async () => {
                             </span>
                           )}
                         </div>
-                        <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
+                        <span className="text-base font-bold text-action-primary">₹{getTotalPrice()}</span>
                       </div>
 
                       {draftSavedAt && (
@@ -2314,7 +2314,7 @@ const handleBillFromCart = async () => {
                             disabled={!canPlaceOrder || isPlacingOrder}
                             className={`py-2 rounded-lg text-sm font-semibold
                               ${canPlaceOrder && !isPlacingOrder
-                                ? 'bg-action-primary text-white hover:bg-action-danger'
+                                ? 'bg-action-primary text-white hover:bg-action-primary/90'
                                 : 'bg-gray-300 cursor-not-allowed'}`}
                           >
                             {isPlacingOrder ? 'Placing...' : 'Place Order'}
@@ -2561,7 +2561,7 @@ const handleBillFromCart = async () => {
               </button>
               <button
                 onClick={confirmClearCart}
-                className="flex-1 py-2 bg-action-primary text-white rounded-lg hover:bg-action-danger"
+                className="flex-1 py-2 bg-action-primary text-white rounded-lg hover:bg-action-primary/90"
               >
                 Clear
               </button>

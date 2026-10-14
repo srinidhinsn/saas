@@ -315,7 +315,7 @@ export default function CounterManager({ clientId, token }) {
           <h2 className="text-2xl font-bold">Counter Management</h2>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition"
+            className="bg-buttons-add text-white px-4 py-2 rounded-xl hover:bg-buttons-add/90 transition"
           >
             + Add Counter
           </button>
@@ -340,7 +340,7 @@ export default function CounterManager({ clientId, token }) {
                       counter.subCategories?.map((c) => c.id) || []
                     );
                   }}
-                  className="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 transition"
+                  className="bg-buttons-add text-white px-3 py-1 rounded-lg hover:bg-buttons-add/90 transition"
                 >
                   Assign
                 </button>
@@ -349,13 +349,13 @@ export default function CounterManager({ clientId, token }) {
                     setEditingCounter(counter);
                     setEditCounterName(counter.name);
                   }}
-                  className="bg-amber-500 text-white px-3 py-1 rounded-lg hover:bg-amber-600 transition"
+                  className="bg-buttons-update text-white px-3 py-1 rounded-lg hover:bg-buttons-update/90 transition"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => setDeletingCounter(counter)}
-                  className="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition"
+                  className="bg-buttons-delete text-white px-3 py-1 rounded-lg hover:bg-buttons-delete/90 transition"
                 >
                   Delete
                 </button>
@@ -397,7 +397,7 @@ export default function CounterManager({ clientId, token }) {
               <button
                 onClick={handleCreateCounter}
                 disabled={loading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                className="bg-buttons-add hover:bg-buttons-add/90 text-white px-4 py-2 rounded-lg"
               >
                 {loading ? "Creating..." : "Create"}
               </button>
