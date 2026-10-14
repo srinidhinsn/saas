@@ -524,7 +524,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
                 onClick={onAddNew}
                 className="flex items-center justify-center gap-2
              px-3 py-2.5 rounded-lg
-             bg-action-primary text-text-white w-full"
+             bg-green-500 text-text-white w-full"
               >
                 <Plus size={16} />
                 User
@@ -571,7 +571,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
               <button
                 onClick={onAddNew}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg
-                 bg-action-primary text-text-white"
+                 bg-green-500 text-text-white hover:bg-green-600"
               >
                 <Plus size={16} />
                 Add User

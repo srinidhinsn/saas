@@ -363,7 +363,7 @@ if (modalType === 'menu') {
                 <button
                   onClick={clearGlobalAddons}
                   disabled={globalAddons.length === 0 && selectedRows.length === 0}
-                  className="px-4 py-2 rounded-lg bg-slate-500 hover:bg-slate-600 text-white font-semibold text-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
+                  className="px-4 py-2 rounded-lg bg-buttons-configure hover:bg-slate-600 text-white font-semibold text-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
                 >
                   Clear All
                 </button>

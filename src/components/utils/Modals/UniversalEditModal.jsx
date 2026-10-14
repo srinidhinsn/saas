@@ -8,16 +8,16 @@ import {isRentalRealm} from '../Menu-utils/menuUtils'
 const getDietaryStyle = (name = '') => {
   const k = name.toLowerCase().replace(/[-_\s]/g, '');
   if (k.includes('nonveg'))
-    return { selected: 'bg-red-100 text-red-800 border-red-500', dot: 'bg-red-500' };
+    return { selected: 'bg-red-100 text-red-800 border-red-500', dot: 'bg-buttons-delete' };
   if (k.includes('egg'))
-    return { selected: 'bg-amber-100 text-amber-800 border-amber-500', dot: 'bg-amber-500' };
+    return { selected: 'bg-amber-100 text-amber-800 border-amber-500', dot: 'bg-buttons-update' };
   if (k.includes('vegan'))
     return { selected: 'bg-emerald-100 text-emerald-800 border-emerald-500', dot: 'bg-emerald-500' };
   if (k.includes('jain'))
     return { selected: 'bg-teal-100 text-teal-800 border-teal-500', dot: 'bg-teal-500' };
   if (k.includes('veg'))
     return { selected: 'bg-green-100 text-green-800 border-green-600', dot: 'bg-green-600' };
-  return { selected: 'bg-slate-200 text-slate-800 border-slate-500', dot: 'bg-slate-500' };
+  return { selected: 'bg-slate-200 text-slate-800 border-slate-500', dot: 'bg-buttons-configure' };
 };
 const UniversalEditModal = ({
   // Common props
@@ -262,7 +262,7 @@ const UniversalEditModal = ({
                   <p className="text-xs text-violet-600 mt-0.5">Combo price is fixed — component items are informational</p>
                 )}
               </div>
-              <button onClick={handleClose} className="p-1.5 rounded-lg bg-red-500 text-text-white hover:opacity-90"><X className="w-5 h-5" /></button>
+              <button onClick={handleClose} className="p-1.5 rounded-lg bg-buttons-delete text-text-white hover:opacity-90"><X className="w-5 h-5" /></button>
             </div>
 
             {/* Content */}
@@ -382,7 +382,7 @@ const UniversalEditModal = ({
                     {(editingItem?.slug || '').includes('__unavailable') && (
                       <div className="flex items-center justify-between mb-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
                         <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-red-500" />
+                          <span className="w-2 h-2 rounded-full bg-buttons-delete" />
                           <span className="text-sm font-semibold text-red-700">
                             Currently marked as Unavailable
                           </span>
@@ -430,7 +430,7 @@ const UniversalEditModal = ({
                             className={`px-3 py-1.5 rounded-lg text-sm border transition-all
               ${isUnavailable ? 'opacity-40 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400' :
                                 selected
-                                  ? 'bg-amber-500 text-text-white border-amber-500'
+                                  ? 'bg-buttons-update text-text-white border-amber-500'
                                   : 'bg-gray-50 border-gray-300 text-text-primary hover:border-amber-600'
                               }`}
                           >
@@ -635,7 +635,7 @@ const UniversalEditModal = ({
                       />
                       <label
                         htmlFor="editImageUpload"
-                        className="inline-block px-4 py-2 bg-amber-500 text-white rounded-md cursor-pointer text-sm font-medium"
+                        className="inline-block px-4 py-2 bg-buttons-update text-white rounded-md cursor-pointer text-sm font-medium"
                       >
                         Choose File
                       </label>
@@ -716,7 +716,7 @@ const UniversalEditModal = ({
               </button>
               <button
                 onClick={handleEditItem}
-                className="px-6 py-2 rounded-md bg-amber-500 text-text-white font-medium"
+                className="px-6 py-2 rounded-md bg-buttons-update text-text-white font-medium"
               >
                 Save Changes
               </button>

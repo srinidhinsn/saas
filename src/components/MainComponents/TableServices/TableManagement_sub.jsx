@@ -676,27 +676,27 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
 
                             <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:justify-center">
                                 <button
-                                    className="flex items-center gap-2 px-4 py-2 bg-slate-500 hover:bg-slate-600 text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
+                                    className="flex items-center gap-2 px-4 py-2 bg-buttons-configure hover:bg-slate-600 text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
                                     onClick={() => setShowConfig(true)}
                                 >
                                     <IoSettingsOutline />   Config
                                 </button>
 
                                 <button
-                                    className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
+                                    className="flex items-center gap-2 px-4 py-2 bg-buttons-update hover:bg-amber-600 text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
                                     onClick={openBulkUpdate}
                                 >
                                     <FaEdit />Bulk Update
                                 </button>
 
                                 <button
-                                    className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-700 text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
+                                    className="flex items-center gap-2 px-4 py-2 bg-buttons-delete hover:bg-red-700 text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
                                     onClick={openBulkDelete}
                                 >
                                     <FaTrash />Bulk Delete
                                 </button>
                                 <button
-                                    className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-700 text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
+                                    className="flex items-center gap-2 px-4 py-2 bg-buttons-add hover:bg-green-700 text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
                                     onClick={() => {
                                         setShowAddTable(true);
                                         setTableRanges([{

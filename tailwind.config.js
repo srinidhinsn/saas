@@ -76,7 +76,6 @@ export default {
           primary: "#ffffff",   // card backgrounds
           secondary: "#f97316", // page background
           tertiary: "#f3f4f6",
-
         },
         text: {
           primary: "#111827",   // strong text
@@ -87,6 +86,12 @@ export default {
         border: {
           default: "#d1d5db",
           hovering: '0 4px 10px rgba(0,0,0,0.03)'
+        },
+        buttons: {
+          add: "#22C55E",        // green-500
+          delete: "#EF4444",     // red-500
+          update: "#F59E0B",     // amber-500
+          configure: "#64748B",  // slate-500
         },
         action: {
           // primary:"purple",

@@ -8,16 +8,16 @@ import {isRentalRealm} from '../Menu-utils/menuUtils'
 const getDietaryStyle = (name = '') => {
   const k = name.toLowerCase().replace(/[-_\s]/g, '');
   if (k.includes('nonveg'))
-    return { selected: 'bg-red-100 text-red-800 border-red-500', dot: 'bg-red-500' };
+    return { selected: 'bg-red-100 text-red-800 border-red-500', dot: 'bg-buttons-delete' };
   if (k.includes('egg'))
-    return { selected: 'bg-amber-100 text-amber-800 border-amber-500', dot: 'bg-amber-500' };
+    return { selected: 'bg-amber-100 text-amber-800 border-amber-500', dot: 'bg-buttons-update' };
   if (k.includes('vegan'))
     return { selected: 'bg-emerald-100 text-emerald-800 border-emerald-500', dot: 'bg-emerald-500' };
   if (k.includes('jain'))
     return { selected: 'bg-teal-100 text-teal-800 border-teal-500', dot: 'bg-teal-500' };
   if (k.includes('veg'))
     return { selected: 'bg-green-100 text-green-800 border-green-600', dot: 'bg-green-600' };
-  return { selected: 'bg-slate-200 text-slate-800 border-slate-500', dot: 'bg-slate-500' };
+  return { selected: 'bg-slate-200 text-slate-800 border-slate-500', dot: 'bg-buttons-configure' };
 };
 const UniversalAddModal = ({
   // Common props
@@ -274,7 +274,7 @@ const UniversalAddModal = ({
                   </p>
                 )}
               </div>
-              <button onClick={handleClose} className="p-1.5 rounded-lg bg-red-500 text-text-white hover:opacity-90"><X className='h-5 w-5' /></button>
+              <button onClick={handleClose} className="p-1.5 rounded-lg bg-buttons-delete text-text-white hover:opacity-90"><X className='h-5 w-5' /></button>
             </div>
 
             <div className="space-y-4">
@@ -415,7 +415,7 @@ const UniversalAddModal = ({
                             setNewItem(prev => ({ ...prev, availability_time: next }));
                           }}
                           className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selected
-                              ? 'bg-green-500 text-text-white border-green-500'
+                              ? 'bg-buttons-add text-text-white border-green-500'
                               : 'bg-bg-tertiary border-border-default text-text-primary hover:border-green-600'
                             }`}
                         >
@@ -617,7 +617,7 @@ const UniversalAddModal = ({
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">Item Image</label>
                 <div
-                  className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${dragActive ? 'bg-green-500' : 'border-border-default'
+                  className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${dragActive ? 'bg-buttons-add' : 'border-border-default'
                     }`}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
@@ -633,7 +633,7 @@ const UniversalAddModal = ({
                           setNewItemImage(null);
                           setNewItemImageUrl('');
                         }}
-                        className="absolute top-2 right-2 bg-red-500 text-text-white p-2 rounded-full hover:opacity-90"
+                        className="absolute top-2 right-2 bg-buttons-delete text-text-white p-2 rounded-full hover:opacity-90"
                       >
                         <X size={16} />
                       </button>
@@ -653,7 +653,7 @@ const UniversalAddModal = ({
                       />
                       <label
                         htmlFor="imageUpload"
-                        className="inline-block px-4 py-2 bg-green-500 text-text-white rounded-lg cursor-pointer hover:opacity-90"
+                        className="inline-block px-4 py-2 bg-buttons-add text-text-white rounded-lg cursor-pointer hover:opacity-90"
                       >
                         Choose File
                       </label>
@@ -674,7 +674,7 @@ const UniversalAddModal = ({
                 <button
                   onClick={handleAddItem}
                   disabled={isSubmitting}
-                  className={`flex-1 px-4 py-2 rounded-lg bg-green-500 text-text-white hover:opacity-90 transition-opacity ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-action-primary hover:opacity-90'}`}
+                  className={`flex-1 px-4 py-2 rounded-lg bg-buttons-add text-text-white hover:opacity-90 transition-opacity ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-action-primary hover:opacity-90'}`}
                 >
                   {isComboCategory ? 'Add Combo' : 'Add Item'}
                 </button>
@@ -716,7 +716,7 @@ const UniversalAddModal = ({
         <div className="bg-bg-primary rounded-xl w-full max-w-xl shadow-2xl border border-border-default my-8">
           <div className="sticky top-0 bg-bg-primary px-4 py-2 border-b-border-default flex justify-between items-center z-10 rounded-t-xl">
             <h3 className="text-xl font-bold text-text-primary">Add Tables</h3>
-            <button onClick={handleClose} className="p-1.5 rounded-lg bg-green-500 text-text-white hover:opacity-90 transition-opacity">
+            <button onClick={handleClose} className="p-1.5 rounded-lg bg-buttons-add text-text-white hover:opacity-90 transition-opacity">
               <X size={24} />
             </button>
           </div>
@@ -814,7 +814,7 @@ const UniversalAddModal = ({
               </div>
             ))}
             <button
-              className="w-full bg-green-500 text-text-white py-2 rounded-lg hover:bg-green-400 transition-colors font-bold text-lg shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="w-full bg-buttons-add text-text-white py-2 rounded-lg hover:bg-green-400 transition-colors font-bold text-lg shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
               disabled={isGenerating}
               onClick={generateTables}
             >

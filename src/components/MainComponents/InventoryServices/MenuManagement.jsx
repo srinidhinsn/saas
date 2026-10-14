@@ -1086,13 +1086,13 @@ const handleBulkUpdate = async () => {
                           className="w-full h-9 pl-10 pr-3 rounded-lg bg-bg-tertiary border border-border-default text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-action-primary/30"/>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end">
-                    <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-slate-500 hover:bg-slate-600 text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
+                    <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-buttons-configure hover:bg-slate-600 text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
                     <IoSettingsOutline /> <span>Config</span>
                     </button>
-                  <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-green-500 hover:bg-green-700 text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
+                  <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-buttons-add hover:bg-green-700 text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
                     <Plus size={14} /><span>{isComboCategory ? 'Add Combo' : 'Add Item'}</span>
                   </button>
-                  <button onClick={() => setShowBulkModal(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-700 text-text-white border-border-default text-sm font-semibold hover:border-action-primary">
+                  <button onClick={() => setShowBulkModal(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-buttons-update hover:bg-amber-700 text-text-white border-border-default text-sm font-semibold hover:border-action-primary">
                     <Edit size={14} /><span className="hidden sm:inline">Bulk Update</span>
                   </button>
                   <MenuExcelTools clientId={clientId} token={token} realm={realm} menuConfig={menuConfig}
@@ -1154,11 +1154,11 @@ const handleBulkUpdate = async () => {
                       </div>
 
                       <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20">
-                        <button className="bg-green-500 text-text-white p-1 rounded-full hover:scale-110"
+                        <button className="bg-buttons-add text-text-white p-1 rounded-full hover:scale-110"
                           onClick={(e) => { e.stopPropagation(); handleItemClick(item); }}>
                           <Edit size={10} />
                         </button>
-                        <button className="bg-red-500 text-text-white p-1 rounded-full hover:scale-110"
+                        <button className="bg-buttons-delete text-text-white p-1 rounded-full hover:scale-110"
                           onClick={(e) => { e.stopPropagation(); setDeleteTarget(item); setShowDeleteModal(true); }}>
                           <Trash2 size={10} />
                         </button>
@@ -1182,7 +1182,7 @@ const handleBulkUpdate = async () => {
             </p>
             <div className="flex gap-3">
               <button onClick={() => setShowDeleteModal(false)} className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-slate-200 transition-colors">Cancel</button>
-              <button onClick={handleDeleteItem} className="flex-1 px-4 py-2 rounded-lg bg-red-500 text-text-white hover:opacity-90 hover:bg-red-600 transition-opacity">Delete</button>
+              <button onClick={handleDeleteItem} className="flex-1 px-4 py-2 rounded-lg bg-buttons-delete text-text-white hover:opacity-90 hover:bg-red-600 transition-opacity">Delete</button>
             </div>
           </div>
         </div>
