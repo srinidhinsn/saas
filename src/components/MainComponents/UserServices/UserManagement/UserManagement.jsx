@@ -448,7 +448,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
       field: 'email',
       minWidth: 200,
       cellRenderer: (params) => (
-        <a href={`mailto:${params.value}`} className="text-text-secondary hover:text-action-danger text-sm hover:underline">
+        <a href={`mailto:${params.value}`} className="text-text-secondary hover:text-buttons-delete text-sm hover:underline">
           {params.value}
         </a>
       ),
@@ -481,14 +481,14 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
         <div className="flex gap-3">
           <button
             onClick={() => onEdit(params.data)}
-            className="text-action-primary hover:text-action-primary"
+            className="text-buttons-add hover:text-green-600"
             title="Edit user"
           >
             <Edit size={16} />
           </button>
           <button
             onClick={() => setDeleteUserId(params.data.id)}
-            className="text-red-600 hover:text-red-800"
+            className="text-buttons-delete hover:text-red-600"
           >
             <Trash2 size={16} />
           </button>
@@ -863,8 +863,13 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Username */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+<<<<<<< HEAD
               <FaUser className="text-action-primary text-xs" />
               Username <span className="text-action-primary">*</span>
+=======
+              <FaUser className="text-buttons-add text-xs" />
+              Username <span className="text-action-danger">*</span>
+>>>>>>> 4848bc19f60e2e42e79d8bb16f76b5107a66ad9a
             </label>
             <input
               name="username"
@@ -882,8 +887,13 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Email */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+<<<<<<< HEAD
               <FaEnvelope className="text-action-primary text-xs" />
               Email <span className="text-action-primary">*</span>
+=======
+              <FaEnvelope className="text-buttons-add text-xs" />
+              Email <span className="text-action-danger">*</span>
+>>>>>>> 4848bc19f60e2e42e79d8bb16f76b5107a66ad9a
             </label>
             <input
               name="email"
@@ -898,7 +908,11 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* First Name */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+<<<<<<< HEAD
               <FaUser className="text-action-primary text-xs" />
+=======
+              <FaUser className="text-buttons-add text-xs" />
+>>>>>>> 4848bc19f60e2e42e79d8bb16f76b5107a66ad9a
               First Name
             </label>
             <input
@@ -914,7 +928,11 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Last Name */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+<<<<<<< HEAD
               <FaUser className="text-action-primary text-xs" />
+=======
+              <FaUser className="text-buttons-add text-xs" />
+>>>>>>> 4848bc19f60e2e42e79d8bb16f76b5107a66ad9a
               Last Name
             </label>
             <input
@@ -930,7 +948,11 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Date of Birth */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+<<<<<<< HEAD
               <FaCalendar className="text-action-primary text-xs" />
+=======
+              <FaCalendar className="text-buttons-add text-xs" />
+>>>>>>> 4848bc19f60e2e42e79d8bb16f76b5107a66ad9a
               Date of Birth
             </label>
             <input
@@ -945,7 +967,11 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Phone */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+<<<<<<< HEAD
               <FaPhone className="text-action-primary text-xs" />
+=======
+              <FaPhone className="text-buttons-add text-xs" />
+>>>>>>> 4848bc19f60e2e42e79d8bb16f76b5107a66ad9a
               Phone
             </label>
             <input
@@ -962,8 +988,13 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Password */}
 <div>
   <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+<<<<<<< HEAD
     <FaLock className="text-action-primary text-xs" />
     {isEdit ? "New Password" : "Password"} {!isEdit && <span className="text-action-primary">*</span>}
+=======
+    <FaLock className="text-buttons-add text-xs" />
+    {isEdit ? "New Password" : "Password"} {!isEdit && <span className="text-action-danger">*</span>}
+>>>>>>> 4848bc19f60e2e42e79d8bb16f76b5107a66ad9a
   </label>
   <input
     name="password"
@@ -979,8 +1010,13 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
 {/* Confirm Password */}
 <div>
   <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+<<<<<<< HEAD
     <FaLock className="text-action-primary text-xs" />
     Confirm Password {!isEdit && <span className="text-action-primary">*</span>}
+=======
+    <FaLock className="text-buttons-add text-xs" />
+    Confirm Password {!isEdit && <span className="text-action-danger">*</span>}
+>>>>>>> 4848bc19f60e2e42e79d8bb16f76b5107a66ad9a
   </label>
   <input
     name="confirmPassword"
@@ -997,8 +1033,13 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           {/* Role */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
+<<<<<<< HEAD
               <FaUserShield className="text-action-primary text-xs" />
               Role <span className="text-action-primary">*</span>
+=======
+              <FaUserShield className="text-buttons-add text-xs" />
+              Role <span className="text-action-danger">*</span>
+>>>>>>> 4848bc19f60e2e42e79d8bb16f76b5107a66ad9a
             </label>
             <select
               name="role"
@@ -1029,7 +1070,11 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
           <button
             type="submit"
             disabled={loading}
+<<<<<<< HEAD
             className="flex-1 px-4 py-2.5 rounded-lg bg-action-primary text-text-white hover:bg-brand-500 hover:text-text-primary transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+=======
+            className="flex-1 px-4 py-2.5 rounded-lg bg-buttons-add text-text-white hover:bg-green-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+>>>>>>> 4848bc19f60e2e42e79d8bb16f76b5107a66ad9a
           >
             {loading
               ? (isEdit ? "Updating User..." : "Adding User...")

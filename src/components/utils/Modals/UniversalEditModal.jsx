@@ -274,7 +274,7 @@ const UniversalEditModal = ({
                   <select
                     value={editingItem.category_id || ''}
                     onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-buttons-update focus:border-transparent"
                     required
                   >
                     <option value="">Select a category</option>
@@ -295,7 +295,7 @@ const UniversalEditModal = ({
                     type="text"
                     value={editingItem.name}
                     onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-buttons-update focus:border-transparent"
                     required
                   />
                 </div>
@@ -306,7 +306,7 @@ const UniversalEditModal = ({
                   <textarea
                     value={editingItem.description || ""}
                     onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-buttons-update focus:border-transparent"
                     rows="3"
                   />
                 </div>
@@ -458,7 +458,7 @@ const UniversalEditModal = ({
                       type="number"
                       value={editingItem.unit_price}
                       onChange={(e) => setEditingItem({ ...editingItem, unit_price: e.target.value })}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-buttons-update focus:border-transparent"
                       required
                     />
                   </div>
@@ -469,7 +469,7 @@ const UniversalEditModal = ({
                       type="number"
                       value={editingItem.discount}
                       onChange={(e) => setEditingItem({ ...editingItem, discount: e.target.value })}
-                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-buttons-update focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -501,7 +501,7 @@ const UniversalEditModal = ({
                               ...prev,
                               zonePrices: { ...(prev.zonePrices || {}), [c.id]: e.target.value }
                             }))}
-                            className="w-24 px-2 py-1 rounded-lg border border-gray-300 bg-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            className="w-24 px-2 py-1 rounded-lg border border-gray-300 bg-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-buttons-update"
                           />
                         </div>
                       </div>
@@ -525,7 +525,7 @@ const UniversalEditModal = ({
                         })
                       }
                       className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900
-                        focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        focus:outline-none focus:ring-2 focus:ring-buttons-update"
                       placeholder="Item Code"
                       required
                     />
@@ -542,14 +542,14 @@ const UniversalEditModal = ({
                           ...editingItem,
                           availability: e.target.value
                         })
-                      } className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      } className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-buttons-update focus:border-transparent"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
                     <select value={editingItem.unit}
                       onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-amber-500">
+                      className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-update">
                     <option value="">Select unit</option>
                     {(units || []).map((u) => (
                       <option key={u} value={u}>{u}</option>
@@ -559,13 +559,13 @@ const UniversalEditModal = ({
                   <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Serving Quantity</label>
                   <input type="number" value={editingItem.serving_quantity ?? ''} onChange={e => setEditingItem({ ...editingItem, serving_quantity: e.target.value })}
-                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="0" />
+                    className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-buttons-update" placeholder="0" />
                 </div>
                 <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Serving Unit</label>
                     <select value={editingItem.serving_unit}
                       onChange={(e) => setEditingItem({ ...editingItem, serving_unit: e.target.value })}
-                      className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-amber-500">
+                      className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-update">
                     <option value="">Select unit</option>
                     {(units || []).map((u) => (
                       <option key={u} value={u}>{u}</option>

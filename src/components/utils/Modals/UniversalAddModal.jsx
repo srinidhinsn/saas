@@ -292,7 +292,7 @@ const UniversalAddModal = ({
                     }));
                   }}
 
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                   required
                 >
                   <option value="">Select a category</option>
@@ -313,7 +313,7 @@ const UniversalAddModal = ({
                   type="text"
                   value={newItem?.name ?? ''}
                   onChange={(e) => setNewItem(prev => ({ ...(prev || {}), name: e.target.value }))}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                   placeholder={isComboCategory ? "e.g. Family Combo, Weekend Special" : "Enter item name"} 
                   required
                 />
@@ -325,7 +325,7 @@ const UniversalAddModal = ({
                 <textarea
                   value={newItem?.description ?? ''}
                   onChange={(e) => setNewItem(prev => ({ ...(prev || {}), description: e.target.value }))}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                   placeholder={isComboCategory ? "What's included, portion details…" : "Enter item description"} rows="3" />
               </div>
               {isRentalRealm(normalizedRealm) &&  (
@@ -437,7 +437,7 @@ const UniversalAddModal = ({
                     type="number"
                     value={newItem?.unit_price ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), unit_price: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                     placeholder="0.00"
                     required
                   />
@@ -449,7 +449,7 @@ const UniversalAddModal = ({
                     type="number"
                     value={newItem?.discount ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), discount: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                     placeholder="0.00"
                   />
                 </div>
@@ -479,7 +479,7 @@ const UniversalAddModal = ({
                           ...prev,
                           zonePrices: { ...(prev.zonePrices || {}), [c.id]: e.target.value }
                         }))}
-                        className="w-24 px-2 py-1 rounded-lg border border-border-default bg-bg-primary text-sm text-right focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className="w-24 px-2 py-1 rounded-lg border border-border-default bg-bg-primary text-sm text-right focus:outline-none focus:ring-2 focus:ring-buttons-add"
                       />
                     </div>
                   </div>
@@ -492,7 +492,7 @@ const UniversalAddModal = ({
                   <select
                     value={newItem?.unit ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), unit: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                   >
                     <option value="">Select unit</option>
                     {(units || []).map((u) => (
@@ -514,7 +514,7 @@ const UniversalAddModal = ({
                         availability: e.target.value
                       }))
                     }
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default focus:outline-none focus:ring-2 focus:ring-buttons-add"
                     placeholder="Enter stock / quantity"
                   />
                 </div>
@@ -523,7 +523,7 @@ const UniversalAddModal = ({
                   <select
                     value={newItem?.serving_unit ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_unit: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                   >
                     <option value="">Select unit</option>
                     {(units || []).map((u) => (
@@ -537,7 +537,7 @@ const UniversalAddModal = ({
                     type="number"
                     value={newItem?.serving_quantity ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_quantity: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                     placeholder="0"
                   />
                 </div>
@@ -548,7 +548,7 @@ const UniversalAddModal = ({
                     type="text"
                     value={newItem?.code ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), code: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                     placeholder="0"
                   />
                 </div>

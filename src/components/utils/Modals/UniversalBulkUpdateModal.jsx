@@ -329,7 +329,7 @@ if (modalType === 'menu') {
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
       <div className="bg-bg-primary w-full sm:max-w-6xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[92vh] h-full rounded-xl shadow-2xl flex flex-col overflow-hidden border border-border-default">
           {/* HEADER */}
-          <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 bg-amber-500 text-gray-900 shrink-0">
+          <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 bg-buttons-update text-gray-900 shrink-0">
             <div className="flex items-center gap-2 min-w-0">
               <Edit className="w-5 h-5 shrink-0" />
               <div className="min-w-0">
@@ -355,7 +355,7 @@ if (modalType === 'menu') {
               <div className="grid grid-cols-2 sm:flex gap-2">
                 <button
                   onClick={() => setShowGlobalAddonPopup(true)}
-                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-gray-900 font-semibold text-sm shadow-sm transition-colors whitespace-nowrap"
+                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-buttons-update hover:bg-amber-600 text-gray-900 font-semibold text-sm shadow-sm transition-colors whitespace-nowrap"
                 >
                   <Plus size={16} />
                   {globalAddons.length > 0 ? `${globalAddons.length} add-on(s)` : 'Select Add-ons'}
@@ -444,7 +444,7 @@ if (modalType === 'menu') {
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={selectedRows.length === 0}
-                className="flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-xs sm:text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg bg-buttons-delete hover:bg-red-700 text-white font-semibold text-xs sm:text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
               >
                 <Trash2 className="w-4 h-4" />
                 Delete
@@ -906,7 +906,7 @@ if (modalType === 'menu') {
             <button
               onClick={handleBulkUpdate}
               disabled={selectedRows.length === 0}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-gray-900 font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-buttons-update hover:bg-amber-600 text-gray-900 font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
             >
               <Edit className="w-4 h-4" />
               Update Selected ({selectedRows.length})
@@ -1087,7 +1087,7 @@ if (modalType === 'table') {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
   <div className="bg-bg-primary w-full sm:max-w-3xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[92vh] h-full rounded-md shadow-2xl flex flex-col overflow-hidden border border-border-default">
         {/* HEADER */}
-        <div className="flex items-center justify-between gap-4 px-8 sm:px-6 py-4 bg-amber-500 text-text-primary shrink-0">
+        <div className="flex items-center justify-between gap-4 px-8 sm:px-6 py-4 bg-buttons-update text-text-primary shrink-0">
           <div className="flex items-center gap-4 min-w-0">
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-bold leading-tight truncate">Bulk Update Tables</h2>
