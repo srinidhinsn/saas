@@ -19,7 +19,7 @@ const contactInfo = {
 //   1) put the file in the  public  folder (next to package.json, NOT inside src)
 //   2) set src below, e.g.  src: '/placeorder.webm'
 // The first video sits at the back (top-left), the second overlaps it in front (bottom-right).
-const demoVideos = [
+const demoVideo = [
   { src: '/Demo.webm', poster: '' },
 ]
 
