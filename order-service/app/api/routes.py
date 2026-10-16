@@ -27,11 +27,12 @@ from services.order_service import (
     _merge_group,
     _deduct_stock_for_order,
     _convert,
-    update_order_status_service,_is_rental_realm
+    update_order_status_service,_is_rental_realm,next_order_number, _day_bounds, group_filters,
 )
 from services.order_status import _status_label
 from decimal import Decimal
 import logging
+from sqlalchemy import text
 
 router = APIRouter()
 logger = logging.getLogger("uvicorn.error")
@@ -58,7 +59,8 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
     db.add(db_order)
     db.flush()
     # dinein_order_id for a fresh order = its own PK
-    db_order.dinein_order_id = str(db_order.id)
+    is_draft = str(getattr(order.status, "value", order.status)).lower() == "draft"
+    db_order.dinein_order_id = f"D{db_order.id}" if is_draft else str(next_order_number(db, client_id))
 
     for item in order.items:
         item_status = OrderStatusEnum.served if is_rental else item.status
@@ -95,22 +97,31 @@ def create_sub_order(
     client_id: str,
     parent_dinein_order_id: str,   # e.g. "1001"
     order: DineinOrderModel,
+    parent_order_id: Optional[int] = None,
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
-    root_order = db.query(Db_Order_Entity).filter(
-        Db_Order_Entity.client_id == client_id,
-        Db_Order_Entity.dinein_order_id == parent_dinein_order_id,
-    ).first()
+    base_q = db.query(Db_Order_Entity).filter(Db_Order_Entity.client_id == client_id)
+    if parent_order_id:
+        root_order = base_q.filter(Db_Order_Entity.id == parent_order_id).first()
+    else:
+        s, e = _day_bounds()
+        root_order = base_q.filter(Db_Order_Entity.dinein_order_id == parent_dinein_order_id,Db_Order_Entity.created_at >= s,
+            Db_Order_Entity.created_at < e,).first()    
     if not root_order:
         raise HTTPException(status_code=404, detail=f"Parent order '{parent_dinein_order_id}' not found")
     is_rental = _is_rental_realm(context)
     order_status = OrderStatusEnum.served if is_rental else OrderStatusEnum.pending
+    root_no = _root_dinein_id(root_order.dinein_order_id or str(root_order.id))
+    db.execute(text("SELECT 1 FROM client WHERE id = :c FOR UPDATE"), {"c": client_id})
+    s, e = _day_bounds(root_order.created_at)
     existing_sub_count = db.query(Db_Order_Entity).filter(
         Db_Order_Entity.client_id == client_id,
-        Db_Order_Entity.dinein_order_id.like(f"{parent_dinein_order_id}-%"),
+        Db_Order_Entity.dinein_order_id.like(f"{root_no}-%"),
+        Db_Order_Entity.created_at >= s,
+        Db_Order_Entity.created_at < e,
     ).count()
-    sub_dinein_order_id = f"{parent_dinein_order_id}-{existing_sub_count + 1}"
+    sub_dinein_order_id = f"{root_no}-{existing_sub_count + 1}"
     
     db_sub_order = Db_Order_Entity(
         client_id=client_id,
@@ -197,7 +208,8 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
     groups: dict = {}
     for order in orders:
         root = _root_dinein_id(order.dinein_order_id or str(order.id))
-        groups.setdefault(root, []).append(order)
+        key = (order.client_id, root, _day_bounds(order.created_at)[0])
+        groups.setdefault(key, []).append(order)
 
     result = [_merge_group(group, context=context, db=db) for group in groups.values()]
     for r in result:
@@ -501,8 +513,6 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
 
     if not remaining_active:
       if order_row:
-        root_dinein_id = _root_dinein_id(order_row.dinein_order_id or str(order_row.id))
-
         # Cancel THIS order
         order_row.status = _status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled
         order_row.total_price = 0
@@ -510,14 +520,8 @@ def delete_order_items( client_id: str, order_item_id: Optional[str] = Query(Non
 
         # Check if any sibling order still has active items
         all_group_orders = (
-            db.query(Db_Order_Entity)
-            .filter(
-                Db_Order_Entity.client_id == client_id,
-                Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}%"),
-                Db_Order_Entity.status != (_status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled),
-                )
-                .all()
-            )
+            db.query(Db_Order_Entity).filter(*group_filters(order_row),
+                Db_Order_Entity.status != (_status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled),).all())
 
         # Only free the table when the ENTIRE group is cancelled
         if not all_group_orders:
@@ -585,18 +589,7 @@ def cancel_order(
             payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=ref_id or order_id, qty=qty,after_stock=after_stock, remarks=build_remark(tag, ref_id or order_id, name, qty, effective_reason))
         )
 
-    root_dinein_id = _root_dinein_id(
-        root_order.dinein_order_id or str(root_order.id)
-    )
-
-    related_orders = (
-        db.query(Db_Order_Entity)
-        .filter(
-            Db_Order_Entity.client_id == client_id,
-            Db_Order_Entity.dinein_order_id.like(f"{root_dinein_id}%"),
-        )
-        .all()
-    )
+    related_orders = db.query(Db_Order_Entity).filter(*group_filters(root_order)).all()
 
     total_cancel_value = sum(
         Decimal(str(order.total_price or 0)) for order in related_orders
@@ -897,11 +890,13 @@ def get_kds_orders(client_id: str, context: SaasContext = Depends(verify_token),
 
 @router.get("/dinein/customer-orders")
 def get_customer_orders(
+    client_id: str,
     customer_id: str,
     context: SaasContext = Depends(verify_token),
     db: Session = Depends(get_db),
 ):
     orders = db.query(Db_Order_Entity).filter(
+        Db_Order_Entity.client_id == client_id, 
         Db_Order_Entity.customer_id == customer_id,
         Db_Order_Entity.status != (_status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled),
     ).all()
@@ -910,7 +905,8 @@ def get_customer_orders(
 
     for order in orders:
         root = _root_dinein_id(order.dinein_order_id or str(order.id))
-        groups.setdefault(root, []).append(order)
+        key = (order.client_id, root, _day_bounds(order.created_at)[0])
+        groups.setdefault(key, []).append(order)
 
     result = [_merge_group(group,context=context,db=db) for group in groups.values()]
     for r in result:
