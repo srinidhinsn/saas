@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import text, or_
 
 TIMEZONE   = os.getenv("TIMEZONE", "UTC")
-RESET_HOUR = int(os.getenv("ORDER_NUMBER_RESET_HOUR", "0"))   # 0 = midnight
+RESET_HOUR = int(os.getenv("ORDER_NUMBER_RESET_HOUR", "0")) 
 
 def _day_bounds(dt=None):
     dt = (dt or datetime.now(ZoneInfo(TIMEZONE))).replace(tzinfo=None)
@@ -28,28 +28,20 @@ def _day_bounds(dt=None):
     return start, start + timedelta(days=1)
 
 def next_order_number(db, client_id: str) -> int:
-    # lock only THIS client's row, so other clients are never blocked
     db.execute(text("SELECT 1 FROM client WHERE id = :c FOR UPDATE"), {"c": client_id})
     s, e = _day_bounds()
     return db.execute(text("""
     SELECT COALESCE(MAX(
              CASE WHEN dinein_order_id ~ '^[0-9]+(-[0-9]+)?$'
                   THEN split_part(dinein_order_id,'-',1)::bigint END), 0) + 1
-    FROM dinein_order
-    WHERE client_id = :c AND created_at >= :s AND created_at < :e
-"""), {"c": client_id, "s": s, "e": e}).scalar_one()
+    FROM dinein_order WHERE client_id = :c AND created_at >= :s AND created_at < :e """), {"c": client_id, "s": s, "e": e}).scalar_one()
 
 def group_filters(order):
-    """Root order + its sub-orders: same client, same day, exact root or root-N."""
     root = _root_dinein_id(order.dinein_order_id or str(order.id))
     s, e = _day_bounds(order.created_at)
     return [
-        Db_Order_Entity.client_id == order.client_id,
-        or_(Db_Order_Entity.dinein_order_id == root,
-            Db_Order_Entity.dinein_order_id.like(f"{root}-%")),
-        Db_Order_Entity.created_at >= s,
-        Db_Order_Entity.created_at < e,
-    ]
+        Db_Order_Entity.client_id == order.client_id,  or_(Db_Order_Entity.dinein_order_id == root,Db_Order_Entity.dinein_order_id.like(f"{root}-%")),
+        Db_Order_Entity.created_at >= s,Db_Order_Entity.created_at < e,]
 
 def _is_rental_realm(context) -> bool:
     return (resolve_realm_from_context(context) or "").strip().lower() == "rental"
