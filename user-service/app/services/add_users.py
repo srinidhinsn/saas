@@ -469,7 +469,7 @@ DEFAULT_CLIENT_CATEGORIES = [
         "id": "dietary_type",
         "name": "Dietary_type",
         "description": "Dietary_types",
-        "sub_categories": ["veg","non_veg","egg"],
+        "sub_categories": [],
         "slug": "_dietary_types",
     },
 ]
@@ -572,7 +572,7 @@ def seed_default_categories(client_id: str, created_by: str, db: Session, admin_
         "id": "dietary_type",
         "name": "Dietary_type",
         "description": "Dietary_types",
-        "sub_categories": ["veg","non_veg","egg"],
+        "sub_categories": [],
         "slug": "_dietary_types",
     },
     ]
