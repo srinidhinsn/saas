@@ -37,6 +37,7 @@ const RoutesManager = ({ token: appToken }) => {
   const [realm, setRealm] = useState();
   const [screenIds, setScreenIds] = useState([]);
   const [userId, setUserId] = useState();
+  const isSuperAdmin = localStorage.getItem('screen_id') === 'super_admin_v1';
   useEffect(() => {
     setToken(appToken);
   }, [appToken]);
@@ -60,7 +61,7 @@ const RoutesManager = ({ token: appToken }) => {
       const userRole = decoded.roles && decoded.roles[0]; // pick first role
       const subscription = decoded.subscription || [];
       setRole(userRole);
-      setRealm(decoded.realm)
+      setRealm(isSuperAdmin ? 'rental' : decoded.realm);
       setUserId(decoded.user_id)
 
       // Fetch all screens for this role

@@ -1533,7 +1533,7 @@ const buildOrderPayload = (items) =>
           const r = await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create-sub-order`,
             { items: buildOrderPayload(newOnly), price: subTotal, total_price: subTotal },
-            { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId } }
+            { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId, parent_order_id: activeOrderId } }
           );
           placedOrderId = activeOrderId;
           placedDineinOrderId = r?.data?.data?.dinein_order_id || activeDineinOrderId;
@@ -1560,13 +1560,15 @@ const buildOrderPayload = (items) =>
               id: existingDraft.id,
               status: 'pending',
               total_price: total,
-              // tells backend to reset dinein_order_id from "DRAFT-X" → "X"
-              dinein_order_id: String(existingDraft.id),
             },
             { headers }
           );
+          const r = await axios.get(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/order`,
+            { headers, params: { client_id: clientId, order_id: existingDraft.id } }
+          );
           placedOrderId = existingDraft.id;
-          placedDineinOrderId = String(existingDraft.id);
+          placedDineinOrderId = r.data?.data?.dinein_order_id || String(existingDraft.id);
         } else {
           const createRes = await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
@@ -2211,7 +2213,7 @@ const handleBillFromCart = async () => {
                             </span>
                           )}
                         </div>
-                        <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
+                        <span className="text-base font-bold text-action-primary">₹{getTotalPrice()}</span>
                       </div>
 
                       {draftSavedAt && (
@@ -2314,7 +2316,7 @@ const handleBillFromCart = async () => {
                             disabled={!canPlaceOrder || isPlacingOrder}
                             className={`py-2 rounded-lg text-sm font-semibold
                               ${canPlaceOrder && !isPlacingOrder
-                                ? 'bg-action-primary text-white hover:bg-action-danger'
+                                ? 'bg-action-primary text-white hover:bg-action-primary/90'
                                 : 'bg-gray-300 cursor-not-allowed'}`}
                           >
                             {isPlacingOrder ? 'Placing...' : 'Place Order'}
@@ -2561,7 +2563,7 @@ const handleBillFromCart = async () => {
               </button>
               <button
                 onClick={confirmClearCart}
-                className="flex-1 py-2 bg-action-primary text-white rounded-lg hover:bg-action-danger"
+                className="flex-1 py-2 bg-action-primary text-white rounded-lg hover:bg-action-primary/90"
               >
                 Clear
               </button>

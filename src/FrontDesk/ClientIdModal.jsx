@@ -36,7 +36,7 @@ export default function ClientIdModal({ open, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-color-modalsbg px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-brand-900/50 px-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <form
@@ -45,28 +45,28 @@ export default function ClientIdModal({ open, onClose }) {
         aria-labelledby="client-id-title"
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md animate-slideUp overflow-hidden rounded-card-lg border border-border-default bg-bg-primary shadow-modal"
+        className="w-full max-w-md animate-slideUp overflow-hidden rounded-panel border border-line bg-surface shadow-soft"
       >
-        <div className="h-1 bg-bg-secondary" />
+        <div className="h-1 bg-brand-600" />
 
         <div className="p-6 sm:p-8">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-button bg-bg-secondary text-lg font-bold text-text-primary">
+            <span className="flex h-10 w-10 items-center justify-center rounded-btn bg-brand-800 font-serif text-lg font-semibold text-white">
               T
             </span>
             <div>
-              <h2 id="client-id-title" className="text-xl font-bold leading-tight tracking-tight text-text-primary">
+              <h2 id="client-id-title" className="text-xl leading-tight tracking-tight">
                 Sign in to TEKHAWK
               </h2>
-              <p className="text-xs text-text-secondary">Software Solutions</p>
+              <p className="text-xs text-muted">Software Solutions</p>
             </div>
           </div>
 
-          <p className="mt-5 text-sm leading-6 text-text-secondary">
+          <p className="mt-5 text-sm leading-6 text-copy">
             Enter your Client ID to continue to your workspace login.
           </p>
 
-          <label htmlFor="client-id" className="mt-6 block text-sm font-medium text-text-primary">
+          <label htmlFor="client-id" className="lp-label mt-6 block">
             Client ID
           </label>
           <input
@@ -80,26 +80,19 @@ export default function ClientIdModal({ open, onClose }) {
             placeholder="e.g. easyfood"
             autoComplete="off"
             aria-invalid={!!error}
-            className={`mt-2 w-full rounded-input border bg-bg-primary px-4 py-3 text-text-primary outline-none transition focus:ring-2 ${
+            className={`lp-input ${
               error
-                ? 'border-action-danger focus:border-action-danger focus:ring-action-danger/30'
-                : 'border-border-default focus:border-bg-secondary focus:ring-bg-secondary/30'
+                ? '!border-action-danger focus:!border-action-danger focus:!ring-action-danger/30'
+                : ''
             }`}
           />
           {error && <p className="mt-2 text-sm text-action-danger">{error}</p>}
 
           <div className="mt-6 flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-button border border-border-default bg-bg-primary px-4 py-3 font-medium text-text-primary transition hover:bg-bg-tertiary"
-            >
+            <button type="button" onClick={onClose} className="lp-btn-secondary flex-1">
               Cancel
             </button>
-            <button
-              type="submit"
-              className="flex-1 rounded-button bg-bg-secondary px-4 py-3 font-bold text-text-primary shadow-button transition hover:brightness-95"
-            >
+            <button type="submit" className="lp-btn-primary flex-1">
               Continue
             </button>
           </div>

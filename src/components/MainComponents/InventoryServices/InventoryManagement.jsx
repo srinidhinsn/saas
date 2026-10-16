@@ -747,12 +747,12 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       <div className="max-w-8xl mx-auto w-full">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div className="flex gap-3">
-            <p className="text-3xl font-bold xl mt-2 text-base text-gray-600">
+            <p className="font-bold xl mt-2 text-base text-gray-600">
               Manage stock items, recipes, and menu availability
             </p>
 
             <button
-              className="flex items-center gap-2 px-4 py-2 bg-action-primary hover:bg-action-primary text-text-white rounded-lg font-medium text-sm transition-all shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-buttons-add hover:bg-buttonsHover-add text-text-white rounded-lg font-medium text-sm transition-all shadow-sm"
               onClick={openInventoryModal}
             >
               + Add Inventory
@@ -891,23 +891,23 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
               <div className="space-y-4 text-base">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Stock items</span>
-                  <span className="font-semibold text-gray-900">{getCurrentInventoryOverview.stockCount}</span>
+                  <span className="font-semibold text-buttons-add">{getCurrentInventoryOverview.stockCount}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Low stock</span>
-                  <span className="font-semibold text-amber-600">
+                  <span className="font-semibold text-buttons-update">
                     {getCurrentInventoryOverview.lowStockCount}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Menu items</span>
-                  <span className="font-semibold text-gray-900">{getCurrentInventoryOverview.menuCount}</span>
+                  <span className="font-semibold text-buttons-delete">{getCurrentInventoryOverview.menuCount}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Inventories</span>
-                  <span className="font-semibold text-purple-600">{getCurrentInventoryOverview.inventoryCount}</span>
+                  <span className="font-semibold text-buttons-configure">{getCurrentInventoryOverview.inventoryCount}</span>
                 </div>
-                <div className="text-sm text-gray-500 pt-3 border-t border-gray-100">
+                <div className="text-sm text-text-primary pt-3 border-t border-gray-100">
                   Last refresh: {new Date().toLocaleTimeString()}
                 </div>
               </div>
@@ -1087,25 +1087,25 @@ function InventoryCategoryTab({
         <div className="flex justify-end gap-4 w-full">
           <button
             onClick={() => onAddQty(params.data)}
-            className="text-green-700 hover:text-green-900 border border-green-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+            className="text-buttons-add hover:text-green-600 border border-green-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
           >
             + Add Qty
           </button>
           <button
             onClick={() => onDeduct(params.data)}
-            className="text-red-700 hover:text-red-900 border border-red-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+            className="text-buttons-delete hover:text-red-600 border border-red-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
           >
             Deduct
           </button>
           <button
             onClick={() => onEdit(params.data)}
-            className="text-action-primary hover:text-action-primary mr-4 border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+            className="text-buttons-update hover:text-amber-600 mr-4 border-default border-amber-300 gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
           >
             Edit
           </button>
           <button
             onClick={() => onDelete(params.data.id)}
-            className="text-action-primary hover:text-action-primary border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+            className="text-buttons-delete hover:text-red-600 border-default border-red-300 gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
           >
             Delete
           </button>
@@ -1134,7 +1134,7 @@ function InventoryCategoryTab({
         </div>
         <button
           onClick={onAddNew}
-          className="ml-4 px-6 py-3 bg-action-primary border border-black-600 hover:bg-action-primary  text-text-white rounded-lg text-base font-semibold transition-colors"
+          className="ml-4 px-6 py-3 bg-buttons-add hover:bg-buttonsHover-add text-text-white rounded-lg text-base font-semibold transition-colors"
         >
           + Add Stock
         </button>
@@ -1326,13 +1326,13 @@ function RecipeTab({
               <div className="flex gap-3">
                 <button
                   onClick={onAddIngredient}
-                  className="flex-1 py-2 px-4 bg-action-primary hover:bg-action-primary text-text-white rounded-lg transition-colors"
+                  className="flex-1 py-2 px-4 bg-buttons-add hover:bg-buttonsHover-add text-text-white rounded-lg transition-colors"
                 >
                   Add
                 </button>
                 <button
                   onClick={() => setNewIngredient({ stock_item_id: "", quantity_required: "", unit: "" })}
-                  className="flex-1 py-2 px-4 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
+                  className="flex-1 py-2 px-4 border bg-slate-100 border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
                 >
                   Clear
                 </button>
@@ -1487,13 +1487,13 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, onAddQt
           <div className="flex justify-end gap-2 w-full">
             <button
               onClick={() => onAddQty(params.data)}
-              className="text-green-700 hover:text-green-900 border border-green-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+              className="text-buttons-add hover:text-green-600 border border-green-200 px-4 py-2 rounded-lg font-medium text-sm transition-all"
             >
               + Add Qty
             </button>
             <button
               onClick={() => onDeduct(params.data)}
-              className="text-red-700 hover:text-red-900 border border-red-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
+              className="text-buttons-delete hover:text-red-600 border border-red-200 px-4 py-2 rounded-lg font-medium text-sm transition-all"
             >
               Deduct
             </button>
@@ -1504,7 +1504,7 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, onAddQt
 
   return (
     <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
-      <div className="bg-action-primary p-5 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
+      <div className="bg-action-primary p-5 border-b rounded-md border-border-default flex items-center justify-between gap-4 flex-wrap">
         <div className="flex-1 min-w-[200px]">
           <h2 className="text-lg font-semibold text-text-white">Menu Availability</h2>
           <p className="text-sm text-text-white mt-1">Manage availability and units for menu items</p>
@@ -1678,7 +1678,7 @@ function StockModal({
           </button>
           <button
             onClick={onSave}
-            className="px-6 py-2.5 bg-action-primary text-text-white rounded-lg transition-colors"
+            className="px-6 py-2.5 bg-buttons-update text-text-white rounded-lg transition-colors"
           >
             {isEditing ? "Update" : "Create"}
           </button>
@@ -1826,14 +1826,14 @@ function AddStockModal({ isOpen, form, units, onChange, onSave, onClose }) {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-text-secondary">
             This records an <strong>IN transaction</strong> and updates the live stock level.
             It will <em>not</em> create a duplicate item.
           </div>
         </div>
         <div className="mt-8 flex justify-end gap-4">
-          <button type="button" onClick={onClose} className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
-          <button onClick={onSave} className="px-6 py-2.5 bg-action-primary text-text-white rounded-lg transition-colors">Add Stock</button>
+          <button type="button" onClick={onClose} className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors">Cancel</button>
+          <button onClick={onSave} className="px-6 py-2.5 bg-buttons-add hover:bg-green-600 text-text-white rounded-lg transition-colors">Add Stock</button>
         </div>
       </div>
     </div>

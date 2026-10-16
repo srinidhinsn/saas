@@ -249,30 +249,30 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
 
           {/* Profile identity card */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="w-14 h-14 rounded-full bg-black flex items-center justify-center text-white font-bold text-lg mb-3">
+            <div className="w-14 h-14 rounded-full bg-action-primary flex items-center justify-center text-text-white font-bold text-lg mb-3">
               {initials || <User size={20} />}
             </div>
             <p className="text-[15px] font-bold text-black leading-tight">{fullName || "Your name"}</p>
-            <p className="text-xs text-gray-400 mt-0.5 break-all">{profileForm.email || "your@email.com"}</p>
+            <p className="text-xs text-text-secondary mt-0.5 break-all">{profileForm.email || "your@email.com"}</p>
             {userRole && (
-              <span className="inline-flex items-center gap-1.5 mt-2.5 text-[10px] font-bold uppercase tracking-wide bg-gray-50 text-gray-600 border border-gray-200 rounded-full px-2.5 py-0.5">
+              <span className="inline-flex items-center gap-1.5 mt-2.5 text-[10px] font-bold uppercase tracking-wide bg-bg-tertiary text-text-primary border border-gray-200 rounded-full px-2.5 py-0.5">
                 {userRole}
               </span>
             )}
           </div>
 
           {/* Meta chips */}
-          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+          <div className="bg-text-white rounded-xl border border-gray-200 divide-y divide-gray-100">
             {[
               { icon: <Phone size={13} />, label: "Phone", val: profileForm.phone || "—" },
               { icon: <Calendar size={13} />, label: "Date of birth", val: profileForm.dob || "—" },
               { icon: <Hash size={13} />, label: "Client ID", val: clientId || "—", mono: true },
             ].map(({ icon, label, val, mono }) => (
               <div key={label} className="flex items-center gap-3 px-4 py-3">
-                <div className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center shrink-0 text-gray-500">{icon}</div>
+                <div className="w-7 h-7 rounded-lg border-default border-border-default flex items-center justify-center shrink-0 text-text-secondary">{icon}</div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
-                  <p className={`text-[13px] font-semibold text-black truncate ${mono ? "font-mono" : ""}`}>{val}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">{label}</p>
+                  <p className={`text-[13px] font-semibold text-text-primary truncate ${mono ? "font-mono" : ""}`}>{val}</p>
                 </div>
               </div>
             ))}
@@ -289,14 +289,14 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
               ].map(({ key, label, icon }) => {
                 const done = savedSections[key];
                 return (
-                  <div key={key} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border ${done ? "bg-gray-50 border-gray-200" : "border-gray-200"}`}>
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${done ? "bg-black text-white" : "text-gray-400"}`}>
+                  <div key={key} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border ${done ? "bg-gray-50 border-border-default" : "border-gray-200"}`}>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${done ? "bg-text-primary text-text-white" : "text-text-secondary0"}`}>
                       {done ? <CheckCircle size={11} /> : icon}
                     </div>
-                    <span className={`text-[12px] font-semibold flex-1 ${done ? "text-black" : "text-gray-400"}`}>{label}</span>
+                    <span className={`text-[12px] font-semibold flex-1 ${done ? "text-text-primary" : "text-text-secondary"}`}>{label}</span>
                     {done
-                      ? <span className="text-[10px] text-gray-500 font-bold">Saved</span>
-                      : <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                      ? <span className="text-[10px] text-text-secondary font-bold">Saved</span>
+                      : <span className="w-1.5 h-1.5 rounded-full bg-buttons-delete" />
                     }
                   </div>
                 );
@@ -339,7 +339,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
             </div>
             <div className="flex justify-end mt-5 pt-4 border-t border-gray-200">
               <button onClick={handleProfileSave} disabled={profileLoading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-buttons-add text-white text-sm font-semibold hover:bg-buttonsHover-add transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 {profileLoading ? <Spin /> : <><CheckCircle size={14} /><span>Save personal info</span></>}
               </button>
             </div>
@@ -357,8 +357,8 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
                         onClick={() => setAddressForm(addr)}
                         className={`px-4 py-2 rounded-lg text-sm border transition-colors
                           ${addressForm.id === addr.id
-                            ? "bg-black text-white border-black"
-                            : "bg-white border-gray-200 hover:border-gray-400"
+                            ? "bg-buttons-add text-text-white"
+                            : "bg-text-white"
                           }`}
                       >
                         {index === 0 && (
@@ -444,7 +444,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
             </div>
             <div className="flex justify-end mt-5 pt-4 border-t border-gray-200">
               <button onClick={handleAddressSave} disabled={addressLoading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-buttons-add text-text-white text-sm font-semibold hover:bg-buttonsHover-add transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 {addressLoading ? <Spin /> : <><CheckCircle size={14} /><span>Save address</span></>}
               </button>
             </div>
@@ -457,7 +457,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
                 <button key={m}
                   onClick={() => { setResetMethod(m); setPasswordForm(p => ({ ...p, otp: "", old_password: "" })); setOtpSent(false); }}
                   className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors
-                    ${resetMethod === m ? "bg-black text-white" : "text-gray-500 hover:text-black"}`}>
+                    ${resetMethod === m ? "bg-buttons-add text-text-white" : "text-buttons-configure hover:text-text-primary"}`}>
                   {lbl}
                 </button>
               ))}
@@ -473,7 +473,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
               {resetMethod === "otp" && !otpSent && (
                 <div className="sm:col-span-2">
                   <button onClick={handleSendOtp} disabled={passwordLoading}
-                    className="flex items-center gap-2 px-5 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50">
+                    className="flex items-center gap-2 px-5 py-2 rounded-lg bg-buttons-update text-text-white text-sm font-semibold hover:bg-buttonsHover-update transition-colors disabled:opacity-50">
                     {passwordLoading ? <Spin /> : <><Send size={13} /><span>Send OTP to email</span></>}
                   </button>
                 </div>
@@ -522,7 +522,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
 
             <div className="flex justify-end mt-5 pt-4 border-t border-gray-200">
               <button onClick={handleResetPassword} disabled={passwordLoading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-buttons-add text-text-white text-sm font-semibold hover:bg-buttonsHover-add transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 {passwordLoading ? <Spin /> : <><Shield size={14} /><span>Reset password</span></>}
               </button>
             </div>
