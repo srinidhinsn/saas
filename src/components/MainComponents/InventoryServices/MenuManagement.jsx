@@ -1086,13 +1086,13 @@ const handleBulkUpdate = async () => {
                           className="w-full h-9 pl-10 pr-3 rounded-lg bg-bg-tertiary border border-border-default text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-action-primary/30"/>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end">
-                    <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-buttons-configure hover:bg-slate-600 text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
+                    <button onClick={() => setShowMenuConfig(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-buttons-configure hover:bg-buttonsHover-configure text-text-white text-sm font-semibold shadow-sm">
                     <IoSettingsOutline /> <span>Config</span>
                     </button>
-                  <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-buttons-add hover:bg-green-700 text-text-white text-sm font-semibold shadow-sm hover:opacity-90">
+                  <button onClick={openAddModal} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-buttons-add hover:bg-buttonsHover-add text-text-white text-sm font-semibold shadow-sm">
                     <Plus size={14} /><span>{isComboCategory ? 'Add Combo' : 'Add Item'}</span>
                   </button>
-                  <button onClick={() => setShowBulkModal(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-buttons-update hover:bg-amber-700 text-text-white border-border-default text-sm font-semibold hover:border-action-primary">
+                  <button onClick={() => setShowBulkModal(true)} className="h-9 px-3 flex items-center gap-2 rounded-lg bg-buttons-update hover:bg-buttonsHover-update text-text-white border-border-default text-sm font-semibold hover:border-action-primary">
                     <Edit size={14} /><span className="hidden sm:inline">Bulk Update</span>
                   </button>
                   <MenuExcelTools clientId={clientId} token={token} realm={realm} menuConfig={menuConfig}

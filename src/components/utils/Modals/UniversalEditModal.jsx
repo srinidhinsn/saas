@@ -270,7 +270,7 @@ const UniversalEditModal = ({
               <div className="space-y-4">
                 {/* Category Selector */}
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">Category <span className="text-red-600">*</span></label>
+                  <label className="block text-sm font-medium mb-1 text-text-primary">Category <span className="text-buttons-delete">*</span></label>
                   <select
                     value={editingItem.category_id || ''}
                     onChange={(e) => setEditingItem({ ...editingItem, category_id: e.target.value })}
@@ -288,8 +288,8 @@ const UniversalEditModal = ({
 
                 {/* Item Name */}
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">
-                    {isComboItem ? 'Combo Name' : 'Item Name'} <span className="text-red-600">*</span>
+                  <label className="block text-sm font-medium mb-1 text-text-primary">
+                    {isComboItem ? 'Combo Name' : 'Item Name'} <span className="text-buttons-delete">*</span>
                   </label>
                   <input
                     type="text"
@@ -302,7 +302,7 @@ const UniversalEditModal = ({
 
                 {/* Description */}
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">Description</label>
+                  <label className="block text-sm font-medium mb-1 text-text-primary">Description</label>
                   <textarea
                     value={editingItem.description || ""}
                     onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
@@ -313,7 +313,7 @@ const UniversalEditModal = ({
             {isRentalRealm(normalizedRealm) && (
                 <div>
                      <label className="block text-sm font-medium mb-2 text-text-primary">
-                           Rental Tier <span className="text-red-600">*</span>
+                           Rental Tier <span className="text-buttons-delete">*</span>
                      </label>
                      <div className="flex gap-2 items-center bg-bg-tertiary border border-border-default rounded-lg p-2">
                          <input  value={editingItem?.rentalTier?.label || ''} placeholder="e.g. Half Day"
@@ -337,7 +337,7 @@ const UniversalEditModal = ({
                 </div> )}
                 {normalizedRealm === 'restaurant' && (
   <div>
-    <label className="block text-sm font-medium mb-1 text-gray-700">
+    <label className="block text-sm font-medium mb-1 text-text-primary">
       Dietary Type
     </label>
     <div className="flex flex-wrap gap-2">
@@ -375,7 +375,7 @@ const UniversalEditModal = ({
 )}
                 {normalizedRealm === 'restaurant' && (
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">
+                    <label className="block text-sm font-medium mb-1 text-text-primary">
                       Availability Timing
                     </label>
 
@@ -430,8 +430,8 @@ const UniversalEditModal = ({
                             className={`px-3 py-1.5 rounded-lg text-sm border transition-all
               ${isUnavailable ? 'opacity-40 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-400' :
                                 selected
-                                  ? 'bg-buttons-update text-text-white border-amber-500'
-                                  : 'bg-gray-50 border-gray-300 text-text-primary hover:border-amber-600'
+                                  ? 'bg-buttons-update text-text-white border-buttons-update'
+                                  : 'bg-gray-50 border-gray-300 text-text-primary hover:border-buttonsHover-update'
                               }`}
                           >
                             {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
@@ -451,7 +451,7 @@ const UniversalEditModal = ({
                 {/* Unit Price & Discount */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">
+                    <label className="block text-sm font-medium mb-1 text-text-primary">
                       {isComboItem ? 'Combo Price (flat) *' : 'Base Price (All Zones) *'}
                     </label>
                     <input
@@ -464,7 +464,7 @@ const UniversalEditModal = ({
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">Discount</label>
+                    <label className="block text-sm font-medium mb-1 text-text-primary">Discount</label>
                     <input
                       type="number"
                       value={editingItem.discount}
@@ -477,7 +477,7 @@ const UniversalEditModal = ({
                 {/* Zone-wise pricing */}
                 {configs.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">
+                    <label className="block text-sm font-medium mb-1 text-text-primary">
                       Zone-wise Pricing
                     </label>
                     {configs.map(c => (
@@ -485,8 +485,8 @@ const UniversalEditModal = ({
                         key={c.id}
                         className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-gray-200 bg-gray-50"
                       >
-                        <span className="text-sm font-medium text-gray-700">
-                          <span className="font-semibold text-amber-600">{c.section}</span>
+                        <span className="text-sm font-medium text-text-primary">
+                          <span className="font-semibold text-buttons-update">{c.section}</span>
                           <span className="text-gray-400 mx-1">—</span>
                           <span>{c.zone}</span>
                         </span>
@@ -511,8 +511,8 @@ const UniversalEditModal = ({
                 {/* Code & Unit */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">
-                      Code <span className="text-red-600">*</span>
+                    <label className="block text-sm font-medium mb-1 text-text-primary">
+                      Code <span className="text-buttons-delete">*</span>
                     </label>
                     <input
                       type="text"
@@ -531,8 +531,8 @@ const UniversalEditModal = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">
-                      Availability  <span className="text-red-600">*</span>
+                    <label className="block text-sm font-medium mb-1 text-text-primary">
+                      Availability  <span className="text-buttons-delete">*</span>
                     </label>
                     <input
                       type="number"
@@ -546,7 +546,7 @@ const UniversalEditModal = ({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">Unit</label>
+                    <label className="block text-sm font-medium mb-1 text-text-primary">Unit</label>
                     <select value={editingItem.unit}
                       onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
                       className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-update">
@@ -557,12 +557,12 @@ const UniversalEditModal = ({
                     </select>
                   </div>
                   <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">Serving Quantity</label>
+                  <label className="block text-sm font-medium mb-1 text-text-primary">Serving Quantity</label>
                   <input type="number" value={editingItem.serving_quantity ?? ''} onChange={e => setEditingItem({ ...editingItem, serving_quantity: e.target.value })}
                     className="w-full px-3 py-2 rounded-md border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-buttons-update" placeholder="0" />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">Serving Unit</label>
+                    <label className="block text-sm font-medium mb-1 text-text-primary">Serving Unit</label>
                     <select value={editingItem.serving_unit}
                       onChange={(e) => setEditingItem({ ...editingItem, serving_unit: e.target.value })}
                       className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-update">
@@ -576,7 +576,7 @@ const UniversalEditModal = ({
 
                 {/* Image */}
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">Item Image</label>
+                  <label className="block text-sm font-medium mb-1 text-text-primary">Item Image</label>
                   {(editItemImageUrl || editingItem.image_id) && (
                     <div className="mb-3">
                       <p className="text-xs text-gray-600 mb-1">Current Image:</p>
@@ -647,7 +647,7 @@ const UniversalEditModal = ({
                 <div>
                   {isComboItem ? (
                     <>
-                      <label className="block text-sm font-medium mb-2 text-gray-700">
+                      <label className="block text-sm font-medium mb-2 text-text-primary">
                         Combo Items
                         <span className="ml-1 text-xs text-gray-400 font-normal">(what's included — price is fixed above)</span>
                       </label>
@@ -664,7 +664,7 @@ const UniversalEditModal = ({
                                   <button type="button"
                                     onClick={() => setEditingItem(prev => ({ ...prev, line_item_id: prev.line_item_id.filter(x => x !== id) }))}
                                     className="w-4 h-4 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center">
-                                    <X size={9} className="text-red-600" />
+                                    <X size={9} className="text-buttons-delete" />
                                   </button>
                                 </div>
                               </div>
@@ -676,7 +676,7 @@ const UniversalEditModal = ({
                       <button
                         type="button"
                         onClick={() => setShowAddonPopup(true)}
-                        className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-gray-300 text-gray-700 hover:border-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-medium"
+                        className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-gray-300 text-text-primary hover:border-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-medium"
                       >
                         <Plus size={18} />
                         <span>{editingItem.line_item_id?.length > 0 ? `Edit Combo Items (${editingItem.line_item_id.length})` : 'Select Combo Items'}</span>
@@ -684,7 +684,7 @@ const UniversalEditModal = ({
                     </>
                   ) : (
                     <>
-                      <label className="block text-sm font-medium mb-2 text-gray-700">Add-ons</label>
+                      <label className="block text-sm font-medium mb-2 text-text-primary">Add-ons</label>
                       {editingItem.line_item_id?.length > 0 && (
                         <div className="mb-3 flex flex-wrap gap-2">
                           {editingItem.line_item_id.map(addonId => (
@@ -696,7 +696,7 @@ const UniversalEditModal = ({
                         </div>
                       )}
                       <button type="button" onClick={() => setShowAddonPopup(true)}
-                        className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-amber-300 text-gray-700 hover:border-amber-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 font-medium">
+                        className="w-full px-4 py-3 rounded-lg bg-gray-50 border-2 border-dashed border-amber-300 text-text-primary hover:border-amber-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 font-medium">
                         <Plus size={18} />
                         <span>{editingItem.line_item_id?.length > 0 ? `Manage Add-ons (${editingItem.line_item_id.length} selected)` : 'Select Add-ons'}</span>
                       </button>
@@ -710,13 +710,13 @@ const UniversalEditModal = ({
             <div className="px-6 py-4 border-t border-border-default bg-gray-50 flex gap-3 justify-end">
               <button
                 onClick={handleClose}
-                className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium"
+                className="px-6 py-2 rounded-md bg-white text-text-primary border border-gray-300 hover:bg-gray-50 font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleEditItem}
-                className="px-6 py-2 rounded-md bg-buttons-update text-text-white font-medium"
+                className="px-6 py-2 rounded-md bg-buttons-update hover:bg-buttonsHover-update text-text-white font-medium"
               >
                 Save Changes
               </button>
@@ -778,7 +778,7 @@ const UniversalEditModal = ({
             <div className="space-y-4">
               {/* No of Seating */}
               <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">No of Seating</label>
+                <label className="block text-sm font-medium mb-1 text-text-primary">No of Seating</label>
                 
                 {/* Desktop */}
                 <input
@@ -802,7 +802,7 @@ const UniversalEditModal = ({
                       const newValue = Math.max(1, (Number(table.table_type) || 1) - 1);
                       handleEditChange(table.id, "table_type", newValue);
                     }}
-                    className="px-4 py-2 text-lg font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="px-4 py-2 text-lg font-bold text-text-primary hover:bg-gray-100 transition-colors"
                   >
                     −
                   </button>
@@ -822,18 +822,18 @@ const UniversalEditModal = ({
                       const newValue = (Number(table.table_type) || 1) + 1;
                       handleEditChange(table.id, "table_type", newValue);
                     }}
-                    className="px-4 py-2 text-lg font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="px-4 py-2 text-lg font-bold text-text-primary hover:bg-gray-100 transition-colors"
                   >
                     +
                   </button>
                 </div>
 
                 {editFieldErrors?.table_type && (
-                  <p className="text-red-600 text-xs mt-1">{editFieldErrors.table_type}</p>
+                  <p className="text-buttons-delete text-xs mt-1">{editFieldErrors.table_type}</p>
                 )}
               </div>
               <div className="">
-                <label className="block text-sm font-medium mb-1 text-gray-700">Section & Zone :</label>
+                <label className="block text-sm font-medium mb-1 text-text-primary">Section & Zone :</label>
 
                 <select
                   value={table.config_id || ""}
@@ -860,7 +860,7 @@ const UniversalEditModal = ({
 
               {/* Status */}
               <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">Status</label>
+                <label className="block text-sm font-medium mb-1 text-text-primary">Status</label>
                 <select
                   value={table.status || ""}
                   onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
@@ -873,7 +873,7 @@ const UniversalEditModal = ({
                   ))}
                 </select>
                 {editFieldErrors?.status && (
-                  <p className="text-red-600 text-xs mt-1">{editFieldErrors.status}</p>
+                  <p className="text-buttons-delete text-xs mt-1">{editFieldErrors.status}</p>
                 )}
               </div>
             </div>
@@ -882,7 +882,7 @@ const UniversalEditModal = ({
           {/* Footer */}
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3 justify-end">
             <button
-              className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium"
+              className="px-6 py-2 rounded-md bg-white text-text-primary border border-gray-300 hover:bg-gray-50 font-medium"
               onClick={handleClose}
             >
               Cancel

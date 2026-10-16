@@ -752,7 +752,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
             </p>
 
             <button
-              className="flex items-center gap-2 px-4 py-2 bg-buttons-add hover:bg-green-600 text-text-white rounded-lg font-medium text-sm transition-all shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-buttons-add hover:bg-buttonsHover-add text-text-white rounded-lg font-medium text-sm transition-all shadow-sm"
               onClick={openInventoryModal}
             >
               + Add Inventory
@@ -1134,7 +1134,7 @@ function InventoryCategoryTab({
         </div>
         <button
           onClick={onAddNew}
-          className="ml-4 px-6 py-3 bg-buttons-add hover:bg-green-600 text-text-white rounded-lg text-base font-semibold transition-colors"
+          className="ml-4 px-6 py-3 bg-buttons-add hover:bg-buttonsHover-add text-text-white rounded-lg text-base font-semibold transition-colors"
         >
           + Add Stock
         </button>
@@ -1326,7 +1326,7 @@ function RecipeTab({
               <div className="flex gap-3">
                 <button
                   onClick={onAddIngredient}
-                  className="flex-1 py-2 px-4 bg-buttons-add hover:bg-green-600 text-text-white rounded-lg transition-colors"
+                  className="flex-1 py-2 px-4 bg-buttons-add hover:bg-buttonsHover-add text-text-white rounded-lg transition-colors"
                 >
                   Add
                 </button>

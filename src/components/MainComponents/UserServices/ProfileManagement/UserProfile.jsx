@@ -339,7 +339,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
             </div>
             <div className="flex justify-end mt-5 pt-4 border-t border-gray-200">
               <button onClick={handleProfileSave} disabled={profileLoading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-buttons-add text-white text-sm font-semibold hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-buttons-add text-white text-sm font-semibold hover:bg-buttonsHover-add transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 {profileLoading ? <Spin /> : <><CheckCircle size={14} /><span>Save personal info</span></>}
               </button>
             </div>
@@ -444,7 +444,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
             </div>
             <div className="flex justify-end mt-5 pt-4 border-t border-gray-200">
               <button onClick={handleAddressSave} disabled={addressLoading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-buttons-add text-white text-sm font-semibold hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-buttons-add text-text-white text-sm font-semibold hover:bg-buttonsHover-add transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 {addressLoading ? <Spin /> : <><CheckCircle size={14} /><span>Save address</span></>}
               </button>
             </div>
@@ -457,7 +457,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
                 <button key={m}
                   onClick={() => { setResetMethod(m); setPasswordForm(p => ({ ...p, otp: "", old_password: "" })); setOtpSent(false); }}
                   className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors
-                    ${resetMethod === m ? "bg-buttons-add text-white" : "text-gray-500 hover:text-black"}`}>
+                    ${resetMethod === m ? "bg-buttons-add text-text-white" : "text-buttons-configure hover:text-text-primary"}`}>
                   {lbl}
                 </button>
               ))}
@@ -473,7 +473,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
               {resetMethod === "otp" && !otpSent && (
                 <div className="sm:col-span-2">
                   <button onClick={handleSendOtp} disabled={passwordLoading}
-                    className="flex items-center gap-2 px-5 py-2 rounded-lg bg-buttons-update text-white text-sm font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50">
+                    className="flex items-center gap-2 px-5 py-2 rounded-lg bg-buttons-update text-text-white text-sm font-semibold hover:bg-buttonsHover-update transition-colors disabled:opacity-50">
                     {passwordLoading ? <Spin /> : <><Send size={13} /><span>Send OTP to email</span></>}
                   </button>
                 </div>
@@ -522,7 +522,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
 
             <div className="flex justify-end mt-5 pt-4 border-t border-gray-200">
               <button onClick={handleResetPassword} disabled={passwordLoading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-buttons-add text-white text-sm font-semibold hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-buttons-add text-text-white text-sm font-semibold hover:bg-buttonsHover-add transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 {passwordLoading ? <Spin /> : <><Shield size={14} /><span>Reset password</span></>}
               </button>
             </div>

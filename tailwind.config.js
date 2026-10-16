@@ -93,6 +93,12 @@ export default {
           update: "#F59E0B",     // amber-500
           configure: "#64748B",  // slate-500
         },
+        buttonsHover: {
+          add: "#16A34A",        // green-600
+          delete: "#DC2626",     // red-600
+          update: "#D97706",     // amber-600
+          configure: "#475569",  // slate-600
+        },
         action: {
           // primary:"purple",
           primary: "#5c1ba4",   // orange-500

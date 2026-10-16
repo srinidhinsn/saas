@@ -355,7 +355,7 @@ if (modalType === 'menu') {
               <div className="grid grid-cols-2 sm:flex gap-2">
                 <button
                   onClick={() => setShowGlobalAddonPopup(true)}
-                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-buttons-update hover:bg-amber-600 text-gray-900 font-semibold text-sm shadow-sm transition-colors whitespace-nowrap"
+                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-buttons-update hover:bg-buttonsHover-update text-gray-900 font-semibold text-sm shadow-sm transition-colors whitespace-nowrap"
                 >
                   <Plus size={16} />
                   {globalAddons.length > 0 ? `${globalAddons.length} add-on(s)` : 'Select Add-ons'}
@@ -363,7 +363,7 @@ if (modalType === 'menu') {
                 <button
                   onClick={clearGlobalAddons}
                   disabled={globalAddons.length === 0 && selectedRows.length === 0}
-                  className="px-4 py-2 rounded-lg bg-buttons-configure hover:bg-slate-600 text-white font-semibold text-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
+                  className="px-4 py-2 rounded-lg bg-buttons-configure hover:bg-buttonsHover-configure text-text-white font-semibold text-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
                 >
                   Clear All
                 </button>
@@ -436,7 +436,7 @@ if (modalType === 'menu') {
                   setBulkEditData(updated);
                 }}
                 disabled={selectedRows.length === 0}
-                className="flex items-center justify-center px-3 sm:px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold text-xs sm:text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+                className="flex items-center justify-center px-3 sm:px-4 py-2 rounded-lg bg-buttons-add hover:bg-buttonsHover-add text-text-white font-semibold text-xs sm:text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
               >
                 <span className="sm:hidden">Avail.</span>
                 <span className="hidden sm:inline">Mark Available</span>
@@ -444,7 +444,7 @@ if (modalType === 'menu') {
               <button
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={selectedRows.length === 0}
-                className="flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg bg-buttons-delete hover:bg-red-700 text-white font-semibold text-xs sm:text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg bg-buttons-delete hover:bg-buttonsHover-delete text-text-white font-semibold text-xs sm:text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
               >
                 <Trash2 className="w-4 h-4" />
                 Delete
@@ -906,7 +906,7 @@ if (modalType === 'menu') {
             <button
               onClick={handleBulkUpdate}
               disabled={selectedRows.length === 0}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-buttons-update hover:bg-amber-600 text-gray-900 font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-buttons-update hover:bg-buttonsHover-update text-gray-900 font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
             >
               <Edit className="w-4 h-4" />
               Update Selected ({selectedRows.length})
@@ -1280,14 +1280,14 @@ if (modalType === 'table') {
         <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-t border-border-default shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <button
             onClick={handleClose}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-bg-secondary font-semibold text-sm transition-colors"
+            className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-slate-100 font-semibold text-sm transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={saveBulkUpdate}
             disabled={selectedUpdateTables.length === 0}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-amber-300 hover:bg-amber-600 text-gray-900 font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-buttons-update hover:bg-buttonsHover-update text-text-white font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
           >
             <Edit className="w-4 h-4" />
             Update ({selectedUpdateTables.length})

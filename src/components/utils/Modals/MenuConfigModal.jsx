@@ -14,7 +14,7 @@ const inputBase =
 const labelBase =
   "block text-[11px] font-semibold uppercase tracking-wide mb-1 text-text-secondary";
 const btnGreen =
-  "flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white " +
+  "flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-buttons-add hover:bg-buttonsHover-add text-white " +
   "font-semibold text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 " +
   "disabled:shadow-none disabled:cursor-not-allowed shrink-0";
 const chipBase =
@@ -227,7 +227,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors shrink-0"
+            className="p-2 rounded-lg bg-buttons-configure/90 hover:bg-text-white text-text-white hover:text-text-primary transition-colors shrink-0"
             aria-label="Close"
           >
             <FaTimes size={14} />
@@ -441,14 +441,14 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
         <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-t border-border-default shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
           <button
             onClick={onClose}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-bg-secondary font-semibold text-sm transition-colors"
+            className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-slate-100 font-semibold text-sm transition-colors"
           >
             Close
           </button>
           <button
             onClick={saveAll}
             disabled={saving}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-slate-500 hover:bg-slate-600 text-white font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-buttons-configure hover:bg-buttonsHover-configure text-white font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
           >
             {saving && (
               <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />

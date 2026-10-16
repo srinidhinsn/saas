@@ -331,7 +331,7 @@ const UniversalAddModal = ({
               {isRentalRealm(normalizedRealm) &&  (
                   <div>
                        <label className="block text-sm font-medium mb-2 text-text-primary">
-                             Rental Tier <span className="text-red-600">*</span>
+                             Rental Tier <span className="text-buttons-delete">*</span>
                        </label>
 
                        <div className="flex gap-2 items-center bg-bg-tertiary border border-border-default rounded-lg p-2">
@@ -415,8 +415,8 @@ const UniversalAddModal = ({
                             setNewItem(prev => ({ ...prev, availability_time: next }));
                           }}
                           className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selected
-                              ? 'bg-buttons-add text-text-white border-green-500'
-                              : 'bg-bg-tertiary border-border-default text-text-primary hover:border-green-600'
+                              ? 'bg-buttons-add text-text-white border-buttons-add'
+                              : 'bg-bg-tertiary border-border-default text-text-primary hover:border-buttonsHover-add'
                             }`}
                         >
                           {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
@@ -464,9 +464,9 @@ const UniversalAddModal = ({
                 {configs.map(c => (
                   <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-border-default bg-bg-tertiary">
                     <span className="text-sm font-medium text-text-primary">
-                      <span className="font-semibold text-green-600">{c.section}</span>
-                      <span className="text-gray-400 mx-1">—</span>
-                      <span>{c.zone}</span>
+                      <span className="font-semibold text-buttons-add">{c.section}</span>
+                      <span className="text-text-secondary mx-1">—</span>
+                      <span className='text-text-primary'>{c.zone}</span>
                     </span>
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-gray-400">₹</span>
@@ -573,7 +573,7 @@ const UniversalAddModal = ({
                                   <span className="text-violet-500">₹{Number(it.unit_price).toFixed(0)}</span>
                                   <button type="button" onClick={() => setNewItem(prev => ({ ...prev, line_item_id: prev.line_item_id.filter(x => x !== id) }))}
                                     className="w-4 h-4 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center">
-                                    <X size={9} className="text-red-600" />
+                                    <X size={9} className="text-buttons-delete" />
                                   </button>
                                 </div>
                               </div>
@@ -674,7 +674,7 @@ const UniversalAddModal = ({
                 <button
                   onClick={handleAddItem}
                   disabled={isSubmitting}
-                  className={`flex-1 px-4 py-2 rounded-lg bg-buttons-add text-text-white hover:opacity-90 transition-opacity ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-action-primary hover:opacity-90'}`}
+                  className={`flex-1 px-4 py-2 rounded-lg bg-buttons-add text-text-white hover:bg-buttonsHover-add  ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-action-primary hover:opacity-90'}`}
                 >
                   {isComboCategory ? 'Add Combo' : 'Add Item'}
                 </button>
@@ -734,7 +734,7 @@ const UniversalAddModal = ({
                       <span className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 text-action-primary text-xs font-bold">
                         i
                       </span>
-                      <div className="absolute left-1/2 -translate-x-1/2 top-7 hidden group-hover:block w-60 p-3 bg-white border border-blue-200 rounded-lg shadow-lg z-50 text-xs text-gray-700">
+                      <div className="absolute left-1/2 -translate-x-1/2 top-7 hidden group-hover:block w-60 p-3 bg-white border border-blue-200 rounded-lg shadow-lg z-50 text-xs text-text-primary">
                         <div className="font-bold mb-1 text-text-primary">
                           Table Range Examples
                         </div>
@@ -814,7 +814,7 @@ const UniversalAddModal = ({
               </div>
             ))}
             <button
-              className="w-full bg-buttons-add text-text-white py-2 rounded-lg hover:bg-green-400 transition-colors font-bold text-lg shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="w-full bg-buttons-add text-text-white py-2 rounded-lg hover:bg-buttonsHover-add transition-colors font-bold text-lg shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
               disabled={isGenerating}
               onClick={generateTables}
             >
