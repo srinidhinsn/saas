@@ -2033,7 +2033,8 @@ const handleBillFromCart = async () => {
           }
           onMarkAsServed={handleMarkAsServed}
           onConfirmPayment={(orderId, tableId) =>
-            setTablePayConfirmModal({ isOpen: true, orderId, tableId })
+            setTablePayConfirmModal({ isOpen: true, orderId, tableId,
+              displayId: tableOrders[tableId]?.dinein_order_id || orderId, })
           }
         />
       )}
@@ -2725,6 +2726,7 @@ const handleBillFromCart = async () => {
       <TablePaymentConfirmModal
         isOpen={tablePayConfirmModal.isOpen}
         orderId={tablePayConfirmModal.orderId}
+        displayId={tablePayConfirmModal.displayId}
         onClose={() => setTablePayConfirmModal({ isOpen: false, orderId: null, tableId: null })}
         onConfirm={(orderId) => {
           handleConfirmPaymentFromGrid(orderId, tablePayConfirmModal.tableId);

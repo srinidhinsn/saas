@@ -552,7 +552,7 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
 // TablePaymentConfirmModal
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const TablePaymentConfirmModal = ({ isOpen, orderId, onClose, onConfirm }) => {
+export const TablePaymentConfirmModal = ({ isOpen, orderId,displayId, onClose, onConfirm }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -563,7 +563,7 @@ export const TablePaymentConfirmModal = ({ isOpen, orderId, onClose, onConfirm }
         </div>
         <div className="px-6 py-5">
           <p className="text-sm text-gray-600">
-            Mark order <span className="font-semibold">#{orderId}</span> as paid and free the table?
+            Mark order <span className="font-semibold">#{displayId ?? orderId}</span> as paid and free the table?
           </p>
         </div>
         <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
@@ -1261,17 +1261,20 @@ export const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeaway
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
 
-        const todayTakeaway = all.filter(o => {
-          if (!takeawayTableIds.includes(String(o.table_id))) return false;
-          if (o.status?.toLowerCase() === 'completed') return false;
-          if (o.status?.toLowerCase() === 'draft') return false;
-          const created = new Date(
-            typeof o.created_at === 'string'
-              ? o.created_at.replace(' ', 'T').split('.')[0] + 'Z'
-              : o.created_at
-          );
-          return created >= todayStart;
-        }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        const takeawayOnly = all.filter(o =>
+          takeawayTableIds.includes(String(o.table_id)) &&
+          !['completed', 'draft'].includes(o.status?.toLowerCase())
+        );
+        
+        const latestDay = takeawayOnly
+          .map(o => o.business_day_start)
+          .filter(Boolean)
+          .sort()
+          .pop();
+        
+        const todayTakeaway = takeawayOnly
+          .filter(o => !latestDay || o.business_day_start === latestDay)
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
         setOrders(todayTakeaway);
       } catch (err) {
