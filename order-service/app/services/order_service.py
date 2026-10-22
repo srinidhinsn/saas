@@ -13,23 +13,36 @@ from models.order_model import DineinOrderModel , resolve_base_status
 from .order_status import _status_label
 from models.saas_context import SaasContext
 from entity.billing_entity import BillingDocumentEntity
-import os
+import os,re
 from datetime import datetime, timedelta, time
 from zoneinfo import ZoneInfo
 from sqlalchemy import text, or_
 
 TIMEZONE   = os.getenv("TIMEZONE", "UTC")
-RESET_HOUR = int(os.getenv("ORDER_NUMBER_RESET_HOUR", "0")) 
+DEFAULT_RESET_HOUR = int(os.getenv("ORDER_NUMBER_RESET_HOUR", "0"))
 
-def _day_bounds(dt=None):
+def _reset_hour(client_id=None) -> int:
+    if client_id:
+        key = "ORDER_NUMBER_RESET_HOUR_" + re.sub(r"[^A-Za-z0-9]", "_", str(client_id)).upper()
+        raw = os.getenv(key)
+        if raw not in (None, ""):
+            try:
+                h = int(raw)
+                if 0 <= h <= 23:
+                    return h
+            except ValueError:
+                pass
+    return DEFAULT_RESET_HOUR
+
+def _day_bounds(dt=None, client_id=None):
+    h = _reset_hour(client_id)
     dt = (dt or datetime.now(ZoneInfo(TIMEZONE))).replace(tzinfo=None)
-    start = datetime.combine((dt - timedelta(hours=RESET_HOUR)).date(), time.min) \
-            + timedelta(hours=RESET_HOUR)
+    start = datetime.combine((dt - timedelta(hours=h)).date(), time.min) + timedelta(hours=h)
     return start, start + timedelta(days=1)
 
 def next_order_number(db, client_id: str) -> int:
     db.execute(text("SELECT 1 FROM client WHERE id = :c FOR UPDATE"), {"c": client_id})
-    s, e = _day_bounds()
+    s, e = _day_bounds(client_id=client_id)
     return db.execute(text("""
     SELECT COALESCE(MAX(
              CASE WHEN dinein_order_id ~ '^[0-9]+(-[0-9]+)?$'
@@ -38,7 +51,7 @@ def next_order_number(db, client_id: str) -> int:
 
 def group_filters(order):
     root = _root_dinein_id(order.dinein_order_id or str(order.id))
-    s, e = _day_bounds(order.created_at)
+    s, e = _day_bounds(order.created_at, order.client_id)
     return [
         Db_Order_Entity.client_id == order.client_id,  or_(Db_Order_Entity.dinein_order_id == root,Db_Order_Entity.dinein_order_id.like(f"{root}-%")),
         Db_Order_Entity.created_at >= s,Db_Order_Entity.created_at < e,]
