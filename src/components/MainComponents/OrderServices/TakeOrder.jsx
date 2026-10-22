@@ -132,6 +132,48 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [selectedDietary, setSelectedDietary] = useState(null);
   const [showTakeawayOrdersModal, setShowTakeawayOrdersModal] = useState(false);
   const hasFetchedRef = useRef(false);
+  const [showDineinPicker, setShowDineinPicker] = useState(false);
+  const dineinPickedRef = useRef(false);
+  const dineinOnlyTables = useMemo(
+    () => tables.filter(t =>
+      !takeawayTables.some(x => x.id === t.id) &&
+      !walkinTables.some(x => x.id === t.id) &&
+      !deliveryTables.some(x => x.id === t.id)
+    ),
+    [tables, takeawayTables, walkinTables, deliveryTables]
+  );
+  
+  const switchToDineIn = () => {
+    setOrderMode('dinein');
+    syncPackagingForOrderMode('dinein');
+  
+    if (activeOrderId && dineinTableId) {
+      setSelectedTable(dineinTableId.toString());
+      return;
+    }
+    // No table chosen yet → ask for one
+    setSelectedTable('');
+    dineinPickedRef.current = false;
+    setShowDineinPicker(true);
+  };
+  const switchToTakeaway = () => {
+    setOrderMode('takeaway');
+    setSelectedTable(takeawayTableId?.toString() || '');
+    syncPackagingForOrderMode('takeaway');
+  };
+  
+  const handleDineinPicked = (table) => {
+    dineinPickedRef.current = true;
+    setSelectedTable(table.id.toString());
+    setDineinTableId(table.id.toString());
+    setZoneConfigId(table.config_id || null);
+  };
+  
+  const handleDineinPickerClose = () => {
+    setShowDineinPicker(false);
+    // Closed without picking → go back to takeaway
+    if (!dineinPickedRef.current) switchToTakeaway();
+  };
   const menuConfig = useMemo(
     () => (clientId ? getMenuConfig(clientId) : null),
     [clientId]
@@ -2176,11 +2218,23 @@ const handleBillFromCart = async () => {
                                    customers={customersList} />
                       <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
                         <div className="flex items-center gap-2">
-                          {orderMode === 'dinein' && selectedTable && (
-                            <span className="font-semibold text-lg text-gray-700">
-                              {tables.find(t => t.id.toString() === selectedTable)?.table_number}
-                            </span>
-                          )}
+                        {orderMode === 'dinein' && (
+  selectedTable ? (
+    <button
+      onClick={() => !activeOrderId && setShowDineinPicker(true)}
+      className="font-semibold text-lg text-gray-700"
+    >
+      {tables.find(t => t.id.toString() === selectedTable)?.table_number}
+    </button>
+  ) : (
+    <button
+      onClick={() => setShowDineinPicker(true)}
+      className="text-sm font-semibold text-red-600 underline"
+    >
+      Select Table
+    </button>
+  )
+)}
 
                           {orderMode === 'takeaway' && (
                             <select
@@ -2234,10 +2288,7 @@ const handleBillFromCart = async () => {
                   {['dinein', 'takeaway'].includes(orderMode) && (
                       <div className="mt-3">
                           <div className="flex bg-gray-100 rounded-lg p-1">
-                               <button onClick={() => {
-                                                      setOrderMode('dinein');
-                                                      if (dineinTableId) setSelectedTable(dineinTableId);
-                                                      syncPackagingForOrderMode('dinein'); }}
+                               <button onClick={switchToDineIn}
                                         className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                                                     ${orderMode === 'dinein'
                                                                       ? 'bg-action-primary text-white shadow-sm'
@@ -2245,10 +2296,7 @@ const handleBillFromCart = async () => {
                                 <Users size={16} /> Dine In
                                </button>
                                <button
-                                       onClick={() => {
-                                                      setOrderMode('takeaway');
-                                                      setSelectedTable(takeawayTableId?.toString());
-                                                      syncPackagingForOrderMode('takeaway'); }}
+                                       onClick={switchToTakeaway}
                                         className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                                                     ${orderMode === 'takeaway'
                                                                      ? 'bg-action-primary text-white shadow-sm'
@@ -2392,11 +2440,23 @@ const handleBillFromCart = async () => {
               {/* Table info + total */}
               <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg mb-3">
                 <div className="flex items-center gap-2">
-                  {orderMode === 'dinein' && selectedTable && (
-                    <span className="font-semibold text-lg text-gray-700">
-                      {tables.find(t => t.id.toString() === selectedTable)?.table_number}
-                    </span>
-                  )}
+                {orderMode === 'dinein' && (
+  selectedTable ? (
+    <button
+      onClick={() => !activeOrderId && setShowDineinPicker(true)}
+      className="font-semibold text-lg text-gray-700"
+    >
+      {tables.find(t => t.id.toString() === selectedTable)?.table_number}
+    </button>
+  ) : (
+    <button
+      onClick={() => setShowDineinPicker(true)}
+      className="text-sm font-semibold text-red-600 underline"
+    >
+      Select Table
+    </button>
+  )
+)}
                   {orderMode === 'takeaway' && (
                     <select
                       value={selectedTable}
@@ -2444,14 +2504,14 @@ const handleBillFromCart = async () => {
               {/* Dine-in / Takeaway toggle */}
               <div className="flex bg-gray-100 rounded-lg p-1 mb-3 flex-shrink-0">
                 <button
-                  onClick={() => { setOrderMode('dinein'); if (dineinTableId) setSelectedTable(dineinTableId); syncPackagingForOrderMode('dinein'); }}
+                  onClick={switchToDineIn}
                   className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                     ${orderMode === 'dinein' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600'}`}
                 >
                   <Users size={16} /> Dine In
                 </button>
                 <button
-                  onClick={() => { setOrderMode('takeaway'); setSelectedTable(takeawayTableId?.toString()); syncPackagingForOrderMode('takeaway'); }}
+                  onClick={switchToTakeaway}
                   className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
                     ${orderMode === 'takeaway' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600'}`}
                 >
@@ -2686,6 +2746,8 @@ const handleBillFromCart = async () => {
         currentTableId={selectedTable}
         onConfirm={handleTransferTable}
       />
+      <TransferTableModal isOpen={showDineinPicker} onClose={handleDineinPickerClose} tables={dineinOnlyTables}
+                          currentTableId={selectedTable} onConfirm={handleDineinPicked} />
       <TakeawayOrdersModal
         isOpen={showTakeawayOrdersModal}
         onClose={() => setShowTakeawayOrdersModal(false)}
