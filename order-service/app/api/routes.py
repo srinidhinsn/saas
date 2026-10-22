@@ -105,7 +105,7 @@ def create_sub_order(
     if parent_order_id:
         root_order = base_q.filter(Db_Order_Entity.id == parent_order_id).first()
     else:
-        s, e = _day_bounds()
+        s, e = _day_bounds(client_id=client_id)
         root_order = base_q.filter(Db_Order_Entity.dinein_order_id == parent_dinein_order_id,Db_Order_Entity.created_at >= s,
             Db_Order_Entity.created_at < e,).first()    
     if not root_order:
@@ -114,7 +114,7 @@ def create_sub_order(
     order_status = OrderStatusEnum.served if is_rental else OrderStatusEnum.pending
     root_no = _root_dinein_id(root_order.dinein_order_id or str(root_order.id))
     db.execute(text("SELECT 1 FROM client WHERE id = :c FOR UPDATE"), {"c": client_id})
-    s, e = _day_bounds(root_order.created_at)
+    s, e = _day_bounds(root_order.created_at, client_id)
     existing_sub_count = db.query(Db_Order_Entity).filter(
         Db_Order_Entity.client_id == client_id,
         Db_Order_Entity.dinein_order_id.like(f"{root_no}-%"),
@@ -208,12 +208,17 @@ def get_orders_for_table(client_id: str, table_id: Optional[str] = None, context
     groups: dict = {}
     for order in orders:
         root = _root_dinein_id(order.dinein_order_id or str(order.id))
-        key = (order.client_id, root, _day_bounds(order.created_at)[0])
+        key = (order.client_id, root, _day_bounds(order.created_at, order.client_id)[0])
         groups.setdefault(key, []).append(order)
 
-    result = [_merge_group(group, context=context, db=db) for group in groups.values()]
-    for r in result:
+    result = []
+    for group in groups.values():
+        r = _merge_group(group, context=context, db=db)
         r["status_label"] = _status_label(context, r.get("status"))
+        r["business_day_start"] = _day_bounds(
+            min(o.created_at for o in group), client_id
+        )[0].isoformat()
+        result.append(r)
     return ResponseModel(screen_id=context.screen_id, data=result)
 
 
@@ -905,14 +910,16 @@ def get_customer_orders(
 
     for order in orders:
         root = _root_dinein_id(order.dinein_order_id or str(order.id))
-        key = (order.client_id, root, _day_bounds(order.created_at)[0])
+        key = (order.client_id, root, _day_bounds(order.created_at, order.client_id)[0])
         groups.setdefault(key, []).append(order)
 
-    result = [_merge_group(group,context=context,db=db) for group in groups.values()]
-    for r in result:
+    result = []
+    for group in groups.values():
+        r = _merge_group(group, context=context, db=db)
         r["status_label"] = _status_label(context, r.get("status"))
+        r["business_day_start"] = _day_bounds(
+            min(o.created_at for o in group), client_id
+        )[0].isoformat()
+        result.append(r)
 
-    return ResponseModel(
-        screen_id=context.screen_id,
-        data=result,
-    )
+    return ResponseModel(screen_id=context.screen_id,data=result)
