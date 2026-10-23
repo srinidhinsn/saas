@@ -230,6 +230,7 @@ function navigation(){
     );
   }
 
+  const isDisabled = loading || !form.username || !form.password
 
 
   return (
@@ -241,7 +242,7 @@ function navigation(){
         <div className="bg-white rounded-xl shadow-md p-8 md:p-10">
           {/* Avatar Circle with Spinning Text */}
           <div className="relative w-32 h-32 mx-auto mb-8">
-            <div className="w-32 h-32 rounded-full flex items-center justify-center relative z-10 shadow-lg" style={{ backgroundColor: '#f97316' }}>
+            <div className="w-32 h-32 rounded-full flex items-center justify-center relative z-10 shadow-lg bg-action-primary">
               <User size={48} className="text-white" strokeWidth={2} />
             </div>
 
@@ -333,7 +334,7 @@ function navigation(){
             </div>
 
             {/* Forgot Password Link */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-end">
               {/* <span
                 onClick={() => navigation()}
                 className="text-sm cursor-pointer transition-colors font-medium"
@@ -345,8 +346,7 @@ function navigation(){
               </span> */}
               <span
                 onClick={() => setShowForgot(true)}
-                className="text-sm cursor-pointer transition-colors font-medium"
-                style={{ color: '#f97316' }}
+                className="text-sm cursor-pointer transition-colors font-medium text-action-primary"
                 onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
                 onMouseOut={(e) => e.target.style.textDecoration = 'none'}
               >
@@ -357,14 +357,12 @@ function navigation(){
             {/* Login Button */}
             <button
               onClick={handleLogin}
-              disabled={loading || !form.username || !form.password}
-              className="w-full py-3.5 rounded-lg text-base font-semibold tracking-wide transition-all shadow-sm"
-              style={{
-                backgroundColor: loading || !form.username || !form.password ? '#d1d5db' : '#f97316',
-                color: '#ffffff',
-                cursor: loading || !form.username || !form.password ? 'not-allowed' : 'pointer',
-                boxShadow: loading || !form.username || !form.password ? 'none' : '0 1px 3px rgba(249, 115, 22, 0.3)',
-              }}
+              disabled={isDisabled}
+  className={`w-full py-3.5 rounded-lg text-base font-semibold tracking-wide text-white transition-all ${
+    isDisabled
+      ? 'bg-bg-tertiary cursor-not-allowed shadow-none'
+      : 'bg-action-primary cursor-pointer shadow-sm hover:brightness-95'
+  }`}
               onMouseOver={(e) => {
                 if (!loading && form.username && form.password) {
                   e.target.style.backgroundColor = '#ea580c';

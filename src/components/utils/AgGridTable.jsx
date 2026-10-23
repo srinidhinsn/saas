@@ -118,7 +118,7 @@ const ColumnVisibilityMenu = ({ columnDefs, hiddenCols, onToggle }) => {
         <div className="relative" ref={ref}>
             <button
                 onClick={() => setOpen(o => !o)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-border-default bg-bg-primary text-text-secondary hover:text-text-primary hover:border-action-primary/40 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-border-default bg-bg-primary text-text-secondary hover:text-text-primary hover:border-buttons-add transition-colors"
             >
                 <Columns3 size={14} /> Columns
             </button>
@@ -289,7 +289,7 @@ const AgGridTable = ({
                         {enableExport && (
                             <button
                                 onClick={handleExport}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-buttons-add text-text-white hover:opacity-90 transition-opacity"
                             >
                                 <Download size={14} /> Export
                             </button>
@@ -357,7 +357,7 @@ const AgGridTable = ({
                         <button
                             onClick={() => gridApiRef.current?.paginationGoToPreviousPage()}
                             disabled={pageInfo.page === 0}
-                            className="w-8 h-8 flex items-center justify-center rounded-full border border-border-default text-text-secondary hover:bg-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-full border border-border-default text-text-secondary hover:bg-buttons-add disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             <ChevronLeft size={15} />
                         </button>
@@ -367,7 +367,7 @@ const AgGridTable = ({
                         <button
                             onClick={() => gridApiRef.current?.paginationGoToNextPage()}
                             disabled={pageInfo.page >= pageInfo.totalPages - 1}
-                            className="w-8 h-8 flex items-center justify-center rounded-full border border-border-default text-text-secondary hover:bg-bg-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-full border border-border-default text-text-secondary hover:bg-buttons-add disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             <ChevronRight size={15} />
                         </button>

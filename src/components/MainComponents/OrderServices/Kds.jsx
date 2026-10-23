@@ -446,13 +446,13 @@ const KitchenCard = ({
 
   const statusColorClass =
   allReady
-    ? 'text-yellow-500'
+    ? 'text-status-ready'
     : card.status === KDS_CONFIG.STATUS.SERVED
-      ? 'text-green-600'
+      ? 'text-status-served'
       : card.status === KDS_CONFIG.STATUS.PENDING
-        ? 'text-blue-600'
+        ? 'text-status-pending'
         : card.status === KDS_CONFIG.STATUS.PREPARING
-          ? 'text-orange-600'
+          ? 'text-status-preparing'
           : '';
 
   const handleStatusClick = async (cardId, itemId, newStatus) => {
@@ -569,7 +569,7 @@ const KitchenCard = ({
                   >
                     <FaClock
                       size={20}
-                      className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'}
+                      className={item.status === 'pending' ? 'text-status-pending' : 'text-gray-400'}
                     />
                   </button>
                   <button
@@ -581,7 +581,7 @@ const KitchenCard = ({
                   >
                     <FaHourglassHalf
                       size={20}
-                      className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'}
+                      className={item.status === 'preparing' ? 'text-status-preparing' : 'text-gray-400'}
                     />
                   </button>
                   <button
@@ -593,7 +593,7 @@ const KitchenCard = ({
                   >
                     <FaCheckCircle
                       size={20}
-                      className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'}
+                      className={item.status === 'ready' ? 'text-status-ready' : 'text-gray-400'}
                     />
                   </button>
                   <button
@@ -605,7 +605,7 @@ const KitchenCard = ({
                   >
                     <FaConciergeBell
                       size={20}
-                      className={item.status === 'served' ? 'text-purple-500' : 'text-gray-400'}
+                      className={item.status === 'served' ? 'text-status-served' : 'text-gray-400'}
                     />
                   </button></>)} 
                 </div>

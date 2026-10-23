@@ -49,7 +49,8 @@ const UniversalBulkUpdateModal = ({
   const [showItemAddonPopup, setShowItemAddonPopup] = React.useState(false);
   const [currentEditingItemId, setCurrentEditingItemId] = React.useState(null);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
-
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const fetchStatuses = async () => {
     try {
       const res = await axios.get(
@@ -114,10 +115,9 @@ const UniversalBulkUpdateModal = ({
       setDietaryOptions([]);
     }
   };
-  // ✅ Replace the useEffect — only fetch ONCE when modal opens, not on every change
+
   useEffect(() => {
     if (!showModal) {
-      // Reset configs when modal closes so stale data doesn't bleed into next open
       setConfigs([]);
       return;
     }
@@ -126,7 +126,16 @@ const UniversalBulkUpdateModal = ({
     fetchConfigs();
     fetchStatuses();
     fetchDietaryTypes();
-  }, [showModal]); // ✅ Only depend on showModal — clientId/token won't change mid-session
+  }, [showModal]); 
+  const confirmBulkDeleteAction = async () => {
+    setIsDeleting(true);
+    try {
+      await handleBulkDelete();
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
   // ✅ Get addon name by ID
   const getAddonNameById = (id) => {
     const addon = allAddonItems?.find(item => item.id === id);
@@ -273,6 +282,7 @@ const UniversalBulkUpdateModal = ({
       setShowGlobalAddonPopup(false);
       setShowItemAddonPopup(false);
       setCurrentEditingItemId(null);
+      setShowDeleteConfirm(false);
     } else if (modalType === 'table') {
       setSelectedUpdateTables([]);
       setBulkUpdateData({});
@@ -287,914 +297,1006 @@ const UniversalBulkUpdateModal = ({
 
   if (!showModal) return null;
 
-  // Render Menu Bulk Update Modal
-  if (modalType === 'menu') {
-    return (
-      <>
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="rounded-lg max-w-6xl w-full bg-white max-h-[90vh] flex flex-col shadow-xl">
+ // Render Menu Bulk Update Modal
+if (modalType === 'menu') {
+  const inputBase =
+    "w-full px-3 py-2 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary " +
+    "focus:outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-500 transition";
+  const labelBase =
+    "block text-[11px] font-semibold uppercase tracking-wide mb-1 text-text-secondary";
+  const thBase =
+    "px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-text-secondary bg-bg-tertiary whitespace-nowrap";
 
-            {/* Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Bulk Update & Delete</h2>
+  const getZoneValue = (item, editData, c) =>
+    editData.zonePrices?.[c.id] ??
+    menuItems?.find(
+      m => Number(m.id) === Number(item.id) && Number(m.zone_config_id) === Number(c.id)
+    )?.unit_price ??
+    '';
+
+  const getZoneVariants = (item) =>
+    menuItems?.filter(
+      m => Number(m.id) === Number(item.id) && m.zone_config_id !== null && m.zone_config_id !== 0
+    ) || [];
+
+  const availabilityBadge = (item) =>
+    Number(item.availability) === 0
+      ? "bg-red-100 text-red-700 border-red-200"
+      : "bg-green-100 text-green-700 border-green-200";
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
+      <div className="bg-bg-primary w-full sm:max-w-6xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[92vh] h-full rounded-xl shadow-2xl flex flex-col overflow-hidden border border-border-default">
+          {/* HEADER */}
+          <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 bg-buttons-update text-gray-900 shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <Edit className="w-5 h-5 shrink-0" />
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-bold leading-tight truncate">Bulk Update & Delete</h2>
+                <p className="text-xs opacity-80 truncate">Select items, edit inline, then save</p>
+              </div>
+            </div>
+            <button
+              onClick={handleClose}
+              className="p-1.5 rounded-lg bg-white/30 hover:bg-white/50 transition-colors shrink-0"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* GLOBAL ADD-ONS */}
+          <div className="px-4 sm:px-6 py-3 bg-amber-50 border-b border-amber-200 shrink-0">
+            <p className="text-xs font-semibold text-text-secondary mb-2">
+              Apply add-ons to all selected items
+            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 sm:flex gap-2">
+                <button
+                  onClick={() => setShowGlobalAddonPopup(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-buttons-update hover:bg-buttonsHover-update text-gray-900 font-semibold text-sm shadow-sm transition-colors whitespace-nowrap"
+                >
+                  <Plus size={16} />
+                  {globalAddons.length > 0 ? `${globalAddons.length} add-on(s)` : 'Select Add-ons'}
+                </button>
+                <button
+                  onClick={clearGlobalAddons}
+                  disabled={globalAddons.length === 0 && selectedRows.length === 0}
+                  className="px-4 py-2 rounded-lg bg-buttons-configure hover:bg-buttonsHover-configure text-text-white font-semibold text-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  Clear All
+                </button>
+              </div>
+
+              {globalAddons.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {globalAddons.slice(0, 3).map(id => (
+                    <span key={id} className="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full text-xs font-medium">
+                      {getAddonNameById(id)}
+                    </span>
+                  ))}
+                  {globalAddons.length > 3 && (
+                    <span className="bg-gray-100 text-gray-600 border border-gray-200 px-2 py-0.5 rounded-full text-xs font-medium">
+                      +{globalAddons.length - 3} more
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-text-secondary mt-2">
+              {selectedRows.length > 0
+                ? `${globalAddons.length > 0 ? 'Add-ons applied to' : 'Select add-ons to apply to'} ${selectedRows.length} selected item(s)`
+                : globalAddons.length > 0
+                  ? `${globalAddons.length} add-on(s) chosen. Now select items to apply them.`
+                  : 'Pick add-ons first then items, or items first then add-ons.'}
+            </p>
+          </div>
+
+          {/* ACTION BAR */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-3 border-b border-border-default bg-bg-tertiary shrink-0">
+            <label className="flex items-center justify-between sm:justify-start gap-3 cursor-pointer select-none">
+              <span className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={selectAllChecked}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                />
+                <span className="text-sm font-semibold text-text-primary">Select All</span>
+              </span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                {selectedRows.length} / {filteredItems.length}
+              </span>
+            </label>
+
+            <div className="grid grid-cols-3 sm:flex gap-2">
               <button
-                onClick={handleClose}
-                className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+                onClick={() => {
+                  if (selectedRows.length === 0) return;
+                  const updated = { ...bulkEditData };
+                  selectedRows.forEach(id => {
+                    updated[id] = { ...(updated[id] || {}), availability: 0 };
+                  });
+                  setBulkEditData(updated);
+                }}
+                disabled={selectedRows.length === 0}
+                className="flex items-center justify-center px-3 sm:px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs sm:text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
               >
-                <X className="w-5 h-5" />
+                <span className="sm:hidden">Unavail.</span>
+                <span className="hidden sm:inline">Mark Unavailable</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (selectedRows.length === 0) return;
+                  const updated = { ...bulkEditData };
+                  selectedRows.forEach(id => {
+                    updated[id] = { ...(updated[id] || {}), availability: 999 };
+                  });
+                  setBulkEditData(updated);
+                }}
+                disabled={selectedRows.length === 0}
+                className="flex items-center justify-center px-3 sm:px-4 py-2 rounded-lg bg-buttons-add hover:bg-buttonsHover-add text-text-white font-semibold text-xs sm:text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+              >
+                <span className="sm:hidden">Avail.</span>
+                <span className="hidden sm:inline">Mark Available</span>
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={selectedRows.length === 0}
+                className="flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg bg-buttons-delete hover:bg-buttonsHover-delete text-text-white font-semibold text-xs sm:text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
               </button>
             </div>
+          </div>
 
-            {/* ✅ Global Add-ons Section */}
-            <div className="px-6 py-4 flex justify-between bg-blue-50 border-b border-blue-200">
-              <div className="flex items-start gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-semibold mb-2 text-gray-700">
-                    Apply Add-ons to All Selected Items
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setShowGlobalAddonPopup(true)}
-                      className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium text-sm whitespace-nowrap flex items-center gap-2"
-                    >
-                      <Plus size={16} />
-                      {globalAddons.length > 0
-                        ? `Selected: ${globalAddons.length} add-on(s)`
-                        : 'Select Add-ons'}
-                    </button>
-                    <button
-                      onClick={clearGlobalAddons}
-                      disabled={globalAddons.length === 0 && selectedRows.length === 0}
-                      className="px-4 py-2 rounded-md bg-gray-600 text-white hover:bg-gray-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
-                    >
-                      Clear All
-                    </button>
-                    {globalAddons.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {globalAddons.slice(0, 3).map(id => (
-                          <span key={id} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">
-                            {getAddonNameById(id)}
-                          </span>
-                        ))}
-                        {globalAddons.length > 3 && (
-                          <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">
-                            +{globalAddons.length - 3} more
-                          </span>
+          {/* CONTENT */}
+          <div className="flex-1 overflow-y-auto bg-bg-primary px-3 sm:px-4 py-3">
+
+            {/* DESKTOP TABLE */}
+            <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+              <table className="w-full border-collapse min-w-[1000px]">
+                <thead className="sticky top-0 z-10">
+                  <tr className="border-b border-border-default">
+                    <th className={`${thBase} w-10`}>
+                      <input
+                        type="checkbox"
+                        checked={selectAllChecked}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                      />
+                    </th>
+                    <th className={thBase}>Name</th>
+                    <th className={thBase}>Description</th>
+                    <th className={thBase}>Price</th>
+                    <th className={thBase}>Discount</th>
+                    <th className={thBase}>Zone Price</th>
+                    <th className={thBase}>Code</th>
+                    <th className={thBase}>Availability</th>
+                    <th className={thBase}>Add-ons</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems.map((item, index) => {
+                    const isSelected = selectedRows.includes(item.id);
+                    const editData = bulkEditData[item.id] || {};
+                    const currentAddons =
+                      editData.line_item_id !== undefined
+                        ? editData.line_item_id
+                        : Array.isArray(item.line_item_id) ? item.line_item_id : [];
+                    const zoneVariants = getZoneVariants(item);
+
+                    return (
+                      <tr
+                        key={item.id}
+                        className={`border-b border-border-default transition-colors ${
+                          isSelected
+                            ? 'bg-amber-50/60'
+                            : index % 2 === 0
+                              ? 'bg-bg-primary hover:bg-bg-tertiary'
+                              : 'bg-bg-tertiary/50 hover:bg-bg-tertiary'
+                        }`}
+                      >
+                        <td className="px-3 py-2.5">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleRowSelection(item.id)}
+                            className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                          />
+                        </td>
+
+                        <td className="px-3 py-2.5 min-w-[160px]">
+                          {isSelected ? (
+                            <input
+                              type="text"
+                              value={editData.name !== undefined ? editData.name : item.name}
+                              onChange={e => updateBulkEditData(item.id, 'name', e.target.value)}
+                              className={inputBase}
+                              placeholder="Item name"
+                            />
+                          ) : (
+                            <span className="text-sm font-medium text-text-primary">{item.name}</span>
+                          )}
+                        </td>
+
+                        <td className="px-3 py-2.5 min-w-[180px]">
+                          {isSelected ? (
+                            <input
+                              type="text"
+                              value={editData.description !== undefined ? editData.description : item.description ?? ''}
+                              onChange={e => updateBulkEditData(item.id, 'description', e.target.value)}
+                              className={inputBase}
+                              placeholder="Description"
+                            />
+                          ) : (
+                            <span className="text-sm text-text-secondary truncate block max-w-[220px]">
+                              {item.description || '-'}
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-3 py-2.5 w-28">
+                          {isSelected ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editData.unit_price !== undefined ? editData.unit_price : item.unit_price}
+                              onChange={e => updateBulkEditData(item.id, 'unit_price', e.target.value)}
+                              className={inputBase}
+                              placeholder="0.00"
+                            />
+                          ) : (
+                            <span className="text-sm font-semibold text-text-primary">
+                              ₹{typeof item.unit_price === 'number' ? item.unit_price.toFixed(2) : '0.00'}
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-3 py-2.5 w-28">
+                          {isSelected ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editData.discount !== undefined ? editData.discount : item.discount}
+                              onChange={e => updateBulkEditData(item.id, 'discount', e.target.value)}
+                              className={inputBase}
+                              placeholder="0.00"
+                            />
+                          ) : (
+                            <span className="text-sm text-text-primary">
+                              {Number(item.discount) > 0 ? `${Number(item.discount)}%` : '-'}
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-3 py-2.5 min-w-[200px]">
+                          {isSelected ? (
+                            <div className="space-y-1.5">
+                              {configs.map(c => (
+                                <div key={c.id} className="flex items-center gap-2">
+                                  <span className="text-xs text-text-secondary font-medium w-24 truncate shrink-0">
+                                    {c.section}-{c.zone}
+                                  </span>
+                                  <span className="text-xs text-text-secondary">₹</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    placeholder={item.unit_price || "0.00"}
+                                    value={getZoneValue(item, editData, c)}
+                                    onChange={e =>
+                                      updateBulkEditData(item.id, 'zonePrices', {
+                                        ...(editData.zonePrices || {}),
+                                        [c.id]: e.target.value
+                                      })
+                                    }
+                                    className="w-20 px-2 py-1 border border-border-default rounded-lg text-xs text-right bg-bg-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-500"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          ) : zoneVariants.length === 0 || !configs.length ? (
+                            <span className="text-xs text-text-secondary">-</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {zoneVariants.map(s => {
+                                const c = configs.find(x => x.id === s.zone_config_id);
+                                return c ? (
+                                  <span
+                                    key={`${s.id}-${s.zone_config_id}`}
+                                    className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200"
+                                  >
+                                    {c.section}-{c.zone}: ₹{s.unit_price}
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-3 py-2.5 w-32">
+                          {isSelected ? (
+                            <input
+                              type="text"
+                              value={editData.code !== undefined ? editData.code : item.code ?? ''}
+                              onChange={e => updateBulkEditData(item.id, 'code', e.target.value)}
+                              className={inputBase}
+                              placeholder="Code"
+                            />
+                          ) : (
+                            <span className="text-sm text-text-primary">{item.code ?? '-'}</span>
+                          )}
+                        </td>
+
+                        <td className="px-3 py-2.5 min-w-[150px]">
+                          {isSelected ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={editData.availability !== undefined ? editData.availability : item.availability ?? ''}
+                                onChange={e => updateBulkEditData(item.id, 'availability', e.target.value)}
+                                className={`${inputBase} w-20`}
+                                placeholder="0"
+                              />
+                              <div className="flex flex-col gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => updateBulkEditData(item.id, 'availability', 0)}
+                                  className="px-2 py-0.5 rounded text-xs bg-red-100 text-red-700 hover:bg-red-200 font-semibold whitespace-nowrap transition-colors"
+                                >
+                                  × Off
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateBulkEditData(item.id, 'availability', 999)}
+                                  className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700 hover:bg-green-200 font-semibold whitespace-nowrap transition-colors"
+                                >
+                                  ✓ On
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${availabilityBadge(item)}`}>
+                              {Number(item.availability) === 0 ? 'Off' : item.availability ?? '—'}
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-3 py-2.5 w-36">
+                          {isSelected ? (
+                            <button
+                              type="button"
+                              onClick={() => openItemAddonPopup(item.id)}
+                              className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border-2 border-dashed border-border-default text-text-primary hover:border-amber-500 hover:bg-amber-50 transition-all text-sm font-medium flex items-center justify-center gap-1"
+                            >
+                              <Plus size={14} />
+                              {currentAddons.length > 0 ? `${currentAddons.length} add-on(s)` : 'Select'}
+                            </button>
+                          ) : (
+                            <span className="text-sm text-text-primary">
+                              {Array.isArray(item.line_item_id) && item.line_item_id.length > 0
+                                ? `${item.line_item_id.length} add-on(s)`
+                                : '-'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* MOBILE CARDS (sibling of the table, so they actually render on small screens) */}
+            <div className="md:hidden space-y-2.5">
+              {filteredItems.map(item => {
+                const isSelected = selectedRows.includes(item.id);
+                const editData = bulkEditData[item.id] || {};
+                const currentAddons =
+                  editData.line_item_id !== undefined
+                    ? editData.line_item_id
+                    : Array.isArray(item.line_item_id) ? item.line_item_id : [];
+                const zoneVariants = getZoneVariants(item);
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border-2 overflow-hidden transition-all ${
+                      isSelected
+                        ? 'border-amber-400 bg-amber-50/40 shadow-sm'
+                        : 'border-border-default bg-bg-primary'
+                    }`}
+                  >
+                    {/* Card header */}
+                    <label className="flex items-center gap-3 px-3 py-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleRowSelection(item.id)}
+                        className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-text-primary text-sm truncate">{item.name}</p>
+                        <p className="text-xs text-text-secondary truncate">{item.description || '—'}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold text-text-primary">₹{item.unit_price}</p>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${availabilityBadge(item)}`}>
+                          {Number(item.availability) === 0 ? 'Off' : item.availability ?? '—'}
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* Zone chips when not selected */}
+                    {!isSelected && zoneVariants.length > 0 && (
+                      <div className="px-3 pb-2.5 flex flex-wrap gap-1.5">
+                        {zoneVariants.map(s => {
+                          const c = configs.find(x => x.id === s.zone_config_id);
+                          return c ? (
+                            <span
+                              key={`${s.id}-${s.zone_config_id}`}
+                              className="text-[11px] bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full"
+                            >
+                              {c.section}-{c.zone}: ₹{s.unit_price}
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
+
+                    {/* Edit fields when selected */}
+                    {isSelected && (
+                      <div className="px-3 pb-3 pt-3 space-y-3 border-t border-amber-200">
+                        <div>
+                          <label className={labelBase}>Name</label>
+                          <input
+                            type="text"
+                            value={editData.name !== undefined ? editData.name : item.name}
+                            onChange={e => updateBulkEditData(item.id, 'name', e.target.value)}
+                            className={inputBase}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={labelBase}>Description</label>
+                          <input
+                            type="text"
+                            value={editData.description !== undefined ? editData.description : item.description ?? ''}
+                            onChange={e => updateBulkEditData(item.id, 'description', e.target.value)}
+                            className={inputBase}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className={labelBase}>Base Price</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editData.unit_price !== undefined ? editData.unit_price : item.unit_price}
+                              onChange={e => updateBulkEditData(item.id, 'unit_price', e.target.value)}
+                              className={inputBase}
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div>
+                            <label className={labelBase}>Discount %</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={editData.discount !== undefined ? editData.discount : item.discount}
+                              onChange={e => updateBulkEditData(item.id, 'discount', e.target.value)}
+                              className={inputBase}
+                              placeholder="0.00"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className={labelBase}>Code</label>
+                            <input
+                              type="text"
+                              value={editData.code !== undefined ? editData.code : item.code ?? ''}
+                              onChange={e => updateBulkEditData(item.id, 'code', e.target.value)}
+                              className={inputBase}
+                              placeholder="Item code"
+                            />
+                          </div>
+                          <div>
+                            <label className={labelBase}>Availability</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={editData.availability !== undefined ? editData.availability : item.availability ?? ''}
+                              onChange={e => updateBulkEditData(item.id, 'availability', e.target.value)}
+                              className={inputBase}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => updateBulkEditData(item.id, 'availability', 0)}
+                            className="py-2 rounded-lg text-xs bg-red-100 text-red-700 hover:bg-red-200 font-semibold transition-colors"
+                          >
+                            × Mark Off
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateBulkEditData(item.id, 'availability', 999)}
+                            className="py-2 rounded-lg text-xs bg-green-100 text-green-700 hover:bg-green-200 font-semibold transition-colors"
+                          >
+                            ✓ Mark On
+                          </button>
+                        </div>
+
+                        {configs.length > 0 && (
+                          <div>
+                            <label className={labelBase}>Zone Prices</label>
+                            <div className="space-y-2">
+                              {configs.map(c => (
+                                <div
+                                  key={c.id}
+                                  className="flex items-center gap-2 bg-bg-primary border border-border-default rounded-lg px-3 py-1.5"
+                                >
+                                  <span className="text-xs font-medium text-text-primary flex-1 truncate">
+                                    {c.section} — {c.zone}
+                                  </span>
+                                  <span className="text-xs text-text-secondary">₹</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    placeholder={item.unit_price || "0.00"}
+                                    value={getZoneValue(item, editData, c)}
+                                    onChange={e =>
+                                      updateBulkEditData(item.id, 'zonePrices', {
+                                        ...(editData.zonePrices || {}),
+                                        [c.id]: e.target.value
+                                      })
+                                    }
+                                    className="w-20 px-2 py-1 border border-border-default rounded-lg text-sm text-right bg-bg-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-500"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         )}
+
+                        <div>
+                          <label className={labelBase}>Add-ons</label>
+                          <button
+                            type="button"
+                            onClick={() => openItemAddonPopup(item.id)}
+                            className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border-2 border-dashed border-border-default text-text-primary hover:border-amber-500 hover:bg-amber-50 transition-all text-sm font-medium flex items-center justify-center gap-2"
+                          >
+                            <Plus size={14} />
+                            {currentAddons.length > 0 ? `${currentAddons.length} add-on(s) selected` : 'Select Add-ons'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
-                  <p className="text-xs text-gray-600 mt-2">
-                    💡 {selectedRows.length > 0
-                      ? `${globalAddons.length > 0 ? 'Add-ons applied to' : 'Select add-ons to apply to'} ${selectedRows.length} selected item(s)`
-                      : globalAddons.length > 0
-                        ? `${globalAddons.length} add-on(s) selected. Now select items to apply them.`
-                        : 'Select add-ons first, then select items - or vice versa!'}
-                  </p>
-                </div>
-              </div>
+                );
+              })}
             </div>
 
-            {/* Action Bar */}
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 px-4 sm:px-6 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectAllChecked}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Select All</span>
-                </label>
-                <span className="text-sm text-gray-600">
-                  {selectedRows.length} item(s) selected
-                </span>
+            {filteredItems.length === 0 && (
+              <div className="text-center py-16">
+                <Search className="w-12 h-12 text-text-secondary mx-auto mb-3 opacity-30" />
+                <p className="text-text-secondary font-medium">No items to display</p>
+                <p className="text-text-secondary text-sm mt-1 opacity-80">Try adjusting your filters or search</p>
               </div>
-
-              <div className="flex gap-2 w-full sm:w-auto flex-wrap">
-                {/* <button
-                  onClick={handleBulkUpdate}
-                  disabled={selectedRows.length === 0}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
-                >
-                  <Edit className="w-4 h-4" />
-                  Update Selected
-                </button> */}
-                <button
-                  onClick={() => {
-                    if (selectedRows.length === 0) return;
-                    const updated = { ...bulkEditData };
-                    selectedRows.forEach(id => {
-                      updated[id] = { ...(updated[id] || {}), availability: 0 };
-                    });
-                    setBulkEditData(updated);
-                  }}
-                  disabled={selectedRows.length === 0}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
-                >
-                  Mark Unavailable
-                </button>
-                <button
-                  onClick={() => {
-                    if (selectedRows.length === 0) return;
-                    const updated = { ...bulkEditData };
-                    selectedRows.forEach(id => {
-                      updated[id] = { ...(updated[id] || {}), availability: 999 };
-                    });
-                    setBulkEditData(updated);
-                  }}
-                  disabled={selectedRows.length === 0}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
-                >
-                  Mark Available
-                </button>
-                <button
-                  onClick={handleBulkDelete}
-                  disabled={selectedRows.length === 0}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </button>
-              </div>
-            </div>
-
-            {/* Table Container */}
-            <div className="flex-1 overflow-auto px-4 py-4">
-              {/* Desktop table */}
-              <div className="hidden md:block min-w-[900px]">
-                <table className="w-full border-collapse">
-                  <thead className="sticky top-0 bg-white z-10">
-                    <tr className="border-b border-gray-200">
-                      <th className="px-4 py-3 text-left bg-gray-50">
-                        <input
-                          type="checkbox"
-                          checked={selectAllChecked}
-                          onChange={toggleSelectAll}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                      </th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Name</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Description</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Price</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Discount</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Zone Price :</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Code</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Availability</th>
-                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-gray-50">Add-ons</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredItems.map((item, index) => {
-                      const isSelected = selectedRows.includes(item.id);
-                      const editData = bulkEditData[item.id] || {};
-                      const currentAddons = editData.line_item_id !== undefined
-                        ? editData.line_item_id
-                        : Array.isArray(item.line_item_id)
-                          ? item.line_item_id
-                          : [];
-
-                      return (
-                        <tr
-                          key={item.id}
-                          className={`border-b border-gray-200 ${isSelected
-                            ? 'bg-blue-50'
-                            : index % 2 === 0
-                              ? 'bg-white hover:bg-gray-50'
-                              : 'bg-gray-50 hover:bg-gray-100'
-                            }`}
-                        >
-                          <td className="px-4 py-3">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleRowSelection(item.id)}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            {isSelected ? (
-                              <input
-                                type="text"
-                                value={editData.name !== undefined ? editData.name : item.name}
-                                onChange={(e) => updateBulkEditData(item.id, 'name', e.target.value)}
-                                className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Item name"
-                              />
-                            ) : (
-                              <span className="text-sm text-gray-900">{item.name}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {isSelected ? (
-                              <input
-                                type="text"
-                                value={editData.description !== undefined ? editData.description : item.description}
-                                onChange={(e) => updateBulkEditData(item.id, 'description', e.target.value)}
-                                className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Description"
-                              />
-                            ) : (
-                              <span className="text-sm text-gray-600 truncate block max-w-xs">
-                                {item.description || '-'}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {isSelected ? (
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={editData.unit_price !== undefined ? editData.unit_price : item.unit_price}
-                                onChange={(e) => updateBulkEditData(item.id, 'unit_price', e.target.value)}
-                                className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="0.00"
-                              />
-                            ) : (
-                              <span className="text-sm text-gray-900">
-                                ₹{typeof item.unit_price === 'number' ? item.unit_price.toFixed(2) : '0.00'}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {isSelected ? (
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={editData.discount !== undefined ? editData.discount : item.discount}
-                                onChange={(e) => updateBulkEditData(item.id, 'discount', e.target.value)}
-                                className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="0.00"
-                              />
-                            ) : (
-                              <span className="text-sm text-gray-900">
-                                ₹{typeof item.discount === 'number' ? item.discount.toFixed(2) : (item.discount || 0)}
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="px-4 py-3 min-w-[200px]">
-                            {isSelected ? (
-                              <div className="space-y-1.5">
-                                {configs.map(c => (
-                                  <div key={c.id} className="flex items-center gap-2">
-                                    <span className="text-xs text-gray-600 font-medium w-24 truncate shrink-0">
-                                      {c.section}-{c.zone}
-                                    </span>
-                                    <span className="text-xs text-gray-400">₹</span>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      placeholder={item.unit_price || "0.00"}
-                                      value={editData.zonePrices?.[c.id] ?? 
-                                        menuItems?.find(m => Number(m.id) === Number(item.id) && Number(m.zone_config_id) === Number(c.id))?.unit_price ?? ''}
-                                      
-                                      onChange={e => updateBulkEditData(item.id, 'zonePrices', {
-                                        ...(editData.zonePrices || {}),
-                                        [c.id]: e.target.value
-                                      })}
-                                      className="w-20 px-2 py-1 border border-gray-200 rounded-lg text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="space-y-0.5">
-                                {(() => {
-                                  if (!menuItems || !configs.length) return <span className="text-xs text-gray-400">-</span>;
-
-                                  const zoneVariants = menuItems.filter(
-                                    m => Number(m.id) === Number(item.id) &&
-                                      m.zone_config_id !== null &&
-                                      m.zone_config_id !== 0
-                                  );
-                                  if (!zoneVariants.length) return <span className="text-xs text-gray-400">-</span>;
-
-                                  return zoneVariants.map(s => {
-                                    const c = configs.find(x => x.id === s.zone_config_id);
-                                    return c ? (
-                                      <div key={`${s.id}-${s.zone_config_id}`} className="text-[11px] text-gray-500">
-                                        <span className="font-medium text-blue-600">{c.section}-{c.zone}</span>: ₹{s.unit_price}
-                                      </div>
-                                    ) : null;
-                                  });
-                                })()}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {isSelected ? (
-                              <input
-                                type="text"
-                                value={
-                                  editData.code !== undefined
-                                    ? editData.code
-                                    : item.code ?? ''
-                                }
-                                onChange={(e) =>
-                                  updateBulkEditData(item.id, 'code', e.target.value)
-                                }
-                                className="w-full px-3 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-action-primary"
-                                placeholder="Code"
-                              />
-                            ) : (
-                              <span className="text-sm text-gray-900">
-                                {item.code ?? '-'}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {isSelected ? (
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={editData.availability !== undefined ? editData.availability : (item.availability ?? '')}
-                                  onChange={(e) => updateBulkEditData(item.id, 'availability', e.target.value)}
-                                  className="w-20 px-2 py-2 rounded-md border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                  placeholder="0"
-                                />
-                                <div className="flex flex-col gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => updateBulkEditData(item.id, 'availability', 0)}
-                                    className="px-2 py-0.5 rounded text-xs bg-red-100 text-red-700 hover:bg-red-200 font-semibold whitespace-nowrap"
-                                  >
-                                    × Off
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => updateBulkEditData(item.id, 'availability', 999)}
-                                    className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700 hover:bg-green-200 font-semibold whitespace-nowrap"
-                                  >
-                                    ✓ On
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <span className={`text-sm font-semibold px-2 py-1 rounded-full ${Number(item.availability) === 0
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-green-100 text-green-700'
-                                }`}>
-                                {Number(item.availability) === 0 ? 'Off' : item.availability ?? '—'}
-                              </span>
-                            )}
-                          </td>
-                          {/* Add-ons Column */}
-                          <td className="px-4 py-3">
-                            {isSelected ? (
-                              <button
-                                type="button"
-                                onClick={() => openItemAddonPopup(item.id)}
-                                className="w-full px-3 py-2 rounded-md bg-gray-50 border-2 border-dashed border-gray-300 text-gray-700 hover:border-blue-500 hover:bg-blue-50 transition-all text-sm font-medium flex items-center justify-center gap-1"
-                              >
-                                <Plus size={14} />
-                                {currentAddons.length > 0
-                                  ? `${currentAddons.length} addon(s)`
-                                  : 'Select'}
-                              </button>
-                            ) : (
-                              <span className="text-sm text-gray-900">
-                                {Array.isArray(item.line_item_id) && item.line_item_id.length > 0
-                                  ? `${item.line_item_id.length} add-on(s)`
-                                  : '-'}
-                              </span>
-                            )}
-                          </td>
-
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                <div className="md:hidden space-y-3">
-                  {filteredItems.map((item) => {
-                    const isSelected = selectedRows.includes(item.id);
-                    const editData = bulkEditData[item.id] || {};
-                    const currentAddons = editData.line_item_id !== undefined
-                      ? editData.line_item_id
-                      : Array.isArray(item.line_item_id) ? item.line_item_id : [];
-                    const zoneVariants = menuItems?.filter(
-                      m => m.id === item.id &&
-                        m.zone_config_id !== null &&
-                        m.zone_config_id !== 0
-                    ) || [];
-
-                    return (
-                      <div key={item.id}
-                        className={`rounded-xl border-2 overflow-hidden transition-all ${isSelected ? 'border-blue-400 bg-blue-50/40' : 'border-gray-200 bg-white'
-                          }`}
-                      >
-                        {/* Card header row */}
-                        <div className="flex items-center gap-3 px-3 py-3">
-                          <input type="checkbox" checked={isSelected}
-                            onChange={() => toggleRowSelection(item.id)}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded" />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 text-sm truncate">{item.name}</p>
-                            <p className="text-xs text-gray-400 truncate">{item.description || '—'}</p>
-                          </div>
-                          <span className="text-sm font-bold text-blue-600">₹{item.unit_price}</span>
-                        </div>
-
-                        {/* Existing zone prices (unselected) */}
-                        {!isSelected && zoneVariants.length > 0 && (
-                          <div className="px-3 pb-2 flex flex-wrap gap-1.5">
-                            {zoneVariants.map(s => {
-                              const c = configs.find(x => x.id === s.zone_config_id);
-                              return c ? (
-                                <span key={`${s.id}-${s.zone_config_id}`} className="text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                                  {c.section}-{c.zone}: ₹{s.unit_price}
-                                </span>
-                              ) : null;
-                            })}
-                          </div>
-                        )}
-
-                        {/* Edit fields (selected) */}
-                        {isSelected && (
-                          <div className="px-3 pb-3 space-y-3 border-t border-blue-100 pt-3">
-                            {/* Name */}
-                            <div>
-                              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Name</label>
-                              <input type="text"
-                                value={editData.name !== undefined ? editData.name : item.name}
-                                onChange={e => updateBulkEditData(item.id, 'name', e.target.value)}
-                                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                              />
-                            </div>
-
-                            {/* Base Price + Discount */}
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Base Price</label>
-                                <input type="number" step="0.01"
-                                  value={editData.unit_price !== undefined ? editData.unit_price : item.unit_price}
-                                  onChange={e => updateBulkEditData(item.id, 'unit_price', e.target.value)}
-                                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                  placeholder="0.00"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Discount</label>
-                                <input type="number" step="0.01"
-                                  value={editData.discount !== undefined ? editData.discount : item.discount}
-                                  onChange={e => updateBulkEditData(item.id, 'discount', e.target.value)}
-                                  className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                  placeholder="0.00"
-                                />
-                              </div>
-                            </div>
-
-                            {/* Code */}
-                            <div>
-                              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Code</label>
-                              <input type="text"
-                                value={editData.code !== undefined ? editData.code : item.code ?? ''}
-                                onChange={e => updateBulkEditData(item.id, 'code', e.target.value)}
-                                className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                placeholder="Item code"
-                              />
-                            </div>
-
-                            {/* Zone Prices */}
-                            {configs.length > 0 && (
-                              <div>
-                                <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Zone Prices</label>
-                                <div className="space-y-2">
-                                  {configs.map(c => (
-                                    <div key={c.id} className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5">
-                                      <span className="text-xs font-medium text-blue-700 flex-1">{c.section} — {c.zone}</span>
-                                      <span className="text-xs text-gray-400">₹</span>
-                                      <input type="number" min="0"
-                                        placeholder={item.unit_price || "0.00"}
-                                        value={editData.zonePrices?.[c.id] ?? 
-                                          menuItems?.find(m => Number(m.id) === Number(item.id) && Number(m.zone_config_id) === Number(c.id))?.unit_price ?? ''}
-                                        onChange={e => updateBulkEditData(item.id, 'zonePrices', {
-                                          ...(editData.zonePrices || {}), [c.id]: e.target.value
-                                        })}
-                                        className="w-20 px-2 py-1 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Add-ons */}
-                            <div>
-                              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Add-ons</label>
-                              <button type="button" onClick={() => openItemAddonPopup(item.id)}
-                                className="w-full px-3 py-2 rounded-lg bg-gray-50 border-2 border-dashed border-gray-300 text-gray-600 hover:border-blue-400 hover:bg-blue-50 transition-all text-sm font-medium flex items-center justify-center gap-2">
-                                <Plus size={14} />
-                                {currentAddons.length > 0 ? `${currentAddons.length} add-on(s) selected` : 'Select Add-ons'}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {filteredItems.length === 0 && (
-                  <div className="text-center py-16 mt-4">
-                    <p className="text-gray-500 text-lg">No items to display</p>
-                    <p className="text-gray-400 text-sm mt-2">Try adjusting your filters or search</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-              <div className="flex justify-between items-center">
-                <p className="text-sm text-gray-600">
-                  For better experience use a large devices !!!
-                </p>
-                <button
-                  onClick={handleBulkUpdate}
-                  disabled={selectedRows.length === 0}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-action-success text-text-white transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed font-medium text-sm"
-                >
-                  <Edit className="w-4 h-4" />
-                  Update Selected
-                </button>
-                <button
-                  onClick={handleClose}
-                  className="px-6 py-2 rounded-md bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 font-medium text-sm"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
+            )}
           </div>
-        </div>
 
-        {/* ✅ FIXED: Global Addon Selection Popup */}
-        <AddonSelectionPopup
-          isOpen={showGlobalAddonPopup}
-          onClose={() => setShowGlobalAddonPopup(false)}
-          selectedAddons={globalAddons}
-          onSave={handleGlobalAddonSave}
-          addonSubcategories={addonSubcategories || []}
-          allAddonItems={allAddonItems || []}
-          currentItemId={null}
-        />
-
-        {/* ✅ Individual Item Addon Selection Popup */}
-        {currentEditingItemId && (
-          <AddonSelectionPopup
-            isOpen={showItemAddonPopup}
-            onClose={() => {
-              setShowItemAddonPopup(false);
-              setCurrentEditingItemId(null);
-            }}
-            selectedAddons={bulkEditData[currentEditingItemId]?.line_item_id ||
-              filteredItems.find(i => i.id === currentEditingItemId)?.line_item_id || []}
-            onSave={(selectedAddons) => {
-              updateBulkEditData(currentEditingItemId, 'line_item_id', selectedAddons);
-              setShowItemAddonPopup(false);
-              setCurrentEditingItemId(null);
-            }}
-            addonSubcategories={addonSubcategories || []}
-            allAddonItems={allAddonItems || []}
-            currentItemId={currentEditingItemId}
-          />
-        )}
-      </>
-    );
-  }
-
-  // Render Table Bulk Update Modal
-  if (modalType === 'table') {
-    const filteredTables = getFilteredUpdateTables();
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-bg-primary rounded-xl w-full max-w-3xl shadow-2xl h-[95vh] overflow-hidden flex flex-col border border-border-default">
-
-          {/* Header */}
-          <div className="px-4 sm:px-6 py-3 border-b border-border-default flex justify-between items-center bg-bg-tertiary flex-shrink-0">
-            <h2 className="text-base sm:text-lg font-bold text-text-primary">Update Tables
-              <span className='text-sm'> (Apply to All Selected)</span>
-            </h2>
+          {/* FOOTER */}
+          <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-t border-border-default shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <button
               onClick={handleClose}
-              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+              className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-bg-secondary font-semibold text-sm transition-colors"
             >
-              <X className="w-4 h-4 " />
-            </button>
-          </div>
-          {/* Global Update Section */}
-          <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-b border-border-default flex-shrink-0">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <div>
-                <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Seating</label>
-                {/* Desktop */}
-                <input
-                  type="number"
-                  min="1"
-                  value={bulkUpdateGlobal.table_type}
-                  onChange={e => {
-                    const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
-                    setBulkUpdateGlobal(prev => ({ ...prev, table_type: value }));
-                  }}
-                  placeholder="No change"
-                  className="hidden sm:block w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
-                />
-                {/* Mobile with +/- buttons */}
-                <div className="sm:hidden flex items-center border border-border-default rounded-lg overflow-hidden bg-bg-primary">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const current = Number(bulkUpdateGlobal.table_type) || 0;
-                      const value = current > 1 ? current - 1 : "";
-                      setBulkUpdateGlobal(prev => ({ ...prev, table_type: value }));
-                    }}
-                    className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
-                  >−</button>
-                  <input
-                    type="number"
-                    min="1"
-                    value={bulkUpdateGlobal.table_type}
-                    onChange={e => {
-                      const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
-                      setBulkUpdateGlobal(prev => ({ ...prev, table_type: value }));
-                    }}
-                    placeholder="None"
-                    className="flex-1 text-center py-1.5 border-x border-border-default focus:outline-none text-sm bg-transparent text-text-primary"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const current = Number(bulkUpdateGlobal.table_type) || 0;
-                      setBulkUpdateGlobal(prev => ({ ...prev, table_type: current + 1 }));
-                    }}
-                    className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
-                  >+</button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Status</label>
-                <select
-                  value={bulkUpdateGlobal.status}
-                  onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
-                  className="w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary text-sm bg-bg-primary text-text-primary"
-                >
-                  <option value="">No change</option>
-                  {statusOptions.length > 0
-                    ? statusOptions.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))
-                    : (
-                      <>
-                        <option value="Vacant">Vacant</option>
-                        <option value="Reserved">Reserved</option>
-                      </>
-                    )
-                  }
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Section & Zone</label>
-                <select
-                  value={bulkUpdateGlobal.config_id || ""}
-                  className="w-full px-3 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
-                  onChange={e => {
-                    const value = Number(e.target.value);
-                    setBulkUpdateGlobal(prev => ({ ...prev, config_id: value }));
-                    selectedUpdateTables.forEach(id => {
-                      handleBulkUpdateChange(id, "config_id", value);
-                    });
-                  }}
-                >
-                  <option value="">No change</option>
-                  {configs.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.section} - {c.zone}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Search Bar */}
-          <div className="px-4 sm:px-6 py-2 border-b border-border-default bg-bg-primary flex-shrink-0">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-secondary" />
-              <input
-                type="text"
-                placeholder="Search tables..."
-                value={bulkUpdateSearch}
-                onChange={e => setBulkUpdateSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-1.5 border border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent text-sm bg-bg-primary text-text-primary"
-              />
-            </div>
-          </div>
-
-          {/* Select All */}
-          <div className="px-4 sm:px-6 py-2 bg-bg-tertiary border-b border-border-default flex-shrink-0">
-            <label className="flex items-center justify-between cursor-pointer">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={selectedUpdateTables.length === filteredTables.length && filteredTables.length > 0}
-                  onChange={selectAllUpdateTables}
-                  className="w-4 h-4 text-action-primary border-border-default rounded focus:ring-action-primary"
-                />
-                <span className="text-sm font-semibold text-text-primary">Select All</span>
-              </div>
-              <span className="text-xs text-text-secondary">
-                {selectedUpdateTables.length} of {filteredTables.length} selected
-              </span>
-            </label>
-          </div>
-
-          {/* Table List */}
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3">
-            <div className="space-y-2">
-              {filteredTables.length === 0 ? (
-                <div className="text-center py-12">
-                  <Search className="w-12 h-12 text-text-secondary mx-auto mb-3 opacity-30" />
-                  <p className="text-text-secondary">No tables found</p>
-                </div>
-              ) : (
-                filteredTables.map(table => {
-                  const config = configs.find(c => c.id === table.config_id);
-                  return (
-
-                    <div
-                      key={table.id}
-                      className={`border rounded-xl p-3 transition-all ${selectedUpdateTables.includes(table.id)
-                        ? 'border-action-primary bg-action-primary/5 shadow-sm'
-                        : 'border-border-default bg-bg-primary'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <input
-                          type="checkbox"
-                          checked={selectedUpdateTables.includes(table.id)}
-                          onChange={() => toggleUpdateTableSelection(table.id)}
-                          className="w-4 h-4 text-action-primary border-border-default rounded focus:ring-action-primary cursor-pointer"
-                        />
-                        <span className="font-bold text-sm text-text-primary">{table.name}</span>
-                      </div>
-
-                      {selectedUpdateTables.includes(table.id) ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-border-default">
-                          <div>
-                            <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Seating</label>
-
-                            {/* Desktop */}
-                            <input
-                              type="number"
-                              min="1"
-                              value={bulkUpdateData[table.id]?.table_type ?? table.table_type ?? ""}
-                              onChange={e => {
-                                const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
-                                handleBulkUpdateChange(table.id, "table_type", value);
-                              }}
-                              placeholder={bulkUpdateGlobal.table_type ? `Global: ${bulkUpdateGlobal.table_type}` : "Seating"}
-                              className="hidden sm:block w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
-                            />
-
-                            {/* Mobile with +/- buttons */}
-                            <div className="sm:hidden flex items-center border border-border-default rounded-lg overflow-hidden bg-bg-primary">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const current = Number(bulkUpdateData[table.id]?.table_type ?? table.table_type) || 1;
-                                  const value = Math.max(1, current - 1);
-                                  handleBulkUpdateChange(table.id, "table_type", value);
-                                }}
-                                className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
-                              >
-                                −
-                              </button>
-                              <input
-                                type="number"
-                                min="1"
-                                value={bulkUpdateData[table.id]?.table_type ?? table.table_type ?? ""}
-                                onChange={e => {
-                                  const value = e.target.value ? Math.max(1, Number(e.target.value)) : "";
-                                  handleBulkUpdateChange(table.id, "table_type", value);
-                                }}
-                                placeholder={bulkUpdateGlobal.table_type ? `${bulkUpdateGlobal.table_type}` : ""}
-                                className="flex-1 text-center py-1.5 border-x border-border-default focus:outline-none text-sm bg-transparent text-text-primary"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const current = Number(bulkUpdateData[table.id]?.table_type ?? table.table_type) || 0;
-                                  handleBulkUpdateChange(table.id, "table_type", current + 1);
-                                }}
-                                className="px-3 py-1.5 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Status</label>
-                            <select
-                              value={bulkUpdateData[table.id]?.status ?? table.status}
-                              onChange={e => handleBulkUpdateChange(table.id, 'status', e.target.value)}
-                              className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
-                            >
-                              {statusOptions.length > 0
-                                ? statusOptions.map(s => (
-                                  <option key={s} value={s}>{s}</option>
-                                ))
-                                : (
-                                  <>
-                                    <option value="Vacant">Vacant</option>
-                                    <option value="Reserved">Reserved</option>
-                                  </>
-                                )
-                              }
-                            </select>
-                          </div>
-                          <div className="">
-                            <label className="block text-xs font-semibold mb-1.5 text-text-secondary">Section & Zone :</label>
-                            <select
-                              value={bulkUpdateData[table.id]?.config_id ?? table.config_id ?? ""}
-                              className="w-full px-3 py-1.5 border border-border-default rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-action-primary focus:border-transparent bg-bg-primary text-text-primary"
-                              onChange={e =>
-                                handleBulkUpdateChange(
-                                  table.id,
-                                  "config_id",
-                                  Number(e.target.value)
-                                )
-                              }
-                            >
-                              <option value="">No change</option>
-
-                              {configs.map(c => (
-                                <option key={c.id} value={c.id}>
-                                  {c.section} - {c.zone}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                        </div>
-                      ) : (
-                        <div className="pt-2 border-t border-border-default">
-                          <div className="grid grid-cols-4 gap-2 text-xs">
-                            <div>
-                              <span className="text-text-secondary">Seating:</span>
-                              <span className="ml-1 text-text-primary font-semibold">{table.table_type}</span>
-                            </div>
-                            <div>
-                              <span className="text-text-secondary">Status:</span>
-                              <span className="ml-1 text-text-primary font-semibold">{table.status}</span>
-                            </div>
-                            <div>
-                              <span className="text-text-secondary">Section & Zone :</span>
-                              <span className="ml-1 text-text-primary font-semibold">
-                                {config ? `${config.section} - ${config.zone}` : "-"}
-                              </span>
-                            </div>
-                            {/* <div>
-                              <span className="text-text-secondary">Zone:</span>
-                              <span className="ml-1 text-text-primary font-semibold">{config?.zone || "-"}</span>
-                            </div> */}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-t border-border-default flex flex-col sm:flex-row gap-2 justify-end flex-shrink-0">
-            <button
-              className="px-6 py-2 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-bg-secondary font-semibold text-sm transition-colors"
-              onClick={handleClose}
-            >
-              Cancel
+              Close
             </button>
             <button
-              className="px-6 py-2 rounded-lg bg-action-primary text-text-white hover:bg-action-primary/90 font-semibold text-sm transition-colors disabled:bg-bg-secondary disabled:cursor-not-allowed shadow-lg"
-              onClick={saveBulkUpdate}
-              disabled={selectedUpdateTables.length === 0}
+              onClick={handleBulkUpdate}
+              disabled={selectedRows.length === 0}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-buttons-update hover:bg-buttonsHover-update text-gray-900 font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
             >
-              Update ({selectedUpdateTables.length})
+              <Edit className="w-4 h-4" />
+              Update Selected ({selectedRows.length})
             </button>
           </div>
         </div>
       </div>
+
+      {/* Global Add-on popup */}
+      <AddonSelectionPopup
+        isOpen={showGlobalAddonPopup}
+        onClose={() => setShowGlobalAddonPopup(false)}
+        selectedAddons={globalAddons}
+        onSave={handleGlobalAddonSave}
+        addonSubcategories={addonSubcategories || []}
+        allAddonItems={allAddonItems || []}
+        currentItemId={null}
+      />
+{/* Bulk Delete Confirmation */}
+{showDeleteConfirm && (
+  <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-3 sm:p-4">
+    <div className="bg-bg-primary w-full max-w-md max-h-[calc(100dvh-1.5rem)] rounded-xl shadow-2xl border border-border-default flex flex-col overflow-hidden">
+
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 py-4 bg-red-50 border-b border-red-200 shrink-0">
+        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+          <Trash2 className="w-5 h-5 text-red-600" />
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-base font-bold text-red-900">Delete selected items?</h3>
+          <p className="text-xs text-red-700">This action cannot be undone</p>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="px-5 py-4 overflow-y-auto">
+        <p className="text-sm text-text-secondary mb-3">
+          You are about to permanently delete{" "}
+          <strong className="text-red-600 text-base">{selectedRows.length}</strong>{" "}
+          item{selectedRows.length !== 1 ? "s" : ""}, including all of their zone prices.
+          They will also be removed from any item that uses them as an add-on.
+        </p>
+
+        <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 rounded-lg bg-bg-tertiary border border-border-default">
+          {filteredItems
+            .filter(i => selectedRows.includes(i.id))
+            .map(i => (
+              <span
+                key={i.id}
+                className="px-2.5 py-1 rounded-full bg-red-100 text-red-700 border border-red-200 text-xs font-semibold"
+              >
+                {i.name}
+              </span>
+            ))}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="px-5 py-3 bg-bg-tertiary border-t border-border-default flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
+        <button
+          onClick={() => setShowDeleteConfirm(false)}
+          disabled={isDeleting}
+          className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-bg-secondary font-semibold text-sm transition-colors disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={confirmBulkDeleteAction}
+          disabled={isDeleting}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-sm shadow-md transition-colors disabled:bg-red-300 disabled:cursor-not-allowed"
+        >
+          {isDeleting ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              Deleting...
+            </>
+          ) : (
+            <>
+              <Trash2 className="w-4 h-4" />
+              Yes, Delete {selectedRows.length}
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+      {/* Per-item Add-on popup */}
+      {currentEditingItemId && (
+        <AddonSelectionPopup
+          isOpen={showItemAddonPopup}
+          onClose={() => {
+            setShowItemAddonPopup(false);
+            setCurrentEditingItemId(null);
+          }}
+          selectedAddons={
+            bulkEditData[currentEditingItemId]?.line_item_id ||
+            filteredItems.find(i => i.id === currentEditingItemId)?.line_item_id || []
+          }
+          onSave={(selectedAddons) => {
+            updateBulkEditData(currentEditingItemId, 'line_item_id', selectedAddons);
+            setShowItemAddonPopup(false);
+            setCurrentEditingItemId(null);
+          }}
+          addonSubcategories={addonSubcategories || []}
+          allAddonItems={allAddonItems || []}
+          currentItemId={currentEditingItemId}
+        />
+      )}
+    </>
+  );
+}
+
+  // Render Table Bulk Update Modal
+if (modalType === 'table') {
+  const filteredTables = getFilteredUpdateTables();
+  const allSelected =
+    selectedUpdateTables.length === filteredTables.length && filteredTables.length > 0;
+
+  const inputBase =
+    "w-full px-3 py-2 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary " +
+    "focus:outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-500 transition";
+  const labelBase =
+    "block text-[11px] font-semibold uppercase tracking-wide mb-1 text-text-secondary";
+
+  const statusBadge = (status) => {
+    const s = (status || "").toLowerCase();
+    if (s === "vacant" || s === "available") return "bg-green-100 text-green-700 border-green-200";
+    if (s === "occupied") return "bg-red-100 text-red-700 border-red-200";
+    if (s === "reserved") return "bg-blue-100 text-blue-700 border-blue-200";
+    return "bg-gray-100 text-gray-600 border-gray-200";
+  };
+
+  const StatusOptions = () =>
+    statusOptions.length > 0 ? (
+      statusOptions.map(s => <option key={s} value={s}>{s}</option>)
+    ) : (
+      <>
+        <option value="Vacant">Vacant</option>
+        <option value="Reserved">Reserved</option>
+      </>
     );
-  }
+
+  // Reusable +/- stepper (works on all screen sizes)
+  const Stepper = ({ value, onChange, placeholder }) => (
+    <div className="flex items-stretch border border-border-default rounded-lg overflow-hidden bg-bg-primary focus-within:ring-2 focus-within:ring-amber-400/60 focus-within:border-amber-500 transition">
+      <button
+        type="button"
+        onClick={() => {
+          const cur = Number(value) || 0;
+          onChange(cur > 1 ? cur - 1 : "");
+        }}
+        className="px-3 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
+        aria-label="Decrease"
+      >
+        −
+      </button>
+      <input
+        type="number"
+        min="1"
+        value={value}
+        onChange={e => onChange(e.target.value ? Math.max(1, Number(e.target.value)) : "")}
+        placeholder={placeholder}
+        className="flex-1 min-w-0 text-center py-2 border-x border-border-default focus:outline-none text-sm bg-transparent text-text-primary"
+      />
+      <button
+        type="button"
+        onClick={() => onChange((Number(value) || 0) + 1)}
+        className="px-3 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
+        aria-label="Increase"
+      >
+        +
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
+  <div className="bg-bg-primary w-full sm:max-w-3xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[92vh] h-full rounded-md shadow-2xl flex flex-col overflow-hidden border border-border-default">
+        {/* HEADER */}
+        <div className="flex items-center justify-between gap-4 px-8 sm:px-6 py-4 bg-buttons-update text-text-primary shrink-0">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold leading-tight truncate">Bulk Update Tables</h2>
+              <p className="text-xs text-text-white truncate">Changes apply to all selected tables</p>
+            </div>
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-1.5 rounded-lg bg-text-white hover:bg-white/50 transition-colors shrink-0"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* GLOBAL APPLY */}
+        <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-b border-border-default shrink-0">
+          <p className="text-xs font-semibold text-text-secondary mb-2">Apply to all selected</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className={labelBase}>Seating</label>
+              <Stepper
+                value={bulkUpdateGlobal.table_type}
+                placeholder="No change"
+                onChange={v => setBulkUpdateGlobal(prev => ({ ...prev, table_type: v }))}
+              />
+            </div>
+
+            <div>
+              <label className={labelBase}>Status</label>
+              <select
+                value={bulkUpdateGlobal.status}
+                onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
+                className={inputBase}
+              >
+                <option value="">No change</option>
+                <StatusOptions />
+              </select>
+            </div>
+
+            <div>
+              <label className={labelBase}>Section & Zone</label>
+              <select
+                value={bulkUpdateGlobal.config_id || ""}
+                className={inputBase}
+                onChange={e => {
+                  const value = Number(e.target.value);
+                  setBulkUpdateGlobal(prev => ({ ...prev, config_id: value }));
+                  selectedUpdateTables.forEach(id =>
+                    handleBulkUpdateChange(id, "config_id", value)
+                  );
+                }}
+              >
+                <option value="">No change</option>
+                {configs.map(c => (
+                  <option key={c.id} value={c.id}>{c.section} - {c.zone}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* SEARCH + SELECT ALL */}
+        <div className="px-4 sm:px-6 py-3 border-b border-border-default bg-bg-primary shrink-0 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+            <input
+              type="text"
+              placeholder="Search tables..."
+              value={bulkUpdateSearch}
+              onChange={e => setBulkUpdateSearch(e.target.value)}
+              className={`${inputBase} pl-9`}
+            />
+          </div>
+
+          <label className="flex items-center justify-between sm:justify-end gap-3 cursor-pointer select-none">
+            <span className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={selectAllUpdateTables}
+                className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+              />
+              <span className="text-sm font-semibold text-text-primary">Select All</span>
+            </span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+              {selectedUpdateTables.length} / {filteredTables.length}
+            </span>
+          </label>
+        </div>
+
+        {/* TABLE LIST */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 bg-bg-primary">
+          {filteredTables.length === 0 ? (
+            <div className="text-center py-16">
+              <Search className="w-12 h-12 text-text-secondary mx-auto mb-3 opacity-30" />
+              <p className="text-text-secondary font-medium">No tables found</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {filteredTables.map(table => {
+                const isSelected = selectedUpdateTables.includes(table.id);
+                const config = configs.find(c => c.id === table.config_id);
+
+                return (
+                  <div
+                    key={table.id}
+                    className={`rounded-xl border-2 overflow-hidden transition-all ${
+                      isSelected
+                        ? "border-amber-400 bg-amber-50/40 shadow-sm"
+                        : "border-border-default bg-bg-primary hover:border-amber-200"
+                    }`}
+                  >
+                    {/* Card header */}
+                    <label className="flex items-center gap-3 px-3 py-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleUpdateTableSelection(table.id)}
+                        className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                      />
+                      <span className="font-bold text-sm text-text-primary flex-1 truncate">
+                        {table.name}
+                      </span>
+                      <span className={`text-[11px] font-semibold capitalize px-2 py-0.5 rounded-full border ${statusBadge(table.status)}`}>
+                        {table.status}
+                      </span>
+                    </label>
+
+                    {isSelected ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-3 pb-3 pt-3 border-t border-amber-200">
+                        <div>
+                          <label className={labelBase}>Seating</label>
+                          <Stepper
+                            value={bulkUpdateData[table.id]?.table_type ?? table.table_type ?? ""}
+                            placeholder={bulkUpdateGlobal.table_type ? `Global: ${bulkUpdateGlobal.table_type}` : "Seating"}
+                            onChange={v => handleBulkUpdateChange(table.id, "table_type", v)}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={labelBase}>Status</label>
+                          <select
+                            value={bulkUpdateData[table.id]?.status ?? table.status}
+                            onChange={e => handleBulkUpdateChange(table.id, "status", e.target.value)}
+                            className={inputBase}
+                          >
+                            <StatusOptions />
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={labelBase}>Section & Zone</label>
+                          <select
+                            value={bulkUpdateData[table.id]?.config_id ?? table.config_id ?? ""}
+                            onChange={e =>
+                              handleBulkUpdateChange(table.id, "config_id", Number(e.target.value))
+                            }
+                            className={inputBase}
+                          >
+                            <option value="">No change</option>
+                            {configs.map(c => (
+                              <option key={c.id} value={c.id}>{c.section} - {c.zone}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-1 px-3 pb-3 pt-2 border-t border-border-default text-xs">
+                        <div>
+                          <span className="text-text-secondary">Seats: </span>
+                          <span className="font-semibold text-text-primary">{table.table_type}</span>
+                        </div>
+                        <div className="col-span-2 sm:col-span-2 truncate">
+                          <span className="text-text-secondary">Section & Zone: </span>
+                          <span className="font-semibold text-text-primary">
+                            {config ? `${config.section} - ${config.zone}` : "-"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* FOOTER */}
+        <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-t border-border-default shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <button
+            onClick={handleClose}
+            className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-slate-100 font-semibold text-sm transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={saveBulkUpdate}
+            disabled={selectedUpdateTables.length === 0}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-buttons-update hover:bg-buttonsHover-update text-text-white font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+          >
+            <Edit className="w-4 h-4" />
+            Update ({selectedUpdateTables.length})
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
   return null;
 };

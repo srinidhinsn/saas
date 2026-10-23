@@ -228,9 +228,10 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
   const transactionType = isServed ? 'WASTAGE' : 'ITEM_CANCELLED';
   const reasonList = isServed ? WASTAGE_REASONS : CANCELLATION_REASONS;
   const typeLabel = isServed ? 'Wastage' : 'Cancellation';
-  const typeColor = isServed ? 'text-red-600' : 'text-orange-600';
-  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200';
-  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600';
+  const typeColor = isServed ? 'text-red-600' : 'text-red-600';
+  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-red-50 border-red-200';
+  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700';
+
 
   useEffect(() => {
     if (isOpen) {
@@ -310,7 +311,7 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
                     ${reason === r
                       ? isServed
                         ? 'bg-red-600 text-white border-red-600'
-                        : 'bg-orange-500 text-white border-orange-500'
+                        : 'bg-red-600 text-white border-red-600'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
                 >
                   {r}
@@ -551,7 +552,7 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
 // TablePaymentConfirmModal
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const TablePaymentConfirmModal = ({ isOpen, orderId, onClose, onConfirm }) => {
+export const TablePaymentConfirmModal = ({ isOpen, orderId,displayId, onClose, onConfirm }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -562,7 +563,7 @@ export const TablePaymentConfirmModal = ({ isOpen, orderId, onClose, onConfirm }
         </div>
         <div className="px-6 py-5">
           <p className="text-sm text-gray-600">
-            Mark order <span className="font-semibold">#{orderId}</span> as paid and free the table?
+            Mark order <span className="font-semibold">#{displayId ?? orderId}</span> as paid and free the table?
           </p>
         </div>
         <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
@@ -977,10 +978,10 @@ export const TableReservation = ({
 
   const getOrderStatusStyle = (status) => {
     const map = {
-      pending: 'bg-orange-100 text-orange-700',
-      preparing: 'bg-blue-100 text-blue-700',
-      ready: 'bg-green-100 text-green-700',
-      served: 'bg-purple-100 text-purple-700',
+      pending: 'bg-status-pending text-text-white',
+      preparing: 'bg-status-preparing text-text-white',
+      ready: 'bg-status-ready text-text-white',
+      served: 'bg-status-served text-text-white',
       cancelled: 'bg-gray-100 text-gray-500',
     };
     return map[status] || 'bg-gray-100 text-gray-700';
@@ -1059,7 +1060,7 @@ export const TableReservation = ({
               onClick={onSelectTakeaway}
               className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
                 ${orderMode === 'takeaway'
-                  ? 'bg-orange-500 text-white shadow'
+                  ? 'bg-action-primary text-white shadow'
                   : 'text-gray-600 hover:bg-gray-100'}`}
             >
               <Package size={12} /> Takeaway
@@ -1260,17 +1261,20 @@ export const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeaway
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
 
-        const todayTakeaway = all.filter(o => {
-          if (!takeawayTableIds.includes(String(o.table_id))) return false;
-          if (o.status?.toLowerCase() === 'completed') return false;
-          if (o.status?.toLowerCase() === 'draft') return false;
-          const created = new Date(
-            typeof o.created_at === 'string'
-              ? o.created_at.replace(' ', 'T').split('.')[0] + 'Z'
-              : o.created_at
-          );
-          return created >= todayStart;
-        }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        const takeawayOnly = all.filter(o =>
+          takeawayTableIds.includes(String(o.table_id)) &&
+          !['completed', 'draft'].includes(o.status?.toLowerCase())
+        );
+        
+        const latestDay = takeawayOnly
+          .map(o => o.business_day_start)
+          .filter(Boolean)
+          .sort()
+          .pop();
+        
+        const todayTakeaway = takeawayOnly
+          .filter(o => !latestDay || o.business_day_start === latestDay)
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
         setOrders(todayTakeaway);
       } catch (err) {
@@ -1363,7 +1367,7 @@ export const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeaway
         <div className="px-4 py-3 border-t bg-gray-50 rounded-b-xl">
           <button
             onClick={() => { onSelectOrder(null); onClose(); }}
-            className="w-full py-2.5 rounded-lg border-2 border-dashed border-orange-300 text-orange-600 text-sm font-semibold hover:bg-orange-50 transition"
+            className="w-full py-2.5 rounded-lg border-2 border-dashed border-action-primary text-action-primary text-sm font-semibold hover:bg-action-primary/10 transition"
           >
             + Start a new takeaway order
           </button>
@@ -1379,7 +1383,7 @@ export const StockConfirmModal = ({ pending, onCancel, onConfirmed }) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className="rounded-xl w-full max-w-sm bg-white shadow-xl">
         <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-red-600">Stock Alert</h2>
+          <h2 className="text-lg font-bold text-action-primary">Stock Alert</h2>
           <button onClick={onCancel} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
         </div>
         <div className="px-6 py-5">
@@ -1388,7 +1392,7 @@ export const StockConfirmModal = ({ pending, onCancel, onConfirmed }) => {
         </div>
         <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
           <button onClick={onCancel} className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Cancel</button>
-          <button onClick={onConfirmed} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-red-600 hover:bg-red-700 text-white">Proceed</button>
+          <button onClick={onConfirmed} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-action-primary hover:bg-action-primary/90 text-white">Proceed</button>
         </div>
       </div>
     </div>
