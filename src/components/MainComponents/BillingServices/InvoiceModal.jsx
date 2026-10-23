@@ -680,7 +680,7 @@ const handleConfirmPayment = async () => {
               <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mr-10">
                 <div className="text-text-white">
                   <div className="text-sm font-medium">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
-                  <div className="text-xs text-text-white/80">Order #{selectedOrder.id}</div>
+                  <div className="text-xs text-text-white/80">Order #{selectedOrder.dinein_order_id ?? selectedOrder.id}</div>
                 </div>
                 <div className="text-text-white">
                   <div className="text-sm font-medium">{new Date().toLocaleDateString()}</div>

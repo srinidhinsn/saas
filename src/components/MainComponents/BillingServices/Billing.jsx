@@ -129,7 +129,8 @@ export default function BillingPage({ clientId, token }) {
       filtered = filtered.filter(order => {
         const tableName = (tablesMap[order.table_id]?.name || '').toLowerCase();
         const orderId = order.id.toString();
-        return tableName.includes(query) || orderId.includes(query);
+        const displayId = (order.dinein_order_id ?? order.id).toString();
+        return tableName.includes(query) || orderId.includes(query) || displayId.includes(query);
       });
     }
 
@@ -359,8 +360,9 @@ const handleItemRemoveAll = async (transactionType, reason) => {
   const billingColumnDefs = [
     {
       headerName: 'Order ID',
-      field: 'id',
+      field: 'dinein_order_id',
       minWidth: 120,
+      valueGetter: (params) => params.data?.dinein_order_id ?? params.data?.id,
       cellRenderer: (params) => (
         <div className="text-sm font-semibold text-text-primary">#{params.value}</div>
       ),
