@@ -7,10 +7,9 @@ import UniversalBulkUpdateModal from "../../utils/Modals/UniversalBulkUpdateModa
 import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModal";
 import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
 import TableConfigModal from "../../utils/Modals/TableConfigModal";
-import { menuCache } from '../../utils/Menu-utils/menuCache'; 
-import { IoSettingsOutline } from "react-icons/io5";
+import { menuCache } from '../../utils/Menu-utils/menuCache';
 
-const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
+const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
 
     const [searchTerm, setSearchTerm] = useState("");
     const [tableRanges, setTableRanges] = useState([]);
@@ -25,6 +24,7 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [loading, setLoading] = useState(true);
     const generatingRef = useRef(false);
+    const [statusFilter, setStatusFilter] = useState("all");
 
     const [requiredScreenId, setRequiredScreenId] = useState(null);
 
@@ -171,23 +171,23 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
             setConfigs(freshConfigs);
             setRequiredScreenId(result.screen_id);
 
-            
-                const tableList = Array.isArray(result?.data) ? result.data : [];
-                const enrichedTables = tableList.map(t => {
-                    const matchedConfig = freshConfigs.find(
-                        c =>
-                            c.section?.trim().toLowerCase() === t.section?.trim().toLowerCase() &&
-                            c.zone?.trim().toLowerCase() === t.location_zone?.trim().toLowerCase()
-                    );
 
-                    return {
-                        ...t,
-                        config_id: matchedConfig?.id || null
-                    };
-                });
+            const tableList = Array.isArray(result?.data) ? result.data : [];
+            const enrichedTables = tableList.map(t => {
+                const matchedConfig = freshConfigs.find(
+                    c =>
+                        c.section?.trim().toLowerCase() === t.section?.trim().toLowerCase() &&
+                        c.zone?.trim().toLowerCase() === t.location_zone?.trim().toLowerCase()
+                );
 
-                setTables(enrichedTables);
-                setOriginalTables(structuredClone(enrichedTables));
+                return {
+                    ...t,
+                    config_id: matchedConfig?.id || null
+                };
+            });
+
+            setTables(enrichedTables);
+            setOriginalTables(structuredClone(enrichedTables));
 
         } catch (error) {
             console.error("Error fetching tables:", error);
@@ -196,8 +196,8 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
         }
     };
     const fetchConfigs = async () => {
-     const { sections } = await menuCache.fetchTablesConfig(clientId, token);
-     setConfigs(sections);
+        const { sections } = await menuCache.fetchTablesConfig(clientId, token);
+        setConfigs(sections);
     };
     const fetchMasterValues = async (categoryId, setter) => {
         try {
@@ -257,9 +257,9 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
         setIsGenerating(true);
         try {
             // Force a fresh fetch before generating so new configs are always picked up
-          menuCache.remove('zoneConfig', clientId);
-          const { sections: freshConfigs } = await menuCache.fetchTablesConfig(clientId, token);
-          setConfigs(freshConfigs);
+            menuCache.remove('zoneConfig', clientId);
+            const { sections: freshConfigs } = await menuCache.fetchTablesConfig(clientId, token);
+            setConfigs(freshConfigs);
             for (let row of tableRanges) {
                 if (!row.range || !row.config_id || !row.table_type) {
                     generatingRef.current = false;
@@ -282,7 +282,7 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
                     }
                     const config = freshConfigs.find(c => Number(c.id) === Number(row?.config_id));
                     if (!config) {
-                        generatingRef.current= false;
+                        generatingRef.current = false;
                         setIsGenerating(false);
                         return;
                     }
@@ -610,11 +610,49 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
             table.name.toLowerCase().includes(bulkDeleteSearch.toLowerCase())
         );
     };
+    /* =====================================================================
+   REPLACE everything in TableManagement.jsx from the line
+       const searchedTables = tables.filter(t => {
+   down to the end of the file with the code below.
+
+   ALSO, in the top part of the file:
+     1. add this state next to your other useState lines:
+            const [statusFilter, setStatusFilter] = useState("all");
+     2. FaUsers is already imported; FaCheck / FaClock are no longer needed.
+
+   No CSS file is needed – everything uses tailwind.config.js tokens.
+   ===================================================================== */
+
+    // Full class strings (not built dynamically) so Tailwind keeps them.
+    const STATE = {
+        vacant: { label: "Vacant", bar: "border-t-state-vacant", chip: "bg-state-vacant-bg text-state-vacant" },
+        occupied: { label: "Occupied", bar: "border-t-state-occupied", chip: "bg-state-occupied-bg text-state-occupied" },
+        reserved: { label: "Reserved", bar: "border-t-state-reserved", chip: "bg-state-reserved-bg text-state-reserved" },
+        other: { label: "Other", bar: "border-t-state-other", chip: "bg-state-other-bg text-state-other" },
+    };
+    const norm = (s) => {
+        const v = (s || "").toLowerCase().trim();
+        return v === "available" ? "vacant" : v;
+    };
+    const isKnown = (t) => ["vacant", "occupied", "reserved"].includes(norm(t.status));
+    const stateOf = (t) => (isKnown(t) ? STATE[norm(t.status)] : { ...STATE.other, label: t.status || "Unknown" });
+
+    const counts = {
+        total: tables.length,
+        vacant: tables.filter(t => norm(t.status) === "vacant").length,
+        occupied: tables.filter(t => norm(t.status) === "occupied").length,
+        reserved: tables.filter(t => norm(t.status) === "reserved").length,
+        other: tables.filter(t => !isKnown(t)).length,
+    };
+    const totalSeats = tables.reduce((n, t) => n + (Number(t.table_type) || 0), 0);
+    const occupancyPct = counts.total ? (100 * counts.occupied) / counts.total : 0;
+
     const searchedTables = tables.filter(t => {
+        if (statusFilter !== "all") {
+            if (statusFilter === "other" ? isKnown(t) : norm(t.status) !== statusFilter) return false;
+        }
         if (!searchTerm.trim()) return true;
-
         const text = searchTerm.toLowerCase();
-
         return (
             t.name?.toLowerCase().includes(text) ||
             t.section?.toLowerCase().includes(text) ||
@@ -625,424 +663,385 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm}) => {
 
     const filteredTables = getSortedTables(searchedTables, colsPerRow);
 
+    const groupedBySection = filteredTables.reduce((acc, table) => {
+        const config = configs.find(c => Number(c.id) === Number(table?.config_id));
+        const sectionKey = config?.section?.toUpperCase() || table.section?.toUpperCase() || "Unassigned";
+        const zoneKey = config?.zone?.toUpperCase() || table.location_zone?.toUpperCase() || "Unassigned";
+        if (!acc[sectionKey]) acc[sectionKey] = {};
+        if (!acc[sectionKey][zoneKey]) acc[sectionKey][zoneKey] = [];
+        acc[sectionKey][zoneKey].push(table);
+        return acc;
+    }, {});
+    const sectionEntries = Object.entries(groupedBySection);
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="min-h-screen bg-canvas font-sans grid place-items-center text-brand-dark">
                 <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-orange-500 mx-auto mb-4"></div>
-                    <p className="text-gray-600 text-lg font-medium">Loading Tables...</p>
+                    <div className="h-11 w-11 mx-auto mb-3 rounded-full border-4 border-brand-soft border-t-brand animate-spin-slow" />
+                    <p className="text-ui-sm font-semibold">Loading tables…</p>
                 </div>
             </div>
         );
     }
 
+    const filterOptions = [
+        ["all", "All", counts.total],
+        ["vacant", "Vacant", counts.vacant],
+        ["occupied", "Occupied", counts.occupied],
+        ...(counts.other ? [["other", "Other", counts.other]] : []),
+    ];
+
     return (
-            <div className="min-h-screen bg-bg-primary">
-                <style>
-                    {`
-          @keyframes scale-in {
-            from {
-              opacity: 0;
-              transform: scale(0.9);
-            }
-            to {
-              opacity: 1;
-              transform: scale(1);
-            }
-          }
-          .animate-scale-in {
-            animation: scale-in 0.2s ease-out;
-          }
-        `}
-                </style>
-                <main className="mx-auto px-3 py-2">
-                    {/* Controls */}
-                    <div className="rounded-xl p-2 mb-4">
-                        <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
-                            <div className="flex flex-col sm:flex-row gap-2 flex-1">
-                                <div className="relative w-full sm:max-w-xs">
-                                    <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
-                                    <input
-                                        type="text"
-                                        value={searchTerm}
-                                        onChange={e => setSearchTerm(e.target.value)}
-                                        placeholder="Search table / section / zone / status..."
-                                        className="w-full pl-10 pr-3 py-2 border border-border-default rounded-lg focus:outline-none focus:border-action-primary bg-bg-primary text-text-primary"
-                                    />
-                                </div>
-                            </div>
+        <div className="ui-page">
 
+            {/* Toolbar */}
+            <section className="ui-panel">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+                        <div className="relative w-full sm:max-w-xs">
+                            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-ui text-ink-muted pointer-events-none" />
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                placeholder="Search table, section, zone or status"
+                                aria-label="Search tables"
+                                className="ui-input"
+                            />
+                        </div>
 
-                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:justify-center">
+                        <div className="ui-toggle" role="group" aria-label="Filter by status">
+                            {filterOptions.map(([key, label, n]) => (
                                 <button
-                                    className="flex items-center gap-2 px-4 py-2 bg-buttons-configure hover:bg-buttonsHover-configure text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
-                                    onClick={() => setShowConfig(true)}
+                                    key={key}
+                                    type="button"
+                                    aria-pressed={statusFilter === key}
+                                    onClick={() => setStatusFilter(key)}
+                                    className={`ui-toggle-btn ${statusFilter === key ? "ui-toggle-btn-active" : ""}`}
                                 >
-                                    <IoSettingsOutline />   Config
+                                    {label} ({n})
                                 </button>
-
-                                <button
-                                    className="flex items-center gap-2 px-4 py-2 bg-buttons-update hover:bg-buttonsHover-update text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
-                                    onClick={openBulkUpdate}
-                                >
-                                    <FaEdit />Bulk Update
-                                </button>
-
-                                <button
-                                    className="flex items-center gap-2 px-4 py-2 bg-buttons-delete hover:bg-buttonsHover-delete text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
-                                    onClick={openBulkDelete}
-                                >
-                                    <FaTrash />Bulk Delete
-                                </button>
-                                <button
-                                    className="flex items-center gap-2 px-4 py-2 bg-buttons-add hover:bg-buttonsHover-add text-text-white rounded-lg transition-colors font-semibold text-sm shadow-md"
-                                    onClick={() => {
-                                        setShowAddTable(true);
-                                        setTableRanges([{
-                                            range: "",
-                                            table_type: "",
-                                            section: "",
-                                            location_zone: "",
-                                            remark: "vacant",
-                                            is_active: false,
-                                            description: "",
-                                            slug: "",
-                                            sort_order: "",
-                                            qr_code_url: ""
-                                        }]);
-
-                                        setFieldErrors([{}]);
-                                    }}
-                                >
-                                    <FaPlus /> Add Table
-                                </button>
-                            </div>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Table Grid */}
-                    {/* Table Grid - grouped by section */}
-                    {(() => {
-                        // Group filtered tables by section
-                        const groupedBySection = filteredTables.reduce((acc, table) => {
-                            const config = configs.find(c => Number(c.id) === Number(table?.config_id));
-                            const sectionKey = config?.section?.toUpperCase() || table.section?.toUpperCase() || "Unassigned";
-                            const zoneKey = config?.zone?.toUpperCase() || table.location_zone?.toUpperCase() || "Unassigned";
-                        
-                            if (!acc[sectionKey]) acc[sectionKey] = {};
-                            if (!acc[sectionKey][zoneKey]) acc[sectionKey][zoneKey] = [];
-                            acc[sectionKey][zoneKey].push(table);
-                            return acc;
-                        }, {});
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            className="ui-btn ui-btn-config"
+                            onClick={() => setShowConfig(true)}
+                        >
+                            <FaEdit /> <span className="hidden md:inline">Config</span>
+                        </button>
 
-                        const sectionEntries = Object.entries(groupedBySection);
+                        <button
+                            className="ui-btn ui-btn-update"
+                            onClick={openBulkUpdate}
+                        >
+                            <FaEdit /> <span className="hidden md:inline">Bulk update</span>
+                        </button>
 
-                        if (sectionEntries.length === 0) {
-                            return (
-                                <div className="bg-bg-primary rounded-xl shadow-sm p-12 text-center border border-border-default">
-                                    <div className="text-text-secondary mb-3">
-                                        <FaSearch className="text-5xl mx-auto" />
+                        <button
+                            className="ui-btn ui-btn-delete"
+                            onClick={openBulkDelete}
+                        >
+                            <FaTrash /> <span className="hidden md:inline">Bulk delete</span>
+                        </button>
+
+                        <button
+                            className="ui-btn ui-btn-add"
+                            onClick={() => {
+                                setShowAddTable(true);
+                                setTableRanges([{
+                                    range: "",
+                                    table_type: "",
+                                    section: "",
+                                    location_zone: "",
+                                    remark: "vacant",
+                                    is_active: false,
+                                    description: "",
+                                    slug: "",
+                                    sort_order: "",
+                                    qr_code_url: ""
+                                }]);
+                                setFieldErrors([{}]);
+                            }}
+                        >
+                            <FaPlus /> <span className="hidden md:inline">Add table</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            {/* Sections → zones → table cards */}
+            {sectionEntries.length === 0 ? (
+                <section className="ui-panel text-center py-10">
+                    <FaSearch className="mx-auto mb-2.5 text-heading-sm text-brand-soft" />
+                    <strong className="block text-body-sm text-ink-soft mb-1">No tables found</strong>
+                    <p className="text-ui text-ink-muted">Change the search or status filter, or add a new table.</p>
+                </section>
+            ) : (
+                sectionEntries.map(([sectionName, zoneGroups]) => {
+                    const all = Object.values(zoneGroups).flat();
+                    const vac = all.filter(t => norm(t.status) === "vacant").length;
+                    const occ = all.filter(t => norm(t.status) === "occupied").length;
+                    return (
+                        <section className="ui-panel" key={sectionName}>
+                            <div className="flex items-center gap-2.5 pb-2.5 mb-3 border-b border-line-divider">
+                                <h3 className="text-panel-title text-brand-dark">{sectionName}</h3>
+                                <span className="text-micro font-bold px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line">
+                                    {all.length} table{all.length !== 1 ? "s" : ""}
+                                </span>
+                                <div className="ml-auto hidden sm:flex gap-2.5 text-ui-sm text-ink-muted">
+                                    <span><b className="text-ink-soft">{vac}</b> vacant</span>
+                                    <span><b className="text-ink-soft">{occ}</b> occupied</span>
+                                </div>
+                            </div>
+
+                            {Object.entries(zoneGroups).map(([zoneName, zoneTables]) => (
+                                <div className="mb-3.5 last:mb-0" key={zoneName}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <h4 className="text-ui font-bold text-ink-soft">{zoneName}</h4>
+                                        <span className="text-micro text-ink-muted">
+                                            {zoneTables.length} table{zoneTables.length !== 1 ? "s" : ""}
+                                        </span>
                                     </div>
-                                    <p className="text-text-secondary text-lg font-medium">No tables found</p>
-                                    <p className="text-text-secondary text-sm mt-1">Try adjusting your search or filter criteria</p>
-                                </div>
-                            );
-                        }
 
-                        return sectionEntries.map(([sectionName, zoneGroups]) => (
-                            <div key={sectionName} className="mb-8">
-                                {/* Section Header */}
-                                <div className="flex items-center gap-3 mb-3">
-                                    <h2 className="text-base font-bold text-text-primary uppercase tracking-wide">
-                                        {sectionName}
-                                    </h2>
-                                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-action-primary/10 text-action-primary border border-action-primary/20">
-                                        {Object.values(zoneGroups).flat().length} table{Object.values(zoneGroups).flat().length !== 1 ? 's' : ''}
-                                    </span>
-                                </div>
-                        
-                                {/* Zone Groups inside Section */}
-                                {Object.entries(zoneGroups).map(([zoneName, zoneTables]) => (
-                                    <div key={zoneName} className="mb-5 pl-3 border-l-2 border-action-primary/20">
-                                        {/* Zone Header */}
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wide">
-                                                {zoneName}
-                                            </h3>
-                                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
-                                                {zoneTables.length} table{zoneTables.length !== 1 ? 's' : ''}
-                                            </span>
-                                        </div>
-                        
-                                        {/* Tables Grid */}
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-6 2xl:grid-cols-8 gap-2 sm:gap-3">
-                                            {zoneTables.map(table => {
-                                                const config = configs.find(c => Number(c.id) === Number(table?.config_id));
-                                                return (
-                                                    <div
-                                                        key={table.id}
-                                                        className={`border-2 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition
-                                                            ${table.status === "vacant" ? "border-border-default" :
-                                                                table.status === "Occupied" ? "border-brand-800" :
-                                                                    "border-blue-400"}`}
-                                                    >
-                                                        {/* HEADER */}
-                                                        <div className="flex justify-between items-center px-3 py-2 text-sm font-bold bg-action-primary text-white">
-                                                            <span>{table.name}</span>
-                                                            <span className="capitalize font-semibold text-xs">{table.status}</span>
-                                                        </div>
-                        
-                                                        {/* BODY */}
-                                                        <div className="px-3 py-3 text-sm text-text-primary flex justify-between">
-                                                            <div>
-                                                                <div className="text-xs text-text-secondary mt-1">
-                                                                    <div className="font-medium">{config?.zone?.toUpperCase() || "-"}</div>
-                                                                    Seats: <span className="font-bold">{table.table_type}</span>
-                                                                </div>
-                                                            </div>
-                                                            <span className="text-[10px] font-semibold">
-                                                                {config?.section?.toUpperCase() || "-"}
-                                                            </span>
-                                                        </div>
-                        
-                                                        {/* FOOTER */}
-                                                        <div className="grid grid-cols-2 border-t text-xs font-semibold">
-                                                            <button
-                                                                onClick={() => {
-                                                                    const copy = structuredClone(table);
-                                                                    editRef.current = copy;
-                                                                    setEditTable(copy);
-                                                                    setEditRowId(copy.id);
-                                                                }}
-                                                                className="py-2 hover:bg-bg-tertiary transition"
-                                                            >
-                                                                EDIT
-                                                            </button>
-                                                            <button
-                                                                onClick={() => {
-                                                                    setDeleteTableId(table.id);
-                                                                    setShowConfirmDelete(true);
-                                                                }}
-                                                                className="py-2 text-action-danger hover:bg-red-50 transition border-l"
-                                                            >
-                                                                DELETE
-                                                            </button>
-                                                        </div>
+                                    <div className="grid grid-cols-[repeat(auto-fill,minmax(168px,1fr))] gap-tiles">
+                                        {zoneTables.map(table => {
+                                            const config = configs.find(c => Number(c.id) === Number(table?.config_id));
+                                            const st = stateOf(table);
+                                            return (
+                                                <div
+                                                    key={table.id}
+                                                    className={`flex flex-col overflow-hidden bg-surface border border-line border-t-bar ${st.bar} rounded-panel shadow-panel hover:shadow-panel-hover transition-shadow duration-fast`}
+                                                >
+                                                    <div className="flex items-center justify-between gap-2 px-3 pt-2.5 pb-1">
+                                                        <span className="text-body-sm font-bold text-brand-dark break-words">{table.name}</span>
+                                                        <span className={`ui-chip ${st.chip}`}>{st.label}</span>
                                                     </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ));
-                    })()}
 
-                    {/* Remove the old standalone empty state since it's handled inside the grouping above */}
+                                                    <div className="grid gap-0.5 px-3 pb-2.5 text-ui-sm text-ink-muted">
+                                                        <div className="flex items-center gap-1.5 text-ui text-ink-soft">
+                                                            <FaUsers className="text-brand text-ui-sm" />
+                                                            <b>{table.table_type}</b> seats
+                                                        </div>
+                                                        <div>Zone: <b className="font-semibold text-ink-soft">{config?.zone || table.location_zone || "—"}</b></div>
+                                                        <div>Section: <b className="font-semibold text-ink-soft">{config?.section || table.section || "—"}</b></div>
+                                                    </div>
 
-                    {filteredTables.length === 0 && (
-                        <div className="bg-bg-primary rounded-xl shadow-sm p-12 text-center border border-border-default">
-                            <div className="text-text-secondary mb-3">
-                                <FaSearch className="text-5xl mx-auto" />
-                            </div>
-                            <p className="text-text-secondary text-lg font-medium">No tables found</p>
-                            <p className="text-text-secondary text-sm mt-1">Try adjusting your search or filter criteria</p>
-                        </div>
-                    )}
-
-                    <UniversalAddModal
-                        showModal={showAddTable}
-                        setShowModal={setShowAddTable}
-                        modalType="table"
-                        zones={zones}
-                        sections={sections}
-                        clientId={clientId}
-                        token={token}
-                        // Table-specific props
-                        tableRanges={tableRanges}
-                        setTableRanges={setTableRanges}
-                        fieldErrors={fieldErrors}
-                        setFieldErrors={setFieldErrors}
-                        isGenerating={isGenerating}
-                        generateTables={generateTables}
-                    />
-                    <UniversalEditModal
-                        showModal={!!editTable}
-                        setShowModal={(show) => {
-                            if (!show) {
-                                setEditTable(null);
-                                setEditRowId(null);
-                                setEditFieldErrors({});
-                            }
-                        }}
-                        modalType="table"
-                        zones={zones}
-                        sections={sections}
-                        clientId={clientId}
-                        token={token}
-                        editRowId={editRowId}
-                        setEditRowId={setEditRowId}
-                        table={editTable}
-                        handleEditChange={handleEditChange}
-                        saveEdit={saveEdit}
-                        editFieldErrors={editFieldErrors}
-                    />
-
-                    <UniversalBulkUpdateModal
-                        showModal={showBulkUpdate}
-                        setShowModal={setShowBulkUpdate}
-                        modalType="table"
-                        zones={zones}
-                        sections={sections}
-                        clientId={clientId}
-                        token={token}
-                        // Table-specific props
-                        tables={tables}
-                        bulkUpdateSearch={bulkUpdateSearch}
-                        setBulkUpdateSearch={setBulkUpdateSearch}
-                        selectedUpdateTables={selectedUpdateTables}
-                        setSelectedUpdateTables={setSelectedUpdateTables}
-                        bulkUpdateData={bulkUpdateData}
-                        setBulkUpdateData={setBulkUpdateData}
-                        bulkUpdateGlobal={bulkUpdateGlobal}
-                        setBulkUpdateGlobal={setBulkUpdateGlobal}
-                        handleBulkUpdateChange={handleBulkUpdateChange}
-                        saveBulkUpdate={saveBulkUpdate}
-                        getFilteredUpdateTables={getFilteredUpdateTables}
-                    />
-
-                    <UniversalBulkDeleteModal
-                        showModal={showBulkDelete}
-                        setShowModal={setShowBulkDelete}
-                        modalType="table"
-                        tables={tables}
-                        bulkDeleteSearch={bulkDeleteSearch}
-                        setBulkDeleteSearch={setBulkDeleteSearch}
-                        selectedDeleteTables={selectedDeleteTables}
-                        setSelectedDeleteTables={setSelectedDeleteTables}
-                        showFirstDeleteConfirm={showFirstDeleteConfirm}
-                        setShowFirstDeleteConfirm={setShowFirstDeleteConfirm}
-                        showSecondDeleteConfirm={showSecondDeleteConfirm}
-                        setShowSecondDeleteConfirm={setShowSecondDeleteConfirm}
-                        confirmBulkDelete={confirmBulkDelete}
-                        getFilteredDeleteTables={getFilteredDeleteTables}
-                    />
-                    <TableConfigModal
-                        show={showConfig}
-                        onClose={() => setShowConfig(false)}
-                        clientId={clientId}
-                        token={token}
-                        refresh={() => { fetchConfigs(); }}
-                        realm={realm}
-                    />
-
-                    {/* First Delete Confirmation */}
-                    {showFirstDeleteConfirm && (
-                        <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4">
-                            <div className="bg-bg-primary rounded-xl w-full max-w-md shadow-2xl border-2 border-border-default animate-scale-in">
-                                <div className="p-6 text-center">
-                                    <h3 className="text-2xl font-bold text-text-primary mb-2">Confirm Deletion</h3>
-                                    <p className="text-text-secondary mb-3">
-                                        Delete <strong className="text-action-danger text-xl">{selectedDeleteTables.length}</strong> table(s)?
-                                    </p>
-                                    <div className="flex flex-wrap gap-2 justify-center mb-5 max-h-32 overflow-y-auto p-2 bg-bg-tertiary rounded-lg">
-                                        {tables.filter(t => selectedDeleteTables.includes(t.id)).map(t => (
-                                            <span key={t.id} className="px-2.5 py-1 bg-tableStatusBg-occupied text-action-danger rounded-full text-sm font-bold border border-red-300">
-                                                {t.name}
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <div className="flex gap-3">
-                                        <button
-                                            className="flex-1 bg-buttons-delete text-text-white py-2.5 rounded-lg hover:bg-buttonsHover-delete transition-colors font-bold shadow-md"
-                                            onClick={() => {
-                                                setShowFirstDeleteConfirm(false);
-                                                setShowSecondDeleteConfirm(true);
-                                            }}
-                                        >
-                                            Continue
-                                        </button>
-                                        <button
-                                            className="flex-1 bg-modalsUpdateBg-cancel text-text-primary py-2.5 rounded-lg hover:bg-bg-tertiary transition-colors font-bold"
-                                            onClick={() => setShowFirstDeleteConfirm(false)}
-                                        >
-                                            Cancel
-                                        </button>
+                                                    <div className="grid grid-cols-2 mt-auto border-t border-line-soft text-micro font-bold tracking-wide">
+                                                        <button
+                                                            className="py-2 bg-canvas/40 text-brand-dark hover:bg-brand-light transition-colors"
+                                                            onClick={() => {
+                                                                const copy = structuredClone(table);
+                                                                editRef.current = copy;
+                                                                setEditTable(copy);
+                                                                setEditRowId(copy.id);
+                                                            }}
+                                                        >
+                                                            EDIT
+                                                        </button>
+                                                        <button
+                                                            className="py-2 bg-canvas/40 text-state-occupied border-l border-line-soft hover:bg-state-occupied-bg transition-colors"
+                                                            onClick={() => {
+                                                                setDeleteTableId(table.id);
+                                                                setShowConfirmDelete(true);
+                                                            }}
+                                                        >
+                                                            DELETE
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    )}
+                            ))}
+                        </section>
+                    );
+                })
+            )}
 
-                    {/* Second Delete Confirmation */}
-                    {showSecondDeleteConfirm && (
-                        <div className="fixed inset-0 bg-color-modalsbg bg-opacity-70 z-50 flex items-center justify-center p-4">
-                            <div className="bg-bg-primary rounded-xl w-full max-w-md shadow-2xl border-default border-red-300 animate-scale-in">
-                                <div className="p-6 text-center">
-                                    <h3 className="text-2xl font-bold text-action-danger mb-3">Final Confirmation</h3>
-                                    <div className="bg-tableStatusBg-occupied border-2 border-red-300 rounded-lg p-3 mb-5">
-                                        <p className="text-gray-800 font-semibold text-base mb-1">
-                                            <span className="text-action-danger font-black text-lg">IRREVERSIBLE ACTION</span>
-                                        </p>
-                                        <p className="text-text-primary text-sm">
-                                            All selected tables will be permanently deleted
-                                        </p>
-                                    </div>
-                                    <div className="flex gap-3">
-                                        <button
-                                            className="flex-1 bg-buttons-delete text-text-white py-3 rounded-lg hover:bg-buttonsHover-delete  transition-colors font-bold shadow-lg flex items-center justify-center gap-2"
-                                            onClick={confirmBulkDelete}
-                                        >
-                                            <FaTrash /> Confirm Delete
-                                        </button>
-                                        <button
-                                            className="flex-1 bg-slate-300 text-text-primary py-3 rounded-lg hover:bg-bg-tertiary transition-colors font-bold"
-                                            onClick={() => {
-                                                setShowSecondDeleteConfirm(false);
-                                                setShowFirstDeleteConfirm(false);
-                                            }}
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+            {/* Existing modals (unchanged props) */}
+            <UniversalAddModal
+                showModal={showAddTable}
+                setShowModal={setShowAddTable}
+                modalType="table"
+                zones={zones}
+                sections={sections}
+                clientId={clientId}
+                token={token}
+                tableRanges={tableRanges}
+                setTableRanges={setTableRanges}
+                fieldErrors={fieldErrors}
+                setFieldErrors={setFieldErrors}
+                isGenerating={isGenerating}
+                generateTables={generateTables}
+            />
+            <UniversalEditModal
+                showModal={!!editTable}
+                setShowModal={(show) => {
+                    if (!show) {
+                        setEditTable(null);
+                        setEditRowId(null);
+                        setEditFieldErrors({});
+                    }
+                }}
+                modalType="table"
+                zones={zones}
+                sections={sections}
+                clientId={clientId}
+                token={token}
+                editRowId={editRowId}
+                setEditRowId={setEditRowId}
+                table={editTable}
+                handleEditChange={handleEditChange}
+                saveEdit={saveEdit}
+                editFieldErrors={editFieldErrors}
+            />
+            <UniversalBulkUpdateModal
+                showModal={showBulkUpdate}
+                setShowModal={setShowBulkUpdate}
+                modalType="table"
+                zones={zones}
+                sections={sections}
+                clientId={clientId}
+                token={token}
+                tables={tables}
+                bulkUpdateSearch={bulkUpdateSearch}
+                setBulkUpdateSearch={setBulkUpdateSearch}
+                selectedUpdateTables={selectedUpdateTables}
+                setSelectedUpdateTables={setSelectedUpdateTables}
+                bulkUpdateData={bulkUpdateData}
+                setBulkUpdateData={setBulkUpdateData}
+                bulkUpdateGlobal={bulkUpdateGlobal}
+                setBulkUpdateGlobal={setBulkUpdateGlobal}
+                handleBulkUpdateChange={handleBulkUpdateChange}
+                saveBulkUpdate={saveBulkUpdate}
+                getFilteredUpdateTables={getFilteredUpdateTables}
+            />
+            <UniversalBulkDeleteModal
+                showModal={showBulkDelete}
+                setShowModal={setShowBulkDelete}
+                modalType="table"
+                tables={tables}
+                bulkDeleteSearch={bulkDeleteSearch}
+                setBulkDeleteSearch={setBulkDeleteSearch}
+                selectedDeleteTables={selectedDeleteTables}
+                setSelectedDeleteTables={setSelectedDeleteTables}
+                showFirstDeleteConfirm={showFirstDeleteConfirm}
+                setShowFirstDeleteConfirm={setShowFirstDeleteConfirm}
+                showSecondDeleteConfirm={showSecondDeleteConfirm}
+                setShowSecondDeleteConfirm={setShowSecondDeleteConfirm}
+                confirmBulkDelete={confirmBulkDelete}
+                getFilteredDeleteTables={getFilteredDeleteTables}
+            />
+            <TableConfigModal
+                show={showConfig}
+                onClose={() => setShowConfig(false)}
+                clientId={clientId}
+                token={token}
+                refresh={() => { fetchConfigs(); }}
+                realm={realm}
+            />
 
-                    {/* Single Delete Confirmation */}
-                    {showConfirmDelete && (
-                        <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4">
-                            <div className="bg-bg-primary rounded-xl w-full max-w-sm shadow-2xl border border-border-default animate-scale-in">
-                                <div className="px-5 py-3 border-b rounded-xl flex justify-between items-center bg-gradient-to-r from-red-50 to-pink-50">
-                                    <h2 className="text-lg font-bold text-action-danger flex items-center gap-2">
-                                        <FaTrash /> Delete Table
-                                    </h2>
-                                    <button onClick={() => setShowConfirmDelete(false)} className="text-text-primary hover:text-text-secondary transition-colors p-1 rounded-full">
-                                        <FaTimes size={20} />
-                                    </button>
-                                </div>
-                                <div className="p-5">
-                                    <div className="text-center">
-                                        {/* <div className="text-5xl mb-3">🗑️</div> */}
-                                        <p className="text-text-primary mb-3">
-                                            Delete table <strong className="text-action-danger text-lg">{tables.find(t => t.id === deleteTableId)?.name || "this table"}</strong>?
-                                        </p>
-                                        <p className="text-sm text-action-danger bg-red-200 p-2 rounded border border-red-300 mb-4">
-                                            This action cannot be undone
-                                        </p>
-                                        <div className="flex justify-center gap-3">
-                                            <button className="bg-action-danger text-text-white rounded-lg px-6 py-2 font-semibold hover:bg-action-primary transition-colors shadow-md" onClick={confirmDelete}>Delete</button>
-                                            <button className="bg-modalsUpdateBg-cancel text-text-primary rounded-lg px-6 py-2 font-semibold hover:bg-bg-tertiary transition-colors" onClick={() => setShowConfirmDelete(false)}>Cancel</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+            {/* Bulk delete – step 1 */}
+            {showFirstDeleteConfirm && (
+                <div className="ui-backdrop font-sans">
+                    <div className="ui-modal animate-scale-in" role="dialog" aria-modal="true" aria-label="Confirm deletion">
+                        <h3 className="text-body font-bold text-state-occupied mb-2.5">
+                            Delete {selectedDeleteTables.length} table{selectedDeleteTables.length !== 1 ? "s" : ""}?
+                        </h3>
+                        <p className="text-ui-sm text-ink-soft mb-3 leading-relaxed">
+                            These tables will be removed from your restaurant:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 max-h-32 overflow-auto p-2 mb-3.5 rounded-button bg-brand-light">
+                            {tables.filter(t => selectedDeleteTables.includes(t.id)).map(t => (
+                                <span key={t.id} className="text-ui-sm font-bold px-2.5 py-0.5 rounded-badge bg-state-occupied-bg text-state-occupied">
+                                    {t.name}
+                                </span>
+                            ))}
                         </div>
-                    )}
-                </main>
-            </div>
+                        <div className="flex justify-end gap-2">
+                            <button className="ui-btn" onClick={() => setShowFirstDeleteConfirm(false)}>Cancel</button>
+                            <button
+                                className="ui-btn ui-btn-danger"
+                                onClick={() => {
+                                    setShowFirstDeleteConfirm(false);
+                                    setShowSecondDeleteConfirm(true);
+                                }}
+                            >
+                                Continue
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Bulk delete – step 2 */}
+            {showSecondDeleteConfirm && (
+                <div className="ui-backdrop font-sans">
+                    <div className="ui-modal animate-scale-in" role="dialog" aria-modal="true" aria-label="Final confirmation">
+                        <h3 className="text-body font-bold text-state-occupied mb-2.5">Final confirmation</h3>
+                        <div className="border-l-bar border-l-state-occupied pl-3 py-2 mb-3.5 text-ui text-ink-muted leading-relaxed">
+                            <b className="text-state-occupied">This cannot be undone.</b> All selected tables will be permanently deleted.
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <button
+                                className="ui-btn"
+                                onClick={() => {
+                                    setShowSecondDeleteConfirm(false);
+                                    setShowFirstDeleteConfirm(false);
+                                }}
+                            >
+                                Cancel
+                            </button>
+                            <button className="ui-btn ui-btn-danger" onClick={confirmBulkDelete}>
+                                <FaTrash /> Delete tables
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Single delete */}
+            {showConfirmDelete && (
+                <div className="ui-backdrop font-sans" onMouseDown={() => setShowConfirmDelete(false)}>
+                    <div
+                        className="ui-modal animate-scale-in"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Delete table"
+                        onMouseDown={e => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between gap-3 mb-2.5">
+                            <h3 className="text-body font-bold text-state-occupied">Delete table</h3>
+                            <button
+                                className="grid place-items-center h-7 w-7 rounded-button-sm border border-brand-line text-ink-muted hover:bg-brand-light"
+                                onClick={() => setShowConfirmDelete(false)}
+                                aria-label="Close"
+                            >
+                                <FaTimes />
+                            </button>
+                        </div>
+                        <p className="text-ui-sm text-ink-soft mb-3">
+                            Delete table{" "}
+                            <strong className="text-state-occupied">
+                                {tables.find(t => t.id === deleteTableId)?.name || "this table"}
+                            </strong>?
+                        </p>
+                        <div className="border-l-bar border-l-state-occupied pl-3 py-1.5 mb-3.5 text-ui text-state-occupied font-bold">
+                            This cannot be undone.
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <button className="ui-btn" onClick={() => setShowConfirmDelete(false)}>Cancel</button>
+                            <button className="ui-btn ui-btn-danger" onClick={confirmDelete}>Delete</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 

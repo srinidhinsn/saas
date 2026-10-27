@@ -2,108 +2,121 @@
 @tailwind components;
 @tailwind utilities;
 
-
-
-/* =====================================================================
-   Landing page styles.
-   Put this in your existing index.css, BELOW the three @tailwind lines
-   (don't add the @tailwind lines twice).
-   Everything is scoped to .lp-root or prefixed with "lp-" so the
-   logged-in app is not affected.
-   ===================================================================== */
-
-   @layer base {
-    html {
-      scroll-padding-top: 5rem; /* section titles aren't hidden under the fixed header */
-    }
-  
-    /* Landing page wrapper: page background, font, text colour */
-    .lp-root {
-      @apply bg-page font-inter text-copy antialiased selection:bg-brand-200 selection:text-brand-900;
-    }
-  
-    /* :where() keeps specificity low, so utilities like text-white on a heading still win */
-    :where(.lp-root) :is(h1, h2, h3) {
-      @apply font-serif font-semibold text-ink;
-    }
+/* landing page styles */
+@layer base {
+  html {
+    scroll-padding-top: 5rem;
   }
-  
-  @layer components {
-    .lp-btn-primary {
-      @apply inline-flex items-center justify-center rounded-btn bg-brand-800 px-6 py-3.5 font-medium text-white transition hover:-translate-y-0.5 hover:bg-brand-700 hover:shadow-soft;
-    }
-    .lp-btn-secondary {
-      @apply inline-flex items-center justify-center rounded-btn border border-line-strong bg-surface px-6 py-3.5 font-medium text-ink transition hover:-translate-y-0.5 hover:bg-soft;
-    }
-    .lp-btn-light {
-      @apply inline-flex items-center justify-center rounded-btn bg-surface px-6 py-3.5 font-medium text-brand-900 transition hover:-translate-y-0.5 hover:bg-brand-50;
-    }
-    .lp-eyebrow {
-      @apply text-sm font-medium uppercase tracking-[.2em] text-brand-600;
-    }
-    .lp-card {
-      @apply rounded-card-lg border border-line bg-surface;
-    }
-    .lp-card-soft {
-      @apply rounded-card-lg border border-line bg-page transition duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-soft;
-    }
-    .lp-chip {
-      @apply rounded-btn bg-soft px-3 py-2;
-    }
-    .lp-badge {
-      @apply rounded-full border px-3 py-1 text-xs font-medium;
-    }
-    .lp-badge-success {
-      @apply lp-badge border-success-line bg-success-soft text-success;
-    }
-    .lp-badge-warning {
-      @apply lp-badge border-warning-line bg-warning-soft text-warning;
-    }
-    .lp-section-alt {
-      @apply border-y border-line bg-surface;
-    }
-    .lp-label {
-      @apply text-sm font-medium text-copy;
-    }
-    .lp-input {
-      @apply mt-2 w-full rounded-btn border border-line-strong bg-surface px-4 py-3 outline-none transition focus:border-brand-600 focus:ring-1 focus:ring-brand-600;
-    }
-  
-    /* Header links: underline slides in on hover */
-    .lp-nav-link {
-      @apply relative transition hover:text-ink after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:bg-brand-600 after:transition-all after:duration-300 hover:after:w-full;
-    }
-  
-    /* Logo image (header + footer). Change the size here. */
-    .lp-logo {
-      @apply h-16 w-auto;
-    }
-  
-    /* Contact tabs */
-    .lp-tab {
-      @apply rounded-btn px-5 py-2.5 text-sm font-medium text-copy transition hover:bg-soft hover:text-ink;
-    }
-    .lp-tab-active {
-      @apply bg-brand-800 text-white hover:bg-brand-800 hover:text-white;
-    }
-  
-    /* Scroll reveal: elements fade up when they come into view.
-       Add class "lp-reveal" to any element. Add [--d:150ms] to delay it (staggering). */
-    .lp-reveal {
-      opacity: 0;
-    }
-    .lp-reveal.is-visible {
-      @apply animate-fade-up opacity-100;
-      animation-delay: var(--d, 0s);
-    }
+
+  .lp-root {
+    @apply bg-canvas font-sans text-ink antialiased;
+    @apply selection:bg-brand-soft selection:text-brand-darker;
   }
-  
-  /* Visitors who prefer less motion just see the content */
-  @media (prefers-reduced-motion: reduce) {
-    .lp-reveal {
-      opacity: 1;
-    }
-    .lp-reveal.is-visible {
-      animation: none;
-    }
+
+  :where(.lp-root) :is(h1, h2, h3) {
+    @apply font-sans font-semibold text-ink;
   }
+}
+
+@layer components {
+  .lp-btn-primary {
+    @apply inline-flex items-center justify-center rounded-button bg-brand px-6 py-3.5 font-medium text-white transition;
+    @apply hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-panel-hover;
+  }
+
+  .lp-btn-secondary {
+    @apply inline-flex items-center justify-center rounded-button border border-line bg-surface px-6 py-3.5 font-medium text-ink transition;
+    @apply hover:-translate-y-0.5 hover:bg-brand-light;
+  }
+
+  .lp-btn-light {
+    @apply inline-flex items-center justify-center rounded-button bg-surface px-6 py-3.5 font-medium text-brand-dark transition;
+    @apply hover:-translate-y-0.5 hover:bg-brand-light;
+  }
+
+  .lp-eyebrow {
+    @apply text-sm font-medium uppercase tracking-[.2em] text-brand-dark;
+  }
+
+  .lp-card {
+    @apply rounded-card-lg border border-line bg-surface;
+  }
+
+  .lp-card-soft {
+    @apply rounded-card-lg border border-line bg-surface transition duration-300;
+    @apply hover:-translate-y-1 hover:border-brand-line hover:shadow-panel-hover;
+  }
+
+  .lp-chip {
+    @apply rounded-button bg-brand-light px-3 py-2;
+  }
+
+  .lp-badge {
+    @apply inline-flex rounded-badge border px-3 py-1 text-xs font-medium;
+  }
+
+  .lp-badge-success {
+    @apply lp-badge;
+    color: #15803d;
+    background-color: #e7f6ee;
+    border-color: #bbf7d0;
+  }
+
+  .lp-badge-warning {
+    @apply lp-badge;
+    color: #a16207;
+    background-color: #fdf3dc;
+    border-color: #fde68a;
+  }
+
+  .lp-section-alt {
+    @apply border-y border-line bg-surface;
+  }
+
+  .lp-label {
+    @apply text-sm font-medium text-ink-soft;
+  }
+
+  .lp-input {
+    @apply mt-2 w-full rounded-input border border-brand-line bg-surface px-4 py-3 outline-none transition;
+    @apply focus:border-brand-ring focus:ring-1 focus:ring-brand-ring;
+  }
+
+  .lp-nav-link {
+    @apply relative transition hover:text-ink;
+    @apply after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:bg-brand after:transition-all after:duration-300;
+    @apply hover:after:w-full;
+  }
+
+  .lp-logo {
+    @apply h-16 w-auto;
+  }
+
+  .lp-tab {
+    @apply rounded-button px-5 py-2.5 text-sm font-medium text-ink-soft transition;
+    @apply hover:bg-brand-light hover:text-ink;
+  }
+
+  .lp-tab-active {
+    @apply bg-brand text-white hover:bg-brand-dark hover:text-white;
+  }
+
+  .lp-reveal {
+    opacity: 0;
+  }
+
+  .lp-reveal.is-visible {
+    @apply animate-slideUp opacity-100;
+    animation-delay: var(--d, 0s);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-reveal {
+    opacity: 1;
+  }
+
+  .lp-reveal.is-visible {
+    animation: none;
+  }
+}
