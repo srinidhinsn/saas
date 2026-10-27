@@ -708,93 +708,98 @@ const UniversalAddModal = ({
       </>
     );
   }
-
+  
   // TABLE modal
   if (modalType === 'table') {
     return (
-      <div className="fixed inset-0 bg-color-modalsbg bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-        <div className="bg-bg-primary rounded-xl w-full max-w-xl shadow-2xl border border-border-default my-8">
-          <div className="sticky top-0 bg-bg-primary px-4 py-2 border-b-border-default flex justify-between items-center z-10 rounded-t-xl">
-            <h3 className="text-xl font-bold text-text-primary">Add Tables</h3>
-            <button onClick={handleClose} className="p-1.5 rounded-lg bg-buttons-add text-text-white hover:opacity-90 transition-opacity">
-              <X size={24} />
+      <div className="ui-backdrop">
+        <div className="ui-dialog max-w-modal-md animate-scale-in" role="dialog" aria-modal="true" aria-label="Add tables">
+
+          {/* Header */}
+          <div className="ui-dialog-head">
+            <div className="min-w-0">
+              <h3 className="text-panel-title text-brand-dark">Add Tables</h3>
+              <p className="text-micro text-ink-muted">Create one table or a whole range at once</p>
+            </div>
+            <button type="button" onClick={handleClose} className="ui-icon-btn" aria-label="Close">
+              <X className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="p-6 max-h-[calc(100vh-12rem)] overflow-y-auto">
+          {/* Body */}
+          <div className="ui-dialog-body space-y-item">
             {(tableRanges || []).map((row, index) => (
               <div
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 p-4 bg-bg-tertiary rounded-lg border-default border-border-default"
                 key={index}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-item rounded-panel border border-line bg-canvas p-panel"
               >
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-text-primary">
+                {/* Range */}
+                <div className="sm:col-span-2">
+                  <label className="ui-label flex items-center gap-item-sm">
                     Table Range *
-                    <div className="relative group cursor-pointer">
-                      <span className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 text-action-primary text-xs font-bold">
+                    <span className="relative group cursor-pointer normal-case tracking-normal">
+                      <span className="grid place-items-center h-4 w-4 rounded-badge bg-brand-light text-brand-dark text-micro font-bold">
                         i
                       </span>
-                      <div className="absolute left-1/2 -translate-x-1/2 top-7 hidden group-hover:block w-60 p-3 bg-white border border-blue-200 rounded-lg shadow-lg z-50 text-xs text-text-primary">
-                        <div className="font-bold mb-1 text-text-primary">
-                          Table Range Examples
-                        </div>
-                        <div className="space-y-1">
-                          <div><strong>Single Table:</strong> S1</div>
-                          <div><strong>Single Range:</strong> S01:S10</div>
-                          <div><strong>Multiple Ranges:</strong> A01:A10,B01:B05</div>
-                        </div>
-                      </div>
-                    </div>
+                      <span className="absolute left-0 top-6 hidden group-hover:block w-60 p-item bg-surface border border-brand-line rounded-button shadow-card z-10 text-ui-sm text-ink font-normal">
+                        <span className="block font-bold mb-1">Table Range Examples</span>
+                        <span className="block"><strong>Single table:</strong> S1</span>
+                        <span className="block"><strong>Single range:</strong> S01:S10</span>
+                        <span className="block"><strong>Multiple ranges:</strong> A01:A10,B01:B05</span>
+                      </span>
+                    </span>
                   </label>
-
                   <input
                     value={row?.range ?? ''}
                     onChange={(e) => handleRangeChange(index, 'range', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-action-success ${fieldErrors?.[index]?.range ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'
-                      }`}
+                    className={`ui-field ${fieldErrors?.[index]?.range ? 'ui-field-error' : ''}`}
                     placeholder="S01:S10"
                   />
-                  {fieldErrors?.[index]?.range && (
-                    <div className="text-action-danger text-xs mt-1 font-medium">Enter table range</div>
-                  )}
+                  {fieldErrors?.[index]?.range && <div className="ui-error-text">Enter table range</div>}
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-text-primary">Seats *</label>
-                  <input type="number" min="1" value={row?.table_type ?? ''} onChange={e => handleRangeChange(index, 'table_type', e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary ${fieldErrors?.[index]?.table_type ? 'border-bulkActions-delete bg-red-50' : 'border-border-default'}`}
-                    placeholder="4" />
-                  {fieldErrors?.[index]?.table_type && <div className="text-action-danger text-xs mt-1 font-medium">Enter seating</div>}
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-2">Table Config *</label>
 
+                {/* Seats */}
+                <div>
+                  <label className="ui-label">Seats *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={row?.table_type ?? ''}
+                    onChange={e => handleRangeChange(index, 'table_type', e.target.value)}
+                    className={`ui-field ${fieldErrors?.[index]?.table_type ? 'ui-field-error' : ''}`}
+                    placeholder="4"
+                  />
+                  {fieldErrors?.[index]?.table_type && <div className="ui-error-text">Enter seating</div>}
+                </div>
+
+                {/* Config */}
+                <div>
+                  <label className="ui-label">Section &amp; Zone *</label>
                   <select
-                    value={row?.config_id ?? ""}
-                    onChange={(e) => handleRangeChange(index, "config_id", Number(e.target.value))}
-                    className="w-full px-3 py-2 border rounded-lg"
+                    value={row?.config_id ?? ''}
+                    onChange={(e) => handleRangeChange(index, 'config_id', Number(e.target.value))}
+                    className="ui-field"
                   >
-                    <option value="">Select Config</option>
-
+                    <option value="">Select config</option>
                     {loadingConfigs ? (
                       <option disabled>Loading...</option>
                     ) : configs.length === 0 ? (
-                      <option disabled>No Config Available</option>
+                      <option disabled>No config available</option>
                     ) : (
                       configs.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.section} - {c.zone}
-                        </option>
+                        <option key={c.id} value={c.id}>{c.section} - {c.zone}</option>
                       ))
                     )}
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold mb-2 text-text-primary">Remark</label>
+                {/* Remark */}
+                <div className="sm:col-span-2">
+                  <label className="ui-label">Remark</label>
                   <select
                     value={row?.remark ?? ''}
                     onChange={(e) => handleRangeChange(index, 'remark', e.target.value)}
-                    className="w-full px-3 py-2 border-default border-border-default rounded-lg focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    className="ui-field"
                   >
                     <option value="">Select status</option>
                     {statusOptions.length > 0
@@ -802,30 +807,33 @@ const UniversalAddModal = ({
                         <option key={s} value={s.toLowerCase()}>{s}</option>
                       ))
                       : (
-                        // fallback if masters API has nothing yet
                         <>
                           <option value="vacant">Vacant</option>
                           <option value="reserved">Reserved</option>
                         </>
-                      )
-                    }
+                      )}
                   </select>
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Footer */}
+          <div className="ui-dialog-foot">
+            <button type="button" className="ui-btn" onClick={handleClose}>Cancel</button>
             <button
-              className="w-full bg-buttons-add text-text-white py-2 rounded-lg hover:bg-buttonsHover-add transition-colors font-bold text-lg shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+              type="button"
+              className="ui-btn ui-btn-add"
               disabled={isGenerating}
               onClick={generateTables}
             >
               {isGenerating ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-border-default"></div>
-                  Generating Tables...
-                </span>
+                <>
+                  <span className="h-4 w-4 rounded-badge border-2 border-white/40 border-t-white animate-spin-slow" />
+                  Generating…
+                </>
               ) : (
-                <span className="flex items-center justify-center gap-2"> Generate Tables
-                </span>
+                'Generate Tables'
               )}
             </button>
           </div>

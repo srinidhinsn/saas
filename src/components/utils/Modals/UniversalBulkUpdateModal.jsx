@@ -1021,282 +1021,259 @@ if (modalType === 'menu') {
 }
 
   // Render Table Bulk Update Modal
-if (modalType === 'table') {
-  const filteredTables = getFilteredUpdateTables();
-  const allSelected =
-    selectedUpdateTables.length === filteredTables.length && filteredTables.length > 0;
+  if (modalType === 'table') {
+    const filteredTables = getFilteredUpdateTables();
+    const allSelected =
+      selectedUpdateTables.length === filteredTables.length && filteredTables.length > 0;
 
-  const inputBase =
-    "w-full px-3 py-2 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary " +
-    "focus:outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-500 transition";
-  const labelBase =
-    "block text-[11px] font-semibold uppercase tracking-wide mb-1 text-text-secondary";
+    // full class strings so Tailwind keeps them
+    const statusChip = (status) => {
+      const s = (status || "").toLowerCase();
+      if (s === "vacant" || s === "available") return "bg-state-vacant-bg text-state-vacant";
+      if (s === "occupied") return "bg-state-occupied-bg text-state-occupied";
+      if (s === "reserved") return "bg-state-reserved-bg text-state-reserved";
+      return "bg-state-other-bg text-state-other";
+    };
 
-  const statusBadge = (status) => {
-    const s = (status || "").toLowerCase();
-    if (s === "vacant" || s === "available") return "bg-green-100 text-green-700 border-green-200";
-    if (s === "occupied") return "bg-red-100 text-red-700 border-red-200";
-    if (s === "reserved") return "bg-blue-100 text-blue-700 border-blue-200";
-    return "bg-gray-100 text-gray-600 border-gray-200";
-  };
+    const statusOptionEls =
+      statusOptions.length > 0
+        ? statusOptions.map(s => <option key={s} value={s}>{s}</option>)
+        : [
+          <option key="Vacant" value="Vacant">Vacant</option>,
+          <option key="Reserved" value="Reserved">Reserved</option>,
+        ];
 
-  const StatusOptions = () =>
-    statusOptions.length > 0 ? (
-      statusOptions.map(s => <option key={s} value={s}>{s}</option>)
-    ) : (
-      <>
-        <option value="Vacant">Vacant</option>
-        <option value="Reserved">Reserved</option>
-      </>
+    // − [n] +  (plain function, NOT a component, so inputs keep focus)
+    const renderStepper = (value, onChange, placeholder) => (
+      <div className="ui-stepper">
+        <button
+          type="button"
+          aria-label="Decrease"
+          onClick={() => {
+            const cur = Number(value) || 0;
+            onChange(cur > 1 ? cur - 1 : "");
+          }}
+        >
+          −
+        </button>
+        <input
+          type="number"
+          min="1"
+          value={value}
+          placeholder={placeholder}
+          onChange={e => onChange(e.target.value ? Math.max(1, Number(e.target.value)) : "")}
+        />
+        <button
+          type="button"
+          aria-label="Increase"
+          onClick={() => onChange((Number(value) || 0) + 1)}
+        >
+          +
+        </button>
+      </div>
     );
 
-  // Reusable +/- stepper (works on all screen sizes)
-  const Stepper = ({ value, onChange, placeholder }) => (
-    <div className="flex items-stretch border border-border-default rounded-lg overflow-hidden bg-bg-primary focus-within:ring-2 focus-within:ring-amber-400/60 focus-within:border-amber-500 transition">
-      <button
-        type="button"
-        onClick={() => {
-          const cur = Number(value) || 0;
-          onChange(cur > 1 ? cur - 1 : "");
-        }}
-        className="px-3 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
-        aria-label="Decrease"
-      >
-        −
-      </button>
-      <input
-        type="number"
-        min="1"
-        value={value}
-        onChange={e => onChange(e.target.value ? Math.max(1, Number(e.target.value)) : "")}
-        placeholder={placeholder}
-        className="flex-1 min-w-0 text-center py-2 border-x border-border-default focus:outline-none text-sm bg-transparent text-text-primary"
-      />
-      <button
-        type="button"
-        onClick={() => onChange((Number(value) || 0) + 1)}
-        className="px-3 text-text-primary hover:bg-bg-tertiary font-bold transition-colors"
-        aria-label="Increase"
-      >
-        +
-      </button>
-    </div>
-  );
+    return (
+      <div className="ui-backdrop">
+        <div className="ui-dialog max-w-modal-lg h-full animate-scale-in" role="dialog" aria-modal="true" aria-label="Bulk update tables">
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
-  <div className="bg-bg-primary w-full sm:max-w-3xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[92vh] h-full rounded-md shadow-2xl flex flex-col overflow-hidden border border-border-default">
-        {/* HEADER */}
-        <div className="flex items-center justify-between gap-4 px-8 sm:px-6 py-4 bg-buttons-update text-text-primary shrink-0">
-          <div className="flex items-center gap-4 min-w-0">
+          {/* HEADER */}
+          <div className="ui-dialog-head">
             <div className="min-w-0">
-              <h2 className="text-base sm:text-lg font-bold leading-tight truncate">Bulk Update Tables</h2>
-              <p className="text-xs text-text-white truncate">Changes apply to all selected tables</p>
+              <h2 className="text-panel-title text-brand-dark truncate">Bulk Update Tables</h2>
+              <p className="text-micro text-ink-muted truncate">Changes apply to all selected tables</p>
             </div>
-          </div>
-          <button
-            onClick={handleClose}
-            className="p-1.5 rounded-lg bg-text-white hover:bg-white/50 transition-colors shrink-0"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* GLOBAL APPLY */}
-        <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-b border-border-default shrink-0">
-          <p className="text-xs font-semibold text-text-secondary mb-2">Apply to all selected</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className={labelBase}>Seating</label>
-              <Stepper
-                value={bulkUpdateGlobal.table_type}
-                placeholder="No change"
-                onChange={v => setBulkUpdateGlobal(prev => ({ ...prev, table_type: v }))}
-              />
-            </div>
-
-            <div>
-              <label className={labelBase}>Status</label>
-              <select
-                value={bulkUpdateGlobal.status}
-                onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
-                className={inputBase}
-              >
-                <option value="">No change</option>
-                <StatusOptions />
-              </select>
-            </div>
-
-            <div>
-              <label className={labelBase}>Section & Zone</label>
-              <select
-                value={bulkUpdateGlobal.config_id || ""}
-                className={inputBase}
-                onChange={e => {
-                  const value = Number(e.target.value);
-                  setBulkUpdateGlobal(prev => ({ ...prev, config_id: value }));
-                  selectedUpdateTables.forEach(id =>
-                    handleBulkUpdateChange(id, "config_id", value)
-                  );
-                }}
-              >
-                <option value="">No change</option>
-                {configs.map(c => (
-                  <option key={c.id} value={c.id}>{c.section} - {c.zone}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* SEARCH + SELECT ALL */}
-        <div className="px-4 sm:px-6 py-3 border-b border-border-default bg-bg-primary shrink-0 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
-            <input
-              type="text"
-              placeholder="Search tables..."
-              value={bulkUpdateSearch}
-              onChange={e => setBulkUpdateSearch(e.target.value)}
-              className={`${inputBase} pl-9`}
-            />
+            <button type="button" onClick={handleClose} className="ui-icon-btn" aria-label="Close">
+              <X className="h-4 w-4" />
+            </button>
           </div>
 
-          <label className="flex items-center justify-between sm:justify-end gap-3 cursor-pointer select-none">
-            <span className="flex items-center gap-2">
+          {/* APPLY TO ALL */}
+          <div className="px-modal py-item bg-brand-tint border-b border-line shrink-0">
+            <p className="ui-label">Apply to all selected</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-item">
+              <div>
+                <label className="ui-label">Seating</label>
+                {renderStepper(
+                  bulkUpdateGlobal.table_type,
+                  v => setBulkUpdateGlobal(prev => ({ ...prev, table_type: v })),
+                  "No change"
+                )}
+              </div>
+
+              <div>
+                <label className="ui-label">Status</label>
+                <select
+                  value={bulkUpdateGlobal.status}
+                  onChange={e => setBulkUpdateGlobal(prev => ({ ...prev, status: e.target.value }))}
+                  className="ui-field"
+                >
+                  <option value="">No change</option>
+                  {statusOptionEls}
+                </select>
+              </div>
+
+              <div>
+                <label className="ui-label">Section &amp; Zone</label>
+                <select
+                  value={bulkUpdateGlobal.config_id || ""}
+                  className="ui-field"
+                  onChange={e => {
+                    const value = Number(e.target.value);
+                    setBulkUpdateGlobal(prev => ({ ...prev, config_id: value }));
+                    selectedUpdateTables.forEach(id =>
+                      handleBulkUpdateChange(id, "config_id", value)
+                    );
+                  }}
+                >
+                  <option value="">No change</option>
+                  {configs.map(c => (
+                    <option key={c.id} value={c.id}>{c.section} - {c.zone}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* SEARCH + SELECT ALL */}
+          <div className="px-modal py-item border-b border-line-soft shrink-0 flex flex-col sm:flex-row gap-item-sm sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-muted pointer-events-none" />
               <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={selectAllUpdateTables}
-                className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                type="text"
+                placeholder="Search tables..."
+                value={bulkUpdateSearch}
+                onChange={e => setBulkUpdateSearch(e.target.value)}
+                className="ui-input"
               />
-              <span className="text-sm font-semibold text-text-primary">Select All</span>
-            </span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-              {selectedUpdateTables.length} / {filteredTables.length}
-            </span>
-          </label>
-        </div>
-
-        {/* TABLE LIST */}
-        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 bg-bg-primary">
-          {filteredTables.length === 0 ? (
-            <div className="text-center py-16">
-              <Search className="w-12 h-12 text-text-secondary mx-auto mb-3 opacity-30" />
-              <p className="text-text-secondary font-medium">No tables found</p>
             </div>
-          ) : (
-            <div className="space-y-2.5">
-              {filteredTables.map(table => {
-                const isSelected = selectedUpdateTables.includes(table.id);
-                const config = configs.find(c => c.id === table.config_id);
 
-                return (
-                  <div
-                    key={table.id}
-                    className={`rounded-xl border-2 overflow-hidden transition-all ${
-                      isSelected
-                        ? "border-amber-400 bg-amber-50/40 shadow-sm"
-                        : "border-border-default bg-bg-primary hover:border-amber-200"
-                    }`}
-                  >
-                    {/* Card header */}
-                    <label className="flex items-center gap-3 px-3 py-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleUpdateTableSelection(table.id)}
-                        className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
-                      />
-                      <span className="font-bold text-sm text-text-primary flex-1 truncate">
-                        {table.name}
-                      </span>
-                      <span className={`text-[11px] font-semibold capitalize px-2 py-0.5 rounded-full border ${statusBadge(table.status)}`}>
-                        {table.status}
-                      </span>
-                    </label>
+            <label className="flex items-center justify-between sm:justify-end gap-item cursor-pointer select-none">
+              <span className="flex items-center gap-item-sm">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={selectAllUpdateTables}
+                  className="ui-check"
+                />
+                <span className="text-ui font-semibold text-ink">Select All</span>
+              </span>
+              <span className="ui-count">
+                {selectedUpdateTables.length} / {filteredTables.length}
+              </span>
+            </label>
+          </div>
 
-                    {isSelected ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-3 pb-3 pt-3 border-t border-amber-200">
-                        <div>
-                          <label className={labelBase}>Seating</label>
-                          <Stepper
-                            value={bulkUpdateData[table.id]?.table_type ?? table.table_type ?? ""}
-                            placeholder={bulkUpdateGlobal.table_type ? `Global: ${bulkUpdateGlobal.table_type}` : "Seating"}
-                            onChange={v => handleBulkUpdateChange(table.id, "table_type", v)}
-                          />
-                        </div>
+          {/* TABLE LIST */}
+          <div className="ui-dialog-body">
+            {filteredTables.length === 0 ? (
+              <div className="text-center py-16">
+                <Search className="h-10 w-10 mx-auto mb-3 text-brand-soft" />
+                <p className="text-ui text-ink-muted">No tables found</p>
+              </div>
+            ) : (
+              <div className="space-y-item-sm">
+                {filteredTables.map(table => {
+                  const isSelected = selectedUpdateTables.includes(table.id);
+                  const config = configs.find(c => c.id === table.config_id);
 
-                        <div>
-                          <label className={labelBase}>Status</label>
-                          <select
-                            value={bulkUpdateData[table.id]?.status ?? table.status}
-                            onChange={e => handleBulkUpdateChange(table.id, "status", e.target.value)}
-                            className={inputBase}
-                          >
-                            <StatusOptions />
-                          </select>
-                        </div>
+                  return (
+                    <div
+                      key={table.id}
+                      className={`rounded-panel border overflow-hidden transition-colors ${
+                        isSelected
+                          ? "border-brand-ring bg-brand-tint"
+                          : "border-line bg-surface hover:border-brand-line"
+                      }`}
+                    >
+                      {/* Card header */}
+                      <label className="flex items-center gap-item px-item py-item-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleUpdateTableSelection(table.id)}
+                          className="ui-check"
+                        />
+                        <span className="flex-1 truncate text-ui font-bold text-ink">{table.name}</span>
+                        <span className={`ui-chip ${statusChip(table.status)}`}>{table.status}</span>
+                      </label>
 
-                        <div>
-                          <label className={labelBase}>Section & Zone</label>
-                          <select
-                            value={bulkUpdateData[table.id]?.config_id ?? table.config_id ?? ""}
-                            onChange={e =>
-                              handleBulkUpdateChange(table.id, "config_id", Number(e.target.value))
-                            }
-                            className={inputBase}
-                          >
-                            <option value="">No change</option>
-                            {configs.map(c => (
-                              <option key={c.id} value={c.id}>{c.section} - {c.zone}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-3 gap-y-1 px-3 pb-3 pt-2 border-t border-border-default text-xs">
-                        <div>
-                          <span className="text-text-secondary">Seats: </span>
-                          <span className="font-semibold text-text-primary">{table.table_type}</span>
-                        </div>
-                        <div className="col-span-2 sm:col-span-2 truncate">
-                          <span className="text-text-secondary">Section & Zone: </span>
-                          <span className="font-semibold text-text-primary">
-                            {config ? `${config.section} - ${config.zone}` : "-"}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                      {isSelected ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-item px-item pb-item pt-item border-t border-brand-line">
+                          <div>
+                            <label className="ui-label">Seating</label>
+                            {renderStepper(
+                              bulkUpdateData[table.id]?.table_type ?? table.table_type ?? "",
+                              v => handleBulkUpdateChange(table.id, "table_type", v),
+                              bulkUpdateGlobal.table_type ? `Global: ${bulkUpdateGlobal.table_type}` : "Seating"
+                            )}
+                          </div>
 
-        {/* FOOTER */}
-        <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-t border-border-default shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <button
-            onClick={handleClose}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-slate-100 font-semibold text-sm transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={saveBulkUpdate}
-            disabled={selectedUpdateTables.length === 0}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-buttons-update hover:bg-buttonsHover-update text-text-white font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
-          >
-            <Edit className="w-4 h-4" />
-            Update ({selectedUpdateTables.length})
-          </button>
+                          <div>
+                            <label className="ui-label">Status</label>
+                            <select
+                              value={bulkUpdateData[table.id]?.status ?? table.status}
+                              onChange={e => handleBulkUpdateChange(table.id, "status", e.target.value)}
+                              className="ui-field"
+                            >
+                              {statusOptionEls}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="ui-label">Section &amp; Zone</label>
+                            <select
+                              value={bulkUpdateData[table.id]?.config_id ?? table.config_id ?? ""}
+                              onChange={e =>
+                                handleBulkUpdateChange(table.id, "config_id", Number(e.target.value))
+                              }
+                              className="ui-field"
+                            >
+                              <option value="">No change</option>
+                              {configs.map(c => (
+                                <option key={c.id} value={c.id}>{c.section} - {c.zone}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-item gap-y-1 px-item pb-item pt-item-sm border-t border-line-soft text-ui-sm">
+                          <div>
+                            <span className="text-ink-muted">Seats: </span>
+                            <span className="font-semibold text-ink">{table.table_type}</span>
+                          </div>
+                          <div className="col-span-2 truncate">
+                            <span className="text-ink-muted">Section &amp; Zone: </span>
+                            <span className="font-semibold text-ink">
+                              {config ? `${config.section} - ${config.zone}` : "-"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* FOOTER */}
+          <div className="ui-dialog-foot">
+            <button type="button" onClick={handleClose} className="ui-btn">Cancel</button>
+            <button
+              type="button"
+              onClick={saveBulkUpdate}
+              disabled={selectedUpdateTables.length === 0}
+              className="ui-btn ui-btn-update"
+            >
+              <Edit className="h-4 w-4" />
+              Update ({selectedUpdateTables.length})
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   return null;
 };

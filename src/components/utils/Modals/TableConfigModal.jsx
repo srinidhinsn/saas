@@ -18,67 +18,39 @@ const normalize = (str = "") =>
 
 const isSame = (a, b) => normalize(a) === normalize(b);
 
-/* shared style tokens */
-const inputBase =
-    "w-full px-3 py-2 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary " +
-    "placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-slate-400/60 " +
-    "focus:border-slate-500 transition disabled:opacity-50 disabled:cursor-not-allowed";
-const labelBase =
-    "block text-[11px] font-semibold uppercase tracking-wide mb-1 text-text-secondary";
-const btnGreen =
-    "flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-buttons-add hover:bg-buttonsHover-add text-text-white " +
-    "font-semibold text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 " +
-    "disabled:shadow-none disabled:cursor-not-allowed";
-
 /* ─────────────────────────────────────────────
-   Popup
+   Popup  (success / error / warning / confirm)
 ───────────────────────────────────────────── */
 const Popup = ({ popup, closePopup }) => {
     if (!popup.show) return null;
 
+    // full class strings so Tailwind keeps them
     const styles = {
-        success: { Icon: FaCheckCircle,         ring: "bg-green-100 text-green-600", title: "Success" },
-        error:   { Icon: FaTimesCircle,         ring: "bg-red-100 text-red-600",     title: "Error" },
-        warning: { Icon: FaExclamationTriangle, ring: "bg-amber-100 text-amber-600", title: "Warning" },
-        confirm: { Icon: FaQuestionCircle,      ring: "bg-red-100 text-red-600",     title: "Confirm" },
-    }[popup.type] || { Icon: FaQuestionCircle, ring: "bg-gray-100 text-gray-600", title: "Notice" };
+        success: { Icon: FaCheckCircle,         ring: "bg-state-vacant-bg text-state-vacant",       title: "Success" },
+        error:   { Icon: FaTimesCircle,         ring: "bg-danger-bg text-danger",                   title: "Error" },
+        warning: { Icon: FaExclamationTriangle, ring: "bg-state-reserved-bg text-state-reserved",   title: "Warning" },
+        confirm: { Icon: FaQuestionCircle,      ring: "bg-danger-bg text-danger",                   title: "Confirm" },
+    }[popup.type] || { Icon: FaQuestionCircle, ring: "bg-brand-light text-brand-dark", title: "Notice" };
 
     const { Icon } = styles;
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[70]">
-            <div className="bg-bg-primary rounded-xl w-full max-w-sm shadow-2xl border border-border-default overflow-hidden">
-                <div className="p-5 text-center">
-                    <div className={`w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center ${styles.ring}`}>
-                        <Icon size={22} />
-                    </div>
-                    <h3 className="text-lg font-bold text-text-primary mb-1">{styles.title}</h3>
-                    <p className="text-sm text-text-secondary break-words">{popup.message}</p>
+        <div className="ui-backdrop ui-backdrop-top">
+            <div className="ui-modal text-center animate-scale-in" role="dialog" aria-modal="true" aria-label={styles.title}>
+                <div className={`h-12 w-12 mx-auto mb-item rounded-badge grid place-items-center ${styles.ring}`}>
+                    <Icon size={22} />
                 </div>
+                <h3 className="text-panel-title text-ink mb-1">{styles.title}</h3>
+                <p className="text-ui text-ink-muted break-words mb-card">{popup.message}</p>
 
-                <div className="flex gap-2 px-5 pb-5">
+                <div className="flex gap-item-sm">
                     {popup.type === "confirm" ? (
                         <>
-                            <button
-                                className="flex-1 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary font-semibold text-sm transition-colors"
-                                onClick={closePopup}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                className="flex-1 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-sm shadow-sm transition-colors"
-                                onClick={popup.onConfirm}
-                            >
-                                Yes, Delete
-                            </button>
+                            <button className="ui-btn flex-1" onClick={closePopup}>Cancel</button>
+                            <button className="ui-btn ui-btn-danger flex-1" onClick={popup.onConfirm}>Yes, Delete</button>
                         </>
                     ) : (
-                        <button
-                            className="w-full py-2 rounded-lg bg-slate-500 hover:bg-slate-600 text-white font-semibold text-sm shadow-sm transition-colors"
-                            onClick={closePopup}
-                        >
-                            OK
-                        </button>
+                        <button className="ui-btn ui-btn-primary w-full" onClick={closePopup}>OK</button>
                     )}
                 </div>
             </div>
@@ -87,7 +59,7 @@ const Popup = ({ popup, closePopup }) => {
 };
 
 /* ─────────────────────────────────────────────
-   MasterTagManager
+   MasterTagManager  (add / remove zone or section values)
 ───────────────────────────────────────────── */
 const MasterTagManager = ({ label, categoryId, clientId, token, showPopup, closePopup, onChanged }) => {
     const [values,      setValues]      = useState([]);
@@ -163,27 +135,25 @@ const MasterTagManager = ({ label, categoryId, clientId, token, showPopup, close
     const showPreview = preview && preview !== input.trim();
 
     return (
-        <div className="border border-border-default rounded-xl bg-bg-tertiary p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-bold text-text-primary">{label}s</h4>
-                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                    {values.length}
-                </span>
+        <div className="rounded-panel border border-line bg-canvas p-panel">
+            <div className="flex items-center justify-between mb-item-sm">
+                <h4 className="text-panel-title text-brand-dark">{label}s</h4>
+                <span className="ui-count">{values.length}</span>
             </div>
 
             {/* Input row */}
-            <div className="flex gap-2">
+            <div className="flex gap-item-sm">
                 <div className="flex-1 relative min-w-0">
                     <input
                         value={input}
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && addValue()}
                         placeholder={`Add ${label.toLowerCase()}… (e.g. First Floor)`}
-                        className={`${inputBase} ${showPreview ? "sm:pr-28" : ""}`}
+                        className={`ui-field ${showPreview ? "sm:pr-28" : ""}`}
                         disabled={adding}
                     />
                     {showPreview && (
-                        <span className="hidden sm:block absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-full pointer-events-none whitespace-nowrap max-w-[7rem] truncate">
+                        <span className="hidden sm:block absolute right-2 top-1/2 -translate-y-1/2 text-micro text-brand-dark bg-brand-light border border-brand-line px-1.5 py-0.5 rounded-badge pointer-events-none whitespace-nowrap max-w-[7rem] truncate">
                             → {preview}
                         </span>
                     )}
@@ -191,45 +161,45 @@ const MasterTagManager = ({ label, categoryId, clientId, token, showPopup, close
                 <button
                     onClick={addValue}
                     disabled={adding || !input.trim()}
-                    className={`${btnGreen} shrink-0`}
+                    className="ui-btn ui-btn-add shrink-0"
                 >
                     {adding
-                        ? <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        ? <span className="h-3.5 w-3.5 rounded-badge border-2 border-white/40 border-t-white animate-spin-slow" />
                         : <FaPlus size={11} />}
-                    <span className="hidden xs:inline sm:inline">Add</span>
+                    <span className="hidden sm:inline">Add</span>
                 </button>
             </div>
 
             {/* Mobile preview (below input) */}
             {showPreview && (
-                <p className="sm:hidden text-[11px] text-slate-600 mt-1">
+                <p className="sm:hidden text-micro text-brand-dark mt-1">
                     Will save as <strong>{preview}</strong>
                 </p>
             )}
 
-            <p className="text-[11px] text-text-secondary mt-1.5 mb-3">
+            <p className="text-micro text-ink-muted mt-1.5 mb-item">
                 Saved in Title Case: <em>first_floor</em> and <em>first floor</em> both become <strong>First Floor</strong>
             </p>
 
             {/* Chips */}
-            <div className="flex flex-wrap gap-2 min-h-[32px]">
+            <div className="flex flex-wrap gap-item-sm">
                 {values.length === 0 ? (
-                    <span className="text-xs text-text-secondary italic">No {label.toLowerCase()}s yet</span>
+                    <span className="text-ui text-ink-muted italic">No {label.toLowerCase()}s yet</span>
                 ) : (
                     values.map(v => (
                         <span
                             key={v}
-                            className="flex items-center gap-1.5 bg-bg-primary border border-border-default pl-3 pr-2 py-1 rounded-full text-sm text-text-primary shadow-sm"
+                            className="inline-flex items-center gap-1.5 bg-surface border border-brand-line pl-3 pr-1.5 py-1 rounded-badge text-ui text-ink shadow-button"
                         >
                             {v}
                             <button
                                 onClick={() => confirmDelete(v)}
                                 disabled={deletingVal === v}
-                                className="w-5 h-5 flex items-center justify-center rounded-full text-red-500 hover:bg-red-100 transition-colors disabled:opacity-40"
+                                className="grid place-items-center h-5 w-5 rounded-badge text-danger hover:bg-danger-bg transition-colors disabled:opacity-40"
                                 aria-label={`Delete ${v}`}
                             >
                                 {deletingVal === v
-                                    ? <span className="w-2.5 h-2.5 border border-red-300 border-t-red-500 rounded-full animate-spin inline-block" />
+                                    ? <span className="h-2.5 w-2.5 rounded-badge border border-danger-border border-t-danger animate-spin-slow inline-block" />
                                     : <FaTimes size={10} />}
                             </button>
                         </span>
@@ -325,57 +295,58 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh, realm }) =>
 
     if (!show) return null;
 
-    const tabClass = (id) =>
-        `flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-            activeTab === id
-                ? "bg-bg-primary text-text-primary shadow-sm"
-                : "text-text-secondary hover:text-text-primary"
-        }`;
-
     const noSections = sectionOptions.length === 0;
     const noZones    = zoneOptions.length    === 0;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
-  <div className="bg-bg-primary w-full sm:max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden border border-border-default">
+        <div className="ui-backdrop">
+            <div className="ui-dialog max-w-modal-md animate-scale-in" role="dialog" aria-modal="true" aria-label="Table configuration">
+
                 {/* HEADER */}
-                <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 bg-slate-500 text-white shrink-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                        <IoSettingsOutline className="w-5 h-5 shrink-0" />
+                <div className="ui-dialog-head">
+                    <div className="flex items-center gap-item min-w-0">
+                        <span className="grid place-items-center h-9 w-9 rounded-button-sm bg-surface border border-brand-line text-brand shrink-0">
+                            <IoSettingsOutline className="h-5 w-5" />
+                        </span>
                         <div className="min-w-0">
-                            <h2 className="text-base sm:text-lg font-bold leading-tight truncate">Table Configuration</h2>
-                            <p className="text-xs opacity-80 truncate">Sections, zones and their combinations</p>
+                            <h2 className="text-panel-title text-brand-dark truncate">Table Configuration</h2>
+                            <p className="text-micro text-ink-muted truncate">Sections, zones and their combinations</p>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors shrink-0"
-                        aria-label="Close"
-                    >
-                        <FaTimes size={14} />
+                    <button onClick={onClose} className="ui-icon-btn" aria-label="Close">
+                        <FaTimes size={13} />
                     </button>
                 </div>
 
                 {/* TABS */}
-                <div className="px-4 sm:px-6 pt-3 shrink-0">
-                    <div className="flex gap-1 p-1 rounded-xl bg-bg-tertiary border border-border-default">
-                        <button className={tabClass("config")}  onClick={() => setActiveTab("config")}>Configs</button>
-                        <button className={tabClass("masters")} onClick={() => setActiveTab("masters")}>Manage</button>
+                <div className="px-modal pt-item shrink-0">
+                    <div className="ui-toggle w-full" role="tablist">
+                        {[["config", "Configs"], ["masters", "Manage"]].map(([id, text]) => (
+                            <button
+                                key={id}
+                                role="tab"
+                                aria-selected={activeTab === id}
+                                className={`ui-toggle-btn flex-1 ${activeTab === id ? "ui-toggle-btn-active" : ""}`}
+                                onClick={() => setActiveTab(id)}
+                            >
+                                {text}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
                 {/* BODY */}
-                <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+                <div className="ui-dialog-body">
 
                     {/* ════ CONFIG TAB ════ */}
                     {activeTab === "config" && (
-                        <div className="space-y-5">
-                            <div className="border border-border-default rounded-xl bg-bg-tertiary p-3 sm:p-4">
-                                <h3 className="text-sm font-bold text-text-primary mb-3">Add Configuration</h3>
+                        <div className="space-y-card">
+                            <div className="rounded-panel border border-line bg-canvas p-panel">
+                                <h3 className="text-panel-title text-brand-dark mb-item">Add Configuration</h3>
 
                                 {(noSections || noZones) && (
-                                    <div className="text-xs text-amber-800 mb-3 bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex gap-2">
-                                        <FaExclamationTriangle className="shrink-0 mt-0.5 text-amber-500" />
+                                    <div className="flex gap-item-sm mb-item p-2.5 rounded-button border border-state-reserved/30 bg-state-reserved-bg text-state-reserved text-ui">
+                                        <FaExclamationTriangle className="shrink-0 mt-0.5" />
                                         <span>
                                             No {noSections ? "sections" : "zones"} found. Go to the{" "}
                                             <button className="font-bold underline" onClick={() => setActiveTab("masters")}>
@@ -386,13 +357,13 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh, realm }) =>
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-item mb-item">
                                     <div>
-                                        <label className={labelBase}>Section</label>
+                                        <label className="ui-label">Section</label>
                                         <select
                                             value={sectionInput}
                                             onChange={e => setSectionInput(e.target.value)}
-                                            className={inputBase}
+                                            className="ui-field"
                                             disabled={noSections}
                                         >
                                             <option value="">Select section</option>
@@ -401,11 +372,11 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh, realm }) =>
                                     </div>
 
                                     <div>
-                                        <label className={labelBase}>Zone</label>
+                                        <label className="ui-label">Zone</label>
                                         <select
                                             value={zoneInput}
                                             onChange={e => setZoneInput(e.target.value)}
-                                            className={inputBase}
+                                            className="ui-field"
                                             disabled={noZones}
                                         >
                                             <option value="">Select zone</option>
@@ -417,10 +388,10 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh, realm }) =>
                                 <button
                                     onClick={addConfig}
                                     disabled={addingConfig || !sectionInput || !zoneInput}
-                                    className={`${btnGreen} w-full`}
+                                    className="ui-btn ui-btn-add w-full"
                                 >
                                     {addingConfig
-                                        ? <span className="w-4 h-4 border-2 border-buttons-configure  rounded-full animate-spin" />
+                                        ? <span className="h-4 w-4 rounded-badge border-2 border-white/40 border-t-white animate-spin-slow" />
                                         : <FaPlus size={12} />}
                                     Add Config
                                 </button>
@@ -428,31 +399,29 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh, realm }) =>
 
                             {/* Existing configs */}
                             <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <h4 className="text-sm font-bold text-text-primary">Existing Configs</h4>
-                                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                                        {configs.length}
-                                    </span>
+                                <div className="flex items-center gap-item-sm mb-item-sm">
+                                    <h4 className="text-panel-title text-brand-dark">Existing Configs</h4>
+                                    <span className="ui-count">{configs.length}</span>
                                 </div>
 
                                 {configs.length === 0 ? (
-                                    <div className="text-center py-8 border border-dashed border-border-default rounded-xl">
-                                        <IoSettingsOutline className="w-8 h-8 mx-auto mb-2 text-text-secondary opacity-40" />
-                                        <p className="text-sm text-text-secondary">No configs yet</p>
+                                    <div className="text-center py-8 border border-dashed border-line rounded-panel">
+                                        <IoSettingsOutline className="h-8 w-8 mx-auto mb-2 text-brand-soft" />
+                                        <p className="text-ui text-ink-muted">No configs yet</p>
                                     </div>
                                 ) : (
-                                    <div className="flex flex-wrap gap-2">
+                                    <div className="flex flex-wrap gap-item-sm">
                                         {configs.map(c => (
                                             <div
                                                 key={c.id}
-                                                className="flex items-center gap-2 bg-bg-primary border border-border-default pl-3 pr-2 py-1.5 rounded-full text-sm shadow-sm"
+                                                className="inline-flex items-center gap-item-sm bg-surface border border-brand-line pl-3 pr-1.5 py-1.5 rounded-badge text-ui shadow-button"
                                             >
-                                                <span className="font-semibold text-text-primary">{c.section}</span>
-                                                <span className="text-text-secondary">×</span>
-                                                <span className="text-text-primary">{c.zone}</span>
+                                                <span className="font-semibold text-brand-dark">{c.section}</span>
+                                                <span className="text-ink-muted">×</span>
+                                                <span className="text-ink">{c.zone}</span>
                                                 <button
                                                     onClick={() => deleteConfig(c)}
-                                                    className="w-5 h-5 flex items-center justify-center rounded-full text-red-500 hover:bg-red-100 transition-colors"
+                                                    className="grid place-items-center h-5 w-5 rounded-badge text-danger hover:bg-danger-bg transition-colors"
                                                     aria-label={`Delete ${c.section} × ${c.zone}`}
                                                 >
                                                     <FaTimes size={10} />
@@ -467,8 +436,8 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh, realm }) =>
 
                     {/* ════ MASTERS TAB ════ */}
                     {activeTab === "masters" && (
-                        <div className="space-y-3">
-                            <p className="text-xs text-text-secondary">
+                        <div className="space-y-item">
+                            <p className="text-ui text-ink-muted">
                                 Add or remove the values used in the dropdowns. Values are saved in Title Case automatically.
                             </p>
 
@@ -496,14 +465,8 @@ const TableConfigModal = ({ show, onClose, clientId, token, refresh, realm }) =>
                 </div>
 
                 {/* FOOTER */}
-                <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-t border-border-default shrink-0 ">
-                    <button
-                        className="w-full sm:w-auto sm:float-right px-6 py-2.5 rounded-lg bg-buttons-configure hover:bg-buttonsHover-configure text-white font-semibold text-sm shadow-md transition-colors"
-                        onClick={onClose}
-                    >
-                        Close
-                    </button>
-                    <div className="clear-both" />
+                <div className="ui-dialog-foot">
+                    <button className="ui-btn ui-btn-primary" onClick={onClose}>Close</button>
                 </div>
             </div>
 

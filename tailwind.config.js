@@ -264,7 +264,11 @@ export default {
 
       height: { control: '36px' },          // buttons + inputs
       minHeight: { metric: '78px' },        // KPI card
-      maxWidth: { modal: '420px' },         // confirm modal
+      maxWidth: {
+        modal: '420px',        // max-w-modal     small confirm / edit
+        'modal-md': '36rem',   // max-w-modal-md  config / add
+        'modal-lg': '48rem',   // max-w-modal-lg  lists / bulk update / bulk delete
+      },         // confirm modal
       gridTemplateColumns: {
         kpi: 'repeat(auto-fit,minmax(150px,1fr))',     // KPI row
         tiles: 'repeat(auto-fill,minmax(168px,1fr))',  // table cards
@@ -497,6 +501,162 @@ export default {
           padding: theme('spacing.modal'),
           color: theme('colors.ink.DEFAULT'),
         },
+         '.ui-backdrop-top': { zIndex: '1300' },
+ 
+        /* dialog shell: head / scrolling body / foot */
+        '.ui-dialog': {
+          display: 'flex',
+          flexDirection: 'column',
+          width: '100%',
+          maxHeight: 'calc(100dvh - 1.5rem)',
+          overflow: 'hidden',
+          backgroundColor: theme('colors.surface'),
+          border: `1px solid ${theme('colors.line.DEFAULT')}`,
+          borderRadius: theme('borderRadius.modal-lg'),
+          boxShadow: theme('boxShadow.modal-lg'),
+          color: theme('colors.ink.DEFAULT'),
+          fontFamily: FONT,
+        },
+        '.ui-dialog-head': {
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: theme('spacing.item'),
+          padding: `${theme('spacing.item')} ${theme('spacing.modal')}`,
+          backgroundColor: brand('light'),
+          borderBottom: `1px solid ${brand('line')}`,
+          flexShrink: '0',
+        },
+        '.ui-dialog-body': {
+          flex: '1 1 auto',
+          overflowY: 'auto',
+          padding: `${theme('spacing.card')} ${theme('spacing.modal')}`,
+        },
+        '.ui-dialog-foot': {
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'flex-end',
+          gap: theme('spacing.item-sm'),
+          padding: `${theme('spacing.item')} ${theme('spacing.modal')}`,
+          backgroundColor: theme('colors.canvas'),
+          borderTop: `1px solid ${theme('colors.line.DEFAULT')}`,
+          flexShrink: '0',
+        },
+ 
+        /* form controls */
+        '.ui-label': {
+          display: 'block',
+          marginBottom: '0.25rem',
+          fontSize: fs('micro'),
+          fontWeight: '700',
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          color: theme('colors.ink.muted'),
+        },
+        '.ui-field': {
+          width: '100%',
+          height: theme('height.control'),
+          padding: `0 ${theme('spacing.item')}`,
+          border: `1px solid ${brand('line')}`,
+          borderRadius: theme('borderRadius.button-sm'),
+          backgroundColor: theme('colors.surface'),
+          fontSize: fs('ui'),
+          color: theme('colors.ink.DEFAULT'),
+          outline: 'none',
+          transition: 'border-color .15s ease, box-shadow .15s ease',
+          '&::placeholder': { color: theme('colors.ink.faint') },
+          '&:focus': { borderColor: brand('ring'), boxShadow: theme('boxShadow.focus-ring') },
+          '&:disabled': { opacity: '0.5', cursor: 'not-allowed' },
+        },
+        '.ui-field-error': {
+          borderColor: theme('colors.danger.DEFAULT'),
+          backgroundColor: theme('colors.danger.bg'),
+        },
+        '.ui-error-text': {
+          marginTop: '0.25rem',
+          fontSize: fs('micro'),
+          fontWeight: '600',
+          color: theme('colors.danger.DEFAULT'),
+        },
+        '.ui-check': {
+          width: '1rem',
+          height: '1rem',
+          accentColor: brand('DEFAULT'),
+          cursor: 'pointer',
+        },
+        '.ui-count': {
+          fontSize: fs('micro'),
+          fontWeight: '700',
+          padding: '0.1rem 0.5rem',
+          borderRadius: theme('borderRadius.badge'),
+          backgroundColor: brand('light'),
+          color: brand('dark'),
+          border: `1px solid ${brand('line')}`,
+        },
+        '.ui-icon-btn': {
+          display: 'grid',
+          placeItems: 'center',
+          width: theme('spacing.section-lg'),
+          height: theme('spacing.section-lg'),
+          flexShrink: '0',
+          border: `1px solid ${brand('line')}`,
+          borderRadius: theme('borderRadius.button-sm'),
+          backgroundColor: theme('colors.surface'),
+          color: theme('colors.ink.muted'),
+          cursor: 'pointer',
+          '&:hover': { backgroundColor: brand('soft'), color: brand('dark') },
+        },
+ 
+        /* selectable list row (bulk delete etc.) */
+        '.ui-row': {
+          display: 'flex',
+          alignItems: 'center',
+          gap: theme('spacing.item'),
+          padding: theme('spacing.item'),
+          border: `1px solid ${theme('colors.line.DEFAULT')}`,
+          borderRadius: theme('borderRadius.panel'),
+          backgroundColor: theme('colors.surface'),
+          cursor: 'pointer',
+          transition: 'background-color .15s ease, border-color .15s ease',
+          '&:hover': { backgroundColor: brand('tint'), borderColor: brand('line') },
+        },
+        '.ui-row-selected': {
+          backgroundColor: brand('tint'),
+          borderColor: brand('ring'),
+        },
+ 
+        /* − [n] + number stepper */
+        '.ui-stepper': {
+          display: 'flex',
+          alignItems: 'stretch',
+          height: theme('height.control'),
+          overflow: 'hidden',
+          border: `1px solid ${brand('line')}`,
+          borderRadius: theme('borderRadius.button-sm'),
+          backgroundColor: theme('colors.surface'),
+          '&:focus-within': { borderColor: brand('ring'), boxShadow: theme('boxShadow.focus-ring') },
+          '& button': {
+            padding: `0 ${theme('spacing.item')}`,
+            fontWeight: '700',
+            color: brand('dark'),
+            cursor: 'pointer',
+            '&:hover': { backgroundColor: brand('light') },
+          },
+          '& input': {
+            flex: '1 1 0%',
+            minWidth: '0',
+            textAlign: 'center',
+            fontSize: fs('ui'),
+            fontWeight: '600',
+            color: theme('colors.ink.DEFAULT'),
+            backgroundColor: 'transparent',
+            border: '0',
+            borderLeft: `1px solid ${brand('line')}`,
+            borderRight: `1px solid ${brand('line')}`,
+            outline: 'none',
+          },
+        },
+ 
       });
     }),
   ],

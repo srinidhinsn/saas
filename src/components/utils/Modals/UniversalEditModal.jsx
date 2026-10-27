@@ -752,147 +752,87 @@ const UniversalEditModal = ({
 
   // Render Table Edit Modal
   if (modalType === 'table' && table) {
+    const setSeats = (v) => handleEditChange(table.id, "table_type", Math.max(1, Number(v) || 1));
+
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
+      <div className="ui-backdrop">
+        <div className="ui-dialog max-w-modal animate-scale-in" role="dialog" aria-modal="true" aria-label="Edit table">
 
           {/* Header */}
-          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900">Edit Table</h2>
-            <button
-              className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
-              onClick={handleClose}
-            >
-              <X className="w-5 h-5" />
+          <div className="ui-dialog-head">
+            <h2 className="text-panel-title text-brand-dark">Edit Table</h2>
+            <button type="button" className="ui-icon-btn" onClick={handleClose} aria-label="Close">
+              <X className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Content */}
-          <div className="px-6 py-4">
-            {/* Table Name Display */}
-            <div className="bg-gray-50 border border-gray-200 rounded-md p-4 mb-4 text-center">
-              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">Table Name</p>
-              <p className="text-2xl font-bold text-gray-900">{table.name}</p>
+          {/* Body */}
+          <div className="ui-dialog-body space-y-item">
+
+            {/* Table name */}
+            <div className="text-center rounded-panel border border-brand-line bg-brand-tint py-item">
+              <p className="ui-label !mb-0">Table Name</p>
+              <p className="text-kpi text-brand-dark">{table.name}</p>
             </div>
 
-            <div className="space-y-4">
-              {/* No of Seating */}
-              <div>
-                <label className="block text-sm font-medium mb-1 text-text-primary">No of Seating</label>
-                
-                {/* Desktop */}
+            {/* Seating */}
+            <div>
+              <label className="ui-label">No of Seating</label>
+              <div className={`ui-stepper ${editFieldErrors?.table_type ? 'border-danger' : ''}`}>
+                <button type="button" aria-label="Decrease" onClick={() => setSeats((Number(table.table_type) || 1) - 1)}>−</button>
                 <input
                   type="number"
                   min="1"
                   value={table.table_type}
-                  onChange={(e) => {
-                    const value = Math.max(1, Number(e.target.value) || 1);
-                    handleEditChange(table.id, "table_type", value);
-                  }}
-                  className={`hidden md:block w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                    }`}
+                  onChange={(e) => setSeats(e.target.value)}
                 />
+                <button type="button" aria-label="Increase" onClick={() => setSeats((Number(table.table_type) || 1) + 1)}>+</button>
+              </div>
+              {editFieldErrors?.table_type && <p className="ui-error-text">{editFieldErrors.table_type}</p>}
+            </div>
 
-                {/* Mobile */}
-                <div className={`md:hidden flex items-center gap-2 border rounded-md ${editFieldErrors?.table_type ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                  }`}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newValue = Math.max(1, (Number(table.table_type) || 1) - 1);
-                      handleEditChange(table.id, "table_type", newValue);
-                    }}
-                    className="px-4 py-2 text-lg font-bold text-text-primary hover:bg-gray-100 transition-colors"
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    min="1"
-                    value={table.table_type}
-                    onChange={(e) => {
-                      const value = Math.max(1, Number(e.target.value) || 1);
-                      handleEditChange(table.id, "table_type", value);
-                    }}
-                    className="flex-1 text-center py-2 border-x border-gray-300 focus:outline-none bg-transparent font-bold"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newValue = (Number(table.table_type) || 1) + 1;
-                      handleEditChange(table.id, "table_type", newValue);
-                    }}
-                    className="px-4 py-2 text-lg font-bold text-text-primary hover:bg-gray-100 transition-colors"
-                  >
-                    +
-                  </button>
-                </div>
-
-                {editFieldErrors?.table_type && (
-                  <p className="text-buttons-delete text-xs mt-1">{editFieldErrors.table_type}</p>
+            {/* Section & Zone */}
+            <div>
+              <label className="ui-label">Section &amp; Zone</label>
+              <select
+                value={table.config_id || ""}
+                onChange={(e) => handleEditChange(table.id, "config_id", Number(e.target.value))}
+                className="ui-field"
+              >
+                <option value="">Select config</option>
+                {loadingConfigs ? (
+                  <option disabled>Loading...</option>
+                ) : configs.length === 0 ? (
+                  <option disabled>No config available</option>
+                ) : (
+                  configs.map(c => (
+                    <option key={c.id} value={c.id}>{c.section} - {c.zone}</option>
+                  ))
                 )}
-              </div>
-              <div className="">
-                <label className="block text-sm font-medium mb-1 text-text-primary">Section & Zone :</label>
+              </select>
+            </div>
 
-                <select
-                  value={table.config_id || ""}
-                  onChange={(e) =>
-                    handleEditChange(table.id, "config_id", Number(e.target.value))
-                  }
-                  className="w-full px-3 py-2 border rounded-md"
-                >
-                  <option value="">Select Config</option>
-
-                  {loadingConfigs ? (
-                    <option disabled>Loading...</option>
-                  ) : configs.length === 0 ? (
-                    <option disabled>No Config Available</option>
-                  ) : (
-                    configs.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.section} - {c.zone}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-sm font-medium mb-1 text-text-primary">Status</label>
-                <select
-                  value={table.status || ""}
-                  onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
-                  className={`w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 ${editFieldErrors?.status ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                    }`}
-                >
-                  <option value="">Select Status</option>
-                  {statusOptions.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-                {editFieldErrors?.status && (
-                  <p className="text-buttons-delete text-xs mt-1">{editFieldErrors.status}</p>
-                )}
-              </div>
+            {/* Status */}
+            <div>
+              <label className="ui-label">Status</label>
+              <select
+                value={table.status || ""}
+                onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
+                className={`ui-field ${editFieldErrors?.status ? 'ui-field-error' : ''}`}
+              >
+                <option value="">Select status</option>
+                {statusOptions.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              {editFieldErrors?.status && <p className="ui-error-text">{editFieldErrors.status}</p>}
             </div>
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3 justify-end">
-            <button
-              className="px-6 py-2 rounded-md bg-white text-text-primary border border-gray-300 hover:bg-gray-50 font-medium"
-              onClick={handleClose}
-            >
-              Cancel
-            </button>
-            <button
-              className="px-6 py-2 rounded-md bg-action-primary text-text-white hover:bg-blue-700 font-medium"
-              onClick={saveEdit}
-            >
-              Save
-            </button>
+          <div className="ui-dialog-foot">
+            <button type="button" className="ui-btn" onClick={handleClose}>Cancel</button>
+            <button type="button" className="ui-btn ui-btn-update" onClick={saveEdit}>Save</button>
           </div>
         </div>
       </div>
