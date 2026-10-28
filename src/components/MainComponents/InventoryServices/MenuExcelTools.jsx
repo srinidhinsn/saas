@@ -80,6 +80,7 @@ const MenuExcelTools = ({
             );
 
           const row = {
+            ID: item.id,
             Name: item.name ?? '',
             Description: item.description ?? '',
             Category: catNameById(item.category_id) || 'Unknown',
@@ -93,7 +94,6 @@ const MenuExcelTools = ({
             Code: item.code != null ? String(item.code) : '',
             Serving_Quantity: item.serving_quantity ?? '',
             Serving_Unit: item.serving_unit ?? '',
-            Line_Item_IDs: Array.isArray(item.line_item_id) ? item.line_item_id.join(', ') : '',
           };
           zoneColumns.forEach((col) => {
             row[`Price_${col}`] = zonePrices[col] ?? '';
@@ -102,9 +102,9 @@ const MenuExcelTools = ({
         });
 
       const headers = [
-        'Name', 'Description', 'Category', 'Dietary_Type', 'Availability_Timing',
+        'ID','Name', 'Description', 'Category', 'Dietary_Type', 'Availability_Timing',
         'Image', 'Unit', 'Unit_Price', 'Discount', 'Availability', 'Code',
-        'Serving_Quantity', 'Serving_Unit', 'Line_Item_IDs',
+        'Serving_Quantity', 'Serving_Unit', 
         ...zoneColumns.map((c) => `Price_${c}`),
       ];
 
@@ -125,15 +125,16 @@ const MenuExcelTools = ({
   }) => {
     for (const row of parsedData) {
       if (!row.Name?.trim()) continue;
-
-      const existingRecords = allMenuItems.filter(
-        (item) => item.name?.trim().toLowerCase() === row.Name.trim().toLowerCase()
+      const categoryId = currentCategoriesFlat.find(
+        (c) => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
+      )?.id || currentSelectedCategoryId;
+      const rowId = Number(row.ID) || null;
+      const existingRecords = allMenuItems.filter((item) =>
+        rowId
+          ? Number(item.id) === rowId
+          : item.name?.trim().toLowerCase() === row.Name.trim().toLowerCase() &&
+            item.category_id === categoryId
       );
-
-      const categoryId =
-        currentCategoriesFlat.find(
-          (c) => c.name.trim().toLowerCase() === (row.Category || '').trim().toLowerCase()
-        )?.id || currentSelectedCategoryId;
 
       const categoryName = currentCategoriesFlat.find((c) => c.id === categoryId)?.name || null;
       if (!categoryName) {
@@ -167,11 +168,7 @@ const MenuExcelTools = ({
       })();
 
       const existingImageId =
-        allMenuItems.find(
-          (item) =>
-            item.name?.trim().toLowerCase() === row.Name.trim().toLowerCase() &&
-            (item.zone_config_id === 0 || item.zone_config_id === null)
-        )?.image_id ?? null;
+  existingRecords.find((item) => item.zone_config_id === 0)?.image_id ?? null;
 
       const importedImageId =
         row.Image && String(row.Image).trim() !== '' ? String(row.Image).trim() : null;
@@ -191,12 +188,6 @@ const MenuExcelTools = ({
         discount: Number(row.Discount) || 0,
         availability: Number(row.Availability) || 0,
         slug,
-        line_item_id: row.Line_Item_IDs
-          ? String(row.Line_Item_IDs)
-              .split(',')
-              .map((v) => parseInt(v.trim(), 10))
-              .filter((v) => !isNaN(v))
-          : null,
         created_by,
         updated_by,
       };
