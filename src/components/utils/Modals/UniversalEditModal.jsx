@@ -754,50 +754,88 @@ const UniversalEditModal = ({
   if (modalType === 'table' && table) {
     const setSeats = (v) => handleEditChange(table.id, "table_type", Math.max(1, Number(v) || 1));
 
-    return (
-      <div className="ui-backdrop">
-        <div className="ui-dialog max-w-modal animate-scale-in" role="dialog" aria-modal="true" aria-label="Edit table">
+    const label = "block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted";
+    const field =
+      "w-full h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink " +
+      "outline-none placeholder:text-ink-faint transition-colors " +
+      "focus:border-brand-ring focus:shadow-focus-ring disabled:opacity-50 disabled:cursor-not-allowed";
+    const fieldError = " !border-state-occupied !bg-state-occupied-bg";
+    const errorText = "mt-1 text-micro font-semibold text-state-occupied";
 
+    return (
+      <div className="ui-backdrop font-sans">
+        <div
+          className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit table"
+        >
           {/* Header */}
-          <div className="ui-dialog-head">
-            <h2 className="text-panel-title text-brand-dark">Edit Table</h2>
-            <button type="button" className="ui-icon-btn" onClick={handleClose} aria-label="Close">
+          <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+            <h2 className="text-panel-title text-brand-dark">Edit table</h2>
+            <button
+              type="button"
+              onClick={handleClose}
+              aria-label="Close"
+              className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors"
+            >
               <X className="h-4 w-4" />
             </button>
           </div>
 
           {/* Body */}
-          <div className="ui-dialog-body space-y-item">
+          <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
 
             {/* Table name */}
-            <div className="text-center rounded-panel border border-brand-line bg-brand-tint py-item">
-              <p className="ui-label !mb-0">Table Name</p>
-              <p className="text-kpi text-brand-dark">{table.name}</p>
+            <div className="text-center rounded-panel border border-brand-line bg-gradient-to-b from-brand-tint to-surface py-item shadow-panel">
+              <span className="block text-metric-label font-semibold text-ink-label">Table name</span>
+              <strong className="block mt-1 text-kpi text-brand-dark break-words">{table.name}</strong>
             </div>
 
             {/* Seating */}
             <div>
-              <label className="ui-label">No of Seating</label>
-              <div className={`ui-stepper ${editFieldErrors?.table_type ? 'border-danger' : ''}`}>
-                <button type="button" aria-label="Decrease" onClick={() => setSeats((Number(table.table_type) || 1) - 1)}>−</button>
+              <label className={label}>No of seating</label>
+              <div
+                className={
+                  "flex items-stretch h-control overflow-hidden rounded-button-sm border bg-surface " +
+                  "focus-within:border-brand-ring focus-within:shadow-focus-ring " +
+                  (editFieldErrors?.table_type ? "border-state-occupied" : "border-brand-line")
+                }
+              >
+                <button
+                  type="button"
+                  aria-label="Decrease"
+                  onClick={() => setSeats((Number(table.table_type) || 1) - 1)}
+                  className="px-item font-bold text-brand-dark hover:bg-brand-light transition-colors"
+                >
+                  −
+                </button>
                 <input
                   type="number"
                   min="1"
                   value={table.table_type}
                   onChange={(e) => setSeats(e.target.value)}
+                  className="flex-1 min-w-0 text-center text-ui font-semibold text-ink bg-transparent border-x border-brand-line outline-none"
                 />
-                <button type="button" aria-label="Increase" onClick={() => setSeats((Number(table.table_type) || 1) + 1)}>+</button>
+                <button
+                  type="button"
+                  aria-label="Increase"
+                  onClick={() => setSeats((Number(table.table_type) || 1) + 1)}
+                  className="px-item font-bold text-brand-dark hover:bg-brand-light transition-colors"
+                >
+                  +
+                </button>
               </div>
-              {editFieldErrors?.table_type && <p className="ui-error-text">{editFieldErrors.table_type}</p>}
+              {editFieldErrors?.table_type && <p className={errorText}>{editFieldErrors.table_type}</p>}
             </div>
 
             {/* Section & Zone */}
             <div>
-              <label className="ui-label">Section &amp; Zone</label>
+              <label className={label}>Section &amp; zone</label>
               <select
                 value={table.config_id || ""}
                 onChange={(e) => handleEditChange(table.id, "config_id", Number(e.target.value))}
-                className="ui-field"
+                className={field}
               >
                 <option value="">Select config</option>
                 {loadingConfigs ? (
@@ -814,25 +852,25 @@ const UniversalEditModal = ({
 
             {/* Status */}
             <div>
-              <label className="ui-label">Status</label>
+              <label className={label}>Status</label>
               <select
                 value={table.status || ""}
                 onChange={(e) => handleEditChange(table.id, "status", e.target.value)}
-                className={`ui-field ${editFieldErrors?.status ? 'ui-field-error' : ''}`}
+                className={field + (editFieldErrors?.status ? fieldError : "")}
               >
                 <option value="">Select status</option>
                 {statusOptions.map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
-              {editFieldErrors?.status && <p className="ui-error-text">{editFieldErrors.status}</p>}
+              {editFieldErrors?.status && <p className={errorText}>{editFieldErrors.status}</p>}
             </div>
           </div>
 
           {/* Footer */}
-          <div className="ui-dialog-foot">
+          <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
             <button type="button" className="ui-btn" onClick={handleClose}>Cancel</button>
-            <button type="button" className="ui-btn ui-btn-update" onClick={saveEdit}>Save</button>
+            <button type="button" className="ui-btn ui-btn-add" onClick={saveEdit}>Save changes</button>
           </div>
         </div>
       </div>

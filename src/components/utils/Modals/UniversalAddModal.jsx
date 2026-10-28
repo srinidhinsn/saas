@@ -711,38 +711,56 @@ const UniversalAddModal = ({
   
   // TABLE modal
   if (modalType === 'table') {
+    const label = "block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted";
+    const field =
+      "w-full h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink " +
+      "outline-none placeholder:text-ink-faint transition-colors " +
+      "focus:border-brand-ring focus:shadow-focus-ring disabled:opacity-50 disabled:cursor-not-allowed";
+    const fieldError = " !border-state-occupied !bg-state-occupied-bg";
+    const errorText = "mt-1 text-micro font-semibold text-state-occupied";
+
     return (
-      <div className="ui-backdrop">
-        <div className="ui-dialog max-w-modal-md animate-scale-in" role="dialog" aria-modal="true" aria-label="Add tables">
+      <div className="ui-backdrop font-sans">
+        <div
+          className="flex flex-col w-full max-w-xl max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Add tables"
+        >
 
           {/* Header */}
-          <div className="ui-dialog-head">
+          <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
             <div className="min-w-0">
-              <h3 className="text-panel-title text-brand-dark">Add Tables</h3>
+              <h3 className="text-panel-title text-brand-dark">Add tables</h3>
               <p className="text-micro text-ink-muted">Create one table or a whole range at once</p>
             </div>
-            <button type="button" onClick={handleClose} className="ui-icon-btn" aria-label="Close">
+            <button
+              type="button"
+              onClick={handleClose}
+              aria-label="Close"
+              className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors"
+            >
               <X className="h-4 w-4" />
             </button>
           </div>
 
           {/* Body */}
-          <div className="ui-dialog-body space-y-item">
+          <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
             {(tableRanges || []).map((row, index) => (
               <div
                 key={index}
-                className="grid grid-cols-1 sm:grid-cols-2 gap-item rounded-panel border border-line bg-canvas p-panel"
+                className="grid grid-cols-1 sm:grid-cols-2 gap-item rounded-panel border border-brand-line bg-brand-tint p-panel"
               >
                 {/* Range */}
                 <div className="sm:col-span-2">
-                  <label className="ui-label flex items-center gap-item-sm">
-                    Table Range *
+                  <label className={`${label} flex items-center gap-item-sm`}>
+                    Table range *
                     <span className="relative group cursor-pointer normal-case tracking-normal">
-                      <span className="grid place-items-center h-4 w-4 rounded-badge bg-brand-light text-brand-dark text-micro font-bold">
+                      <span className="grid place-items-center h-4 w-4 rounded-badge bg-brand-soft text-brand-dark text-micro font-bold">
                         i
                       </span>
                       <span className="absolute left-0 top-6 hidden group-hover:block w-60 p-item bg-surface border border-brand-line rounded-button shadow-card z-10 text-ui-sm text-ink font-normal">
-                        <span className="block font-bold mb-1">Table Range Examples</span>
+                        <span className="block font-bold text-brand-dark mb-1">Table range examples</span>
                         <span className="block"><strong>Single table:</strong> S1</span>
                         <span className="block"><strong>Single range:</strong> S01:S10</span>
                         <span className="block"><strong>Multiple ranges:</strong> A01:A10,B01:B05</span>
@@ -752,33 +770,33 @@ const UniversalAddModal = ({
                   <input
                     value={row?.range ?? ''}
                     onChange={(e) => handleRangeChange(index, 'range', e.target.value)}
-                    className={`ui-field ${fieldErrors?.[index]?.range ? 'ui-field-error' : ''}`}
+                    className={field + (fieldErrors?.[index]?.range ? fieldError : '')}
                     placeholder="S01:S10"
                   />
-                  {fieldErrors?.[index]?.range && <div className="ui-error-text">Enter table range</div>}
+                  {fieldErrors?.[index]?.range && <div className={errorText}>Enter table range</div>}
                 </div>
 
                 {/* Seats */}
                 <div>
-                  <label className="ui-label">Seats *</label>
+                  <label className={label}>Seats *</label>
                   <input
                     type="number"
                     min="1"
                     value={row?.table_type ?? ''}
                     onChange={e => handleRangeChange(index, 'table_type', e.target.value)}
-                    className={`ui-field ${fieldErrors?.[index]?.table_type ? 'ui-field-error' : ''}`}
+                    className={field + (fieldErrors?.[index]?.table_type ? fieldError : '')}
                     placeholder="4"
                   />
-                  {fieldErrors?.[index]?.table_type && <div className="ui-error-text">Enter seating</div>}
+                  {fieldErrors?.[index]?.table_type && <div className={errorText}>Enter seating</div>}
                 </div>
 
                 {/* Config */}
                 <div>
-                  <label className="ui-label">Section &amp; Zone *</label>
+                  <label className={label}>Section &amp; zone *</label>
                   <select
                     value={row?.config_id ?? ''}
                     onChange={(e) => handleRangeChange(index, 'config_id', Number(e.target.value))}
-                    className="ui-field"
+                    className={field}
                   >
                     <option value="">Select config</option>
                     {loadingConfigs ? (
@@ -795,11 +813,11 @@ const UniversalAddModal = ({
 
                 {/* Remark */}
                 <div className="sm:col-span-2">
-                  <label className="ui-label">Remark</label>
+                  <label className={label}>Remark</label>
                   <select
                     value={row?.remark ?? ''}
                     onChange={(e) => handleRangeChange(index, 'remark', e.target.value)}
-                    className="ui-field"
+                    className={field}
                   >
                     <option value="">Select status</option>
                     {statusOptions.length > 0
@@ -819,7 +837,7 @@ const UniversalAddModal = ({
           </div>
 
           {/* Footer */}
-          <div className="ui-dialog-foot">
+          <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
             <button type="button" className="ui-btn" onClick={handleClose}>Cancel</button>
             <button
               type="button"
@@ -833,7 +851,7 @@ const UniversalAddModal = ({
                   Generating…
                 </>
               ) : (
-                'Generate Tables'
+                'Generate tables'
               )}
             </button>
           </div>

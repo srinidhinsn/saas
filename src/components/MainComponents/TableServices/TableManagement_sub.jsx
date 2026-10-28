@@ -610,20 +610,7 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
             table.name.toLowerCase().includes(bulkDeleteSearch.toLowerCase())
         );
     };
-    /* =====================================================================
-   REPLACE everything in TableManagement.jsx from the line
-       const searchedTables = tables.filter(t => {
-   down to the end of the file with the code below.
 
-   ALSO, in the top part of the file:
-     1. add this state next to your other useState lines:
-            const [statusFilter, setStatusFilter] = useState("all");
-     2. FaUsers is already imported; FaCheck / FaClock are no longer needed.
-
-   No CSS file is needed – everything uses tailwind.config.js tokens.
-   ===================================================================== */
-
-    // Full class strings (not built dynamically) so Tailwind keeps them.
     const STATE = {
         vacant: { label: "Vacant", bar: "border-t-state-vacant", chip: "bg-state-vacant-bg text-state-vacant" },
         occupied: { label: "Occupied", bar: "border-t-state-occupied", chip: "bg-state-occupied-bg text-state-occupied" },
@@ -711,14 +698,14 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
                             />
                         </div>
 
-                        <div className="ui-toggle" role="group" aria-label="Filter by status">
+                        <div className="ui-tabs" role="group" aria-label="Filter by status">
                             {filterOptions.map(([key, label, n]) => (
                                 <button
                                     key={key}
                                     type="button"
                                     aria-pressed={statusFilter === key}
                                     onClick={() => setStatusFilter(key)}
-                                    className={`ui-toggle-btn ${statusFilter === key ? "ui-toggle-btn-active" : ""}`}
+                                    className={`ui-tab ${statusFilter === key ? "ui-tab-active" : ""}`}
                                 >
                                     {label} ({n})
                                 </button>
@@ -818,7 +805,6 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
                                                 >
                                                     <div className="flex items-center justify-between gap-2 px-3 pt-2.5 pb-1">
                                                         <span className="text-body-sm font-bold text-brand-dark break-words">{table.name}</span>
-                                                        <span className={`ui-chip ${st.chip}`}>{st.label}</span>
                                                     </div>
 
                                                     <div className="grid gap-0.5 px-3 pb-2.5 text-ui-sm text-ink-muted">
@@ -826,8 +812,8 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
                                                             <FaUsers className="text-brand text-ui-sm" />
                                                             <b>{table.table_type}</b> seats
                                                         </div>
-                                                        <div>Zone: <b className="font-semibold text-ink-soft">{config?.zone || table.location_zone || "—"}</b></div>
-                                                        <div>Section: <b className="font-semibold text-ink-soft">{config?.section || table.section || "—"}</b></div>
+                                                        {/* <div>Zone: <b className="font-semibold text-ink-soft">{config?.zone || table.location_zone || "—"}</b></div>
+                                                        <div>Section: <b className="font-semibold text-ink-soft">{config?.section || table.section || "—"}</b></div> */}
                                                     </div>
 
                                                     <div className="grid grid-cols-2 mt-auto border-t border-line-soft text-micro font-bold tracking-wide">
@@ -843,7 +829,7 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
                                                             EDIT
                                                         </button>
                                                         <button
-                                                            className="py-2 bg-canvas/40 text-state-occupied border-l border-line-soft hover:bg-state-occupied-bg transition-colors"
+                                                            className="py-2 bg-canvas/40 text-brand-dark border-l border-line-soft hover:bg-brand-soft transition-colors"
                                                             onClick={() => {
                                                                 setDeleteTableId(table.id);
                                                                 setShowConfirmDelete(true);
@@ -983,9 +969,9 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
             {showSecondDeleteConfirm && (
                 <div className="ui-backdrop font-sans">
                     <div className="ui-modal animate-scale-in" role="dialog" aria-modal="true" aria-label="Final confirmation">
-                        <h3 className="text-body font-bold text-state-occupied mb-2.5">Final confirmation</h3>
-                        <div className="border-l-bar border-l-state-occupied pl-3 py-2 mb-3.5 text-ui text-ink-muted leading-relaxed">
-                            <b className="text-state-occupied">This cannot be undone.</b> All selected tables will be permanently deleted.
+                        <h3 className="text-body font-bold text-brand-dark mb-2.5">Final confirmation</h3>
+                        <div className="border-l-bar border-l-brand pl-3 py-2 mb-3.5 text-ui text-ink-muted leading-relaxed">
+                            <b className="text-brand-dark">This cannot be undone.</b> All selected tables will be permanently deleted.
                         </div>
                         <div className="flex justify-end gap-2">
                             <button
