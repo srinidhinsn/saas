@@ -174,6 +174,7 @@ def _merge_group(orders: list,context=None, db: Session = None) -> dict:
             "created_at": o.created_at,
             "status": o.status,
             "total_price": o.total_price or 0,
+            "created_by": o.created_by, 
         }
         for o in orders
     ]
@@ -197,6 +198,8 @@ def _merge_group(orders: list,context=None, db: Session = None) -> dict:
         "item_names": [i.get("item_name", "") for i in merged_items],
         "sub_orders": sub_orders_meta,           # for TakeOrder count + timer
         "order_count": len(orders),              # total batches incl. root
+        "created_by": root.created_by,  
+        "handler_id": root.handler_id, 
         "invoice_id": root.invoice_id,
         "invoice_number": (invoice.document_number
         if invoice
