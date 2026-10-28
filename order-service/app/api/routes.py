@@ -54,7 +54,7 @@ def create_order(client_id: str, order: DineinOrderModel, context: SaasContext =
         price=order.price, gst=order.gst, cst=order.cst, discount=order.discount,
         invoice_status=order.invoice_status, total_price=order.total_price,
         invoice_id=order.invoice_id, dinein_order_id=None,
-        handler_id=order.handler_id, created_by=order.created_by, updated_by=order.updated_by,
+        handler_id=order.handler_id, created_by=order.created_by or str(context.user_id), updated_by=order.updated_by,
     )
     db.add(db_order)
     db.flush()
@@ -129,7 +129,7 @@ def create_sub_order(
         table_id=root_order.table_id,
         status=_status_label(context,order_status) or order_status,
         price=order.price, gst=0, cst=0, total_price=order.total_price,
-        created_by=order.created_by, invoice_id=None, invoice_status=None,
+        created_by=order.created_by or str(context.user_id), invoice_id=None, invoice_status=None,
     )
     db.add(db_sub_order)
     db.flush()
