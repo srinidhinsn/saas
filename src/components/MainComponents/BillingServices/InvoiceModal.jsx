@@ -993,9 +993,9 @@ const handleConfirmPayment = async () => {
                               }}
                               className="flex-1 border border-border-default rounded-lg px-2 py-1.5 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                             >
-                              {PAYMENT_METHODS.map(m => (
-                                <option key={m.value} value={m.value}>{m.label}</option>
-                              ))}
+                                {filterPaymentMethods(gateways).filter(m => !isPhonePeMethod(m.value)).map(m => (
+    <option key={m.value} value={m.value}>{m.label}</option>
+  ))}
                             </select>
                             <input
                               type="number"

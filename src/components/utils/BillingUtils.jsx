@@ -20,8 +20,8 @@ export const isOnlinePaymentMethod = (method) =>
 
 export const needsRazorpay = (splitPaymentEnabled, paymentSplits, method) =>
   splitPaymentEnabled
-    ? paymentSplits.some(s => isOnlinePaymentMethod(s.method))
-    : isOnlinePaymentMethod(method);
+    ? paymentSplits.some(s => isRazorpayMethod(s.method))
+    : isRazorpayMethod(method);
     export const filterPaymentMethods = (gateways = {}) =>
       PAYMENT_METHODS.filter(m => {
         if (isRazorpayMethod(m.value)) return !!gateways.razorpay;
