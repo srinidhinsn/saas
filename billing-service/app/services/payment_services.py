@@ -207,3 +207,17 @@ def verify_phonepe_payment_service(db: Session,client_id: str,document_id: int,m
     db.refresh(invoice)
 
     return {"invoice_id": invoice.id,"payment_method": updated_methods,"payment_status": invoice.payment_status,}
+
+def _env_key(client_id: str) -> str:
+    return "".join(c if c.isalnum() else "_" for c in client_id).upper()
+
+def _env_set(name: str) -> bool:
+    val = (os.getenv(name) or "").strip()
+    return bool(val) and not val.lower().startswith("your_")
+
+def get_available_gateways_service(client_id: str) -> dict:
+    k = _env_key(client_id)
+    return {
+        "razorpay": _env_set(f"RAZORPAY_KEY_ID_{k}") and _env_set(f"RAZORPAY_KEY_SECRET_{k}"),
+        "phonepe": _env_set(f"PHONEPE_{k}") and _env_set(f"PHONEPE_{k}_SECRET"),
+    }
