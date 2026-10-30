@@ -5,6 +5,20 @@ import axios from 'axios';
 import AddonSelectionPopup from './AddonSelection';
 import ComboSelectionPopup from './CombosSelectionPopup';
 import {isRentalRealm} from '../Menu-utils/menuUtils'
+const getDietaryStyle = (name = '') => {
+  const k = name.toLowerCase().replace(/[-_\s]/g, '');
+  if (k.includes('nonveg'))
+    return { selected: 'bg-red-100 text-red-800 border-red-500', dot: 'bg-buttons-delete' };
+  if (k.includes('egg'))
+    return { selected: 'bg-amber-100 text-amber-800 border-amber-500', dot: 'bg-buttons-update' };
+  if (k.includes('vegan'))
+    return { selected: 'bg-emerald-100 text-emerald-800 border-emerald-500', dot: 'bg-emerald-500' };
+  if (k.includes('jain'))
+    return { selected: 'bg-teal-100 text-teal-800 border-teal-500', dot: 'bg-teal-500' };
+  if (k.includes('veg'))
+    return { selected: 'bg-green-100 text-green-800 border-green-600', dot: 'bg-green-600' };
+  return { selected: 'bg-slate-200 text-slate-800 border-slate-500', dot: 'bg-buttons-configure' };
+};
 const UniversalAddModal = ({
   // Common props
   showModal,
@@ -260,7 +274,7 @@ const UniversalAddModal = ({
                   </p>
                 )}
               </div>
-              <button onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90"><X className='h-5 w-5' /></button>
+              <button onClick={handleClose} className="p-1.5 rounded-lg bg-buttons-delete text-text-white hover:opacity-90"><X className='h-5 w-5' /></button>
             </div>
 
             <div className="space-y-4">
@@ -278,7 +292,7 @@ const UniversalAddModal = ({
                     }));
                   }}
 
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                   required
                 >
                   <option value="">Select a category</option>
@@ -299,7 +313,7 @@ const UniversalAddModal = ({
                   type="text"
                   value={newItem?.name ?? ''}
                   onChange={(e) => setNewItem(prev => ({ ...(prev || {}), name: e.target.value }))}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                   placeholder={isComboCategory ? "e.g. Family Combo, Weekend Special" : "Enter item name"} 
                   required
                 />
@@ -311,13 +325,13 @@ const UniversalAddModal = ({
                 <textarea
                   value={newItem?.description ?? ''}
                   onChange={(e) => setNewItem(prev => ({ ...(prev || {}), description: e.target.value }))}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                   placeholder={isComboCategory ? "What's included, portion details…" : "Enter item description"} rows="3" />
               </div>
               {isRentalRealm(normalizedRealm) &&  (
                   <div>
                        <label className="block text-sm font-medium mb-2 text-text-primary">
-                             Rental Tier <span className="text-red-600">*</span>
+                             Rental Tier <span className="text-buttons-delete">*</span>
                        </label>
 
                        <div className="flex gap-2 items-center bg-bg-tertiary border border-border-default rounded-lg p-2">
@@ -348,29 +362,32 @@ const UniversalAddModal = ({
       Dietary Type
     </label>
     <div className="flex flex-wrap gap-2">
-    {dietaryOptions.map((d) => {
-  const key = (d || '').toLowerCase().replace(/[-_\s]/g, '');
-  const selected = (newItem?.dietary_type || '').toLowerCase().replace(/[-_\s]/g, '') === key;
-  const colorClass = dietaryColorMap?.[d] || dietaryColorMap?.[key] || 'bg-gray-300';
-  return (
-    <button
-      key={d}
-      type="button"
-      onClick={() =>
-        setNewItem(prev => ({ ...prev, dietary_type: selected ? '' : d }))
-      }
-      className={`px-3 py-1.5 rounded-lg text-sm border-2 transition-all capitalize flex items-center gap-2 ${
-        selected
-          ? 'bg-bg-tertiary text-text-primary shadow-sm'
-          : 'bg-bg-tertiary text-text-primary hover:opacity-80'
-      }`}
-      style={{ borderColor: 'transparent' }}
-    >
-      <span className={`w-2.5 h-2.5 rounded-full ${colorClass}`} />
-      {d}
-    </button>
-  );
-})}
+    <div className="flex flex-wrap gap-2">
+  {dietaryOptions.map((d) => {
+    const key = (d || '').toLowerCase().replace(/[-_\s]/g, '');
+    const selected = (newItem?.dietary_type || '').toLowerCase().replace(/[-_\s]/g, '') === key;
+    const style = getDietaryStyle(d);
+    const dotClass = dietaryColorMap?.[d] || dietaryColorMap?.[key] || style.dot;
+    return (
+      <button
+        key={d}
+        type="button"
+        onClick={() =>
+          setNewItem(prev => ({ ...prev, dietary_type: selected ? '' : d }))
+        }
+        className={`px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-all capitalize flex items-center gap-2 ${
+          selected
+            ? `${style.selected} shadow-sm`
+            : 'bg-bg-tertiary text-text-primary border-border-default hover:border-slate-400'
+        }`}
+      >
+        <span className={`w-2.5 h-2.5 rounded-full ${dotClass}`} />
+        {d}
+        {selected && <span className="text-xs font-bold">✓</span>}
+      </button>
+    );
+  })}
+</div>
     </div>
     {!newItem?.dietary_type && (
       <p className="text-xs text-text-secondary mt-1">No dietary type selected</p>
@@ -398,8 +415,8 @@ const UniversalAddModal = ({
                             setNewItem(prev => ({ ...prev, availability_time: next }));
                           }}
                           className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selected
-                              ? 'bg-action-primary text-white border-action-primary'
-                              : 'bg-bg-tertiary border-border-default text-text-primary hover:border-action-primary'
+                              ? 'bg-buttons-add text-text-white border-buttons-add'
+                              : 'bg-bg-tertiary border-border-default text-text-primary hover:border-buttonsHover-add'
                             }`}
                         >
                           {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
@@ -420,7 +437,7 @@ const UniversalAddModal = ({
                     type="number"
                     value={newItem?.unit_price ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), unit_price: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                     placeholder="0.00"
                     required
                   />
@@ -432,7 +449,7 @@ const UniversalAddModal = ({
                     type="number"
                     value={newItem?.discount ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), discount: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                     placeholder="0.00"
                   />
                 </div>
@@ -447,9 +464,9 @@ const UniversalAddModal = ({
                 {configs.map(c => (
                   <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-border-default bg-bg-tertiary">
                     <span className="text-sm font-medium text-text-primary">
-                      <span className="font-semibold text-blue-600">{c.section}</span>
-                      <span className="text-gray-400 mx-1">—</span>
-                      <span>{c.zone}</span>
+                      <span className="font-semibold text-buttons-add">{c.section}</span>
+                      <span className="text-text-secondary mx-1">—</span>
+                      <span className='text-text-primary'>{c.zone}</span>
                     </span>
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-gray-400">₹</span>
@@ -462,7 +479,7 @@ const UniversalAddModal = ({
                           ...prev,
                           zonePrices: { ...(prev.zonePrices || {}), [c.id]: e.target.value }
                         }))}
-                        className="w-24 px-2 py-1 rounded-lg border border-border-default bg-bg-primary text-sm text-right focus:outline-none focus:ring-2 focus:ring-action-primary"
+                        className="w-24 px-2 py-1 rounded-lg border border-border-default bg-bg-primary text-sm text-right focus:outline-none focus:ring-2 focus:ring-buttons-add"
                       />
                     </div>
                   </div>
@@ -475,7 +492,7 @@ const UniversalAddModal = ({
                   <select
                     value={newItem?.unit ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), unit: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                   >
                     <option value="">Select unit</option>
                     {(units || []).map((u) => (
@@ -497,7 +514,7 @@ const UniversalAddModal = ({
                         availability: e.target.value
                       }))
                     }
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default focus:outline-none focus:ring-2 focus:ring-buttons-add"
                     placeholder="Enter stock / quantity"
                   />
                 </div>
@@ -506,7 +523,7 @@ const UniversalAddModal = ({
                   <select
                     value={newItem?.serving_unit ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_unit: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                   >
                     <option value="">Select unit</option>
                     {(units || []).map((u) => (
@@ -520,7 +537,7 @@ const UniversalAddModal = ({
                     type="number"
                     value={newItem?.serving_quantity ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_quantity: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                     placeholder="0"
                   />
                 </div>
@@ -531,7 +548,7 @@ const UniversalAddModal = ({
                     type="text"
                     value={newItem?.code ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), code: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
                     placeholder="0"
                   />
                 </div>
@@ -556,7 +573,7 @@ const UniversalAddModal = ({
                                   <span className="text-violet-500">₹{Number(it.unit_price).toFixed(0)}</span>
                                   <button type="button" onClick={() => setNewItem(prev => ({ ...prev, line_item_id: prev.line_item_id.filter(x => x !== id) }))}
                                     className="w-4 h-4 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center">
-                                    <X size={9} className="text-red-600" />
+                                    <X size={9} className="text-buttons-delete" />
                                   </button>
                                 </div>
                               </div>
@@ -585,7 +602,7 @@ const UniversalAddModal = ({
                         </div>
                       )}
                       <button type="button" onClick={() => setShowAddonPopup(true)}
-                        className="w-full px-4 py-3 rounded-lg bg-bg-tertiary border-2 border-dashed border-border-default text-text-primary hover:border-action-primary hover:bg-bg-secondary transition-all flex items-center justify-center gap-2 font-medium">
+                        className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border-default border-border-default text-text-primary hover:bg-slate-200 transition-all flex items-center justify-center gap-2 font-medium">
                         <Plus size={18} />
                         <span>{newItem?.line_item_id?.length > 0 ? `Manage Add-ons (${newItem.line_item_id.length} selected)` : 'Select Add-ons'}</span>
                       </button>
@@ -600,7 +617,7 @@ const UniversalAddModal = ({
               <div>
                 <label className="block text-sm font-medium mb-2 text-text-primary">Item Image</label>
                 <div
-                  className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${dragActive ? 'border-action-primary bg-bg-secondary' : 'border-border-default'
+                  className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${dragActive ? 'bg-buttons-add' : 'border-border-default'
                     }`}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
@@ -616,7 +633,7 @@ const UniversalAddModal = ({
                           setNewItemImage(null);
                           setNewItemImageUrl('');
                         }}
-                        className="absolute top-2 right-2 bg-action-danger text-text-white p-2 rounded-full hover:opacity-90"
+                        className="absolute top-2 right-2 bg-buttons-delete text-text-white p-2 rounded-full hover:opacity-90"
                       >
                         <X size={16} />
                       </button>
@@ -636,7 +653,7 @@ const UniversalAddModal = ({
                       />
                       <label
                         htmlFor="imageUpload"
-                        className="inline-block px-4 py-2 bg-action-primary text-text-white rounded-lg cursor-pointer hover:opacity-90"
+                        className="inline-block px-4 py-2 bg-buttons-add text-text-white rounded-lg cursor-pointer hover:opacity-90"
                       >
                         Choose File
                       </label>
@@ -650,14 +667,14 @@ const UniversalAddModal = ({
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={handleClose}
-                  className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors"
+                  className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-slate-200 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddItem}
                   disabled={isSubmitting}
-                  className={`flex-1 px-4 py-2 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-action-primary hover:opacity-90'}`}
+                  className={`flex-1 px-4 py-2 rounded-lg bg-buttons-add text-text-white hover:bg-buttonsHover-add  ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-action-primary hover:opacity-90'}`}
                 >
                   {isComboCategory ? 'Add Combo' : 'Add Item'}
                 </button>
@@ -699,7 +716,7 @@ const UniversalAddModal = ({
         <div className="bg-bg-primary rounded-xl w-full max-w-xl shadow-2xl border border-border-default my-8">
           <div className="sticky top-0 bg-bg-primary px-4 py-2 border-b-border-default flex justify-between items-center z-10 rounded-t-xl">
             <h3 className="text-xl font-bold text-text-primary">Add Tables</h3>
-            <button onClick={handleClose} className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity">
+            <button onClick={handleClose} className="p-1.5 rounded-lg bg-buttons-add text-text-white hover:opacity-90 transition-opacity">
               <X size={24} />
             </button>
           </div>
@@ -717,7 +734,7 @@ const UniversalAddModal = ({
                       <span className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-100 text-action-primary text-xs font-bold">
                         i
                       </span>
-                      <div className="absolute left-1/2 -translate-x-1/2 top-7 hidden group-hover:block w-60 p-3 bg-white border border-blue-200 rounded-lg shadow-lg z-50 text-xs text-gray-700">
+                      <div className="absolute left-1/2 -translate-x-1/2 top-7 hidden group-hover:block w-60 p-3 bg-white border border-blue-200 rounded-lg shadow-lg z-50 text-xs text-text-primary">
                         <div className="font-bold mb-1 text-text-primary">
                           Table Range Examples
                         </div>
@@ -797,7 +814,7 @@ const UniversalAddModal = ({
               </div>
             ))}
             <button
-              className="w-full bg-action-primary text-text-white py-2 rounded-lg hover:bg-bulkActionsHover-addingHover hover:text-text-primary transition-colors font-bold text-lg shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="w-full bg-buttons-add text-text-white py-2 rounded-lg hover:bg-buttonsHover-add transition-colors font-bold text-lg shadow-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
               disabled={isGenerating}
               onClick={generateTables}
             >
@@ -807,8 +824,7 @@ const UniversalAddModal = ({
                   Generating Tables...
                 </span>
               ) : (
-                <span className="flex items-center justify-center gap-2">
-                  <FaPlus /> Generate Tables
+                <span className="flex items-center justify-center gap-2"> Generate Tables
                 </span>
               )}
             </button>

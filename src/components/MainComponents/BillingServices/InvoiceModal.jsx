@@ -7,7 +7,7 @@ import RazorpayPayment from "../../Constants/RazorPay/RazorpayPayment";
 import { useClient } from "../../../context/ClientContext";
 import { isPackagingOrderItem, fmt, formatPriceByMode } from '../../utils/Menu-utils/menuUtils';
 import {
-  PAYMENT_METHODS,
+  filterPaymentMethods,
   needsRazorpay,
   sumSplits,
   getBalance,
@@ -98,6 +98,8 @@ export default function InvoiceModal({
   const { clientDetails } = useClient();
   const clientGstNumber = clientDetails?.gst_number || "";
   const [showPhonePeIframe, setShowPhonePeIframe] = useState(false);
+  const [gateways, setGateways] = useState({ razorpay: false, phonepe: false });
+  const [gatewaysLoaded, setGatewaysLoaded] = useState(false);
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
   const allOrderItems = selectedOrder?.items || [];
@@ -242,7 +244,39 @@ const onSplitAmountBlur = () => {
       fetchUniqueCustomers();
     }
   }, [clientId, token]);
-
+  useEffect(() => {
+    if (!clientId || !token) return;
+    (async () => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify/payment_gateways`,
+          { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId } }
+        );
+        setGateways(res.data?.data || { razorpay: false, phonepe: false });
+      } catch (err) {
+        console.error("Failed to fetch payment gateways:", err);
+        setGateways({ razorpay: false, phonepe: false });
+      } finally {
+        setGatewaysLoaded(true);
+      }
+    })();
+  }, [clientId, token]);
+  
+  const isMethodAvailable = (value) => {
+    const v = String(value || "").toLowerCase();
+    if (v.includes("razorpay")) return gateways.razorpay;
+    if (v.includes("phonepe")) return gateways.phonepe;
+    return true; // Cash, Due, etc.
+  };
+  
+  // If the saved/selected method isn't available for this client, fall back to Cash
+  useEffect(() => {
+    if (!gatewaysLoaded) return;
+    if (!isMethodAvailable(method)) {
+      setMethod("Cash");
+      if (!splitPaymentEnabled) setPaymentSplits([{ method: "Cash", amount: total }]);
+    }
+  }, [gatewaysLoaded, gateways]);
   useEffect(() => {
     const loadInvoiceDraft = async () => {
       if (!initialOrder) return;
@@ -330,7 +364,7 @@ const onSplitAmountBlur = () => {
         );
 
         setPaymentSplits(splits);
-        updateBalance(sumSplits(splits));
+        updateBalance(splits);
       }
     }
   }, [total]);
@@ -677,10 +711,10 @@ const handleConfirmPayment = async () => {
                   </p>
                 </div>
               </div>
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mr-10">
                 <div className="text-text-white">
                   <div className="text-sm font-medium">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
-                  <div className="text-xs text-text-white/80">Order #{selectedOrder.id}</div>
+                  <div className="text-xs text-text-white/80">Order #{selectedOrder.dinein_order_id ?? selectedOrder.id}</div>
                 </div>
                 <div className="text-text-white">
                   <div className="text-sm font-medium">{new Date().toLocaleDateString()}</div>
@@ -753,11 +787,11 @@ const handleConfirmPayment = async () => {
                   {/* Totals */}
                   <div className="border-t border-border-default bg-bg-tertiary px-5 py-4 rounded-b-xl">
                     <div className="space-y-2">
-                      <div className="flex justify-between text-text-secondary">
+                      <div className="flex justify-between text-text-primary">
                         <span>Subtotal</span>
                         <span className="font-semibold">₹{formatPriceByMode(orderSubtotal, clientId)}</span>
                       </div>
-                      <div className="flex justify-between text-action-danger">
+                      <div className="flex justify-between text-buttons-delete">
                         <span>Discount</span>
                         <span className="font-semibold">-₹{formatPriceByMode(calculatedDiscount, clientId)}</span>
                       </div>
@@ -910,8 +944,8 @@ const handleConfirmPayment = async () => {
                             key={statusOption}
                             type="button"
                             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${paymentStatus === statusOption
-                              ? "bg-action-primary text-text-white shadow-md"
-                              : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary border border-border-default"
+                              ? "bg-buttons-add text-text-white shadow-md"
+                              : "bg-bg-tertiary text-text-secondary hover:bg-buttons-configure hover:text-text-white border border-border-default"
                               }`}
                             onClick={() => setPaymentStatus(statusOption)}
                           >
@@ -959,9 +993,9 @@ const handleConfirmPayment = async () => {
                               }}
                               className="flex-1 border border-border-default rounded-lg px-2 py-1.5 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
                             >
-                              {PAYMENT_METHODS.map(m => (
-                                <option key={m.value} value={m.value}>{m.label}</option>
-                              ))}
+                              {filterPaymentMethods(gateways).map(m => (
+  <option key={m.value} value={m.value}>{m.label}</option>
+))}
                             </select>
                             <input
                               type="number"
@@ -992,20 +1026,20 @@ const handleConfirmPayment = async () => {
                       </div>
                     ) : (
                       <div className="flex gap-2">
-                        <select
-                          value={method}
-                          onChange={(e) => {
-                            setMethod(e.target.value);
-                            setPaymentSplits([{ method: e.target.value, amount: total }]);
-                          }}
-                          className="flex-1 border border-border-default rounded-lg px-3 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
-                        >
-                          <option>Cash</option>
-                          <option value="razorpay_upi">UPI (Razorpay)</option>
-                          <option value="razorpay_card">Card (Razorpay)</option>
-                          <option value="phonepe">PhonePe</option>
-                          <option>Due</option>
-                        </select>
+                       <select
+  value={method}
+  onChange={(e) => {
+    setMethod(e.target.value);
+    setPaymentSplits([{ method: e.target.value, amount: total }]);
+  }}
+  className="flex-1 border border-border-default rounded-lg px-3 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
+>
+  <option value="Cash">Cash</option>
+  {gateways.razorpay && <option value="razorpay_upi">UPI</option>}
+  {gateways.razorpay && <option value="razorpay_card">Card</option>}
+  {gateways.phonepe && <option value="phonepe">PhonePe</option>}
+  <option value="Due">Due</option>
+</select>
                         <input
                           type="number"
                           value={total}

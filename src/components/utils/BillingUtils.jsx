@@ -8,17 +8,26 @@ export const PAYMENT_METHODS = [
   { value: "Cash", label: "Cash" },
   { value: "razorpay_upi", label: "UPI (Razorpay)" },
   { value: "razorpay_card", label: "Card (Razorpay)" },
+  { value: "phonepe", label: "PhonePe" },
   { value: "Due", label: "Due" },
 ];
+export const isRazorpayMethod = (method) =>
+  method === "razorpay_upi" || method === "razorpay_card";
 
+export const isPhonePeMethod = (method) => method === "phonepe";
 export const isOnlinePaymentMethod = (method) =>
   method === "razorpay_upi" || method === "razorpay_card";
 
 export const needsRazorpay = (splitPaymentEnabled, paymentSplits, method) =>
   splitPaymentEnabled
-    ? paymentSplits.some(s => isOnlinePaymentMethod(s.method))
-    : isOnlinePaymentMethod(method);
-
+    ? paymentSplits.some(s => isRazorpayMethod(s.method))
+    : isRazorpayMethod(method);
+export const filterPaymentMethods = (gateways = {}) =>
+      PAYMENT_METHODS.filter(m => {
+        if (isRazorpayMethod(m.value)) return !!gateways.razorpay;
+        if (isPhonePeMethod(m.value)) return !!gateways.phonepe;
+        return true;
+      });
 // Sum of all amounts across split rows
 export const sumSplits = (splits) =>
   splits.reduce((sum, s) => sum + Number(s.amount || 0), 0);
@@ -324,10 +333,10 @@ export const getInitialOrderMode = (order, tablesMap = {}) => {
 
 export const StatusBadge = ({ status }) => {
   const styles = {
-    pending: 'bg-orange-100 text-orange-700 border-orange-200',
-    preparing: 'bg-blue-100 text-blue-700 border-blue-200',
-    ready: 'bg-green-100 text-green-700 border-green-200',
-    served: 'bg-gray-100 text-gray-600 border-gray-200',
+    pending: 'bg-status-pending text-text-white border-orange-200',
+    preparing: 'bg-status-preparing text-text-white border-blue-200',
+    ready: 'bg-status-ready text-text-white border-green-200',
+    served: 'bg-status-served text-text-white border-gray-200',
   };
   const s = status?.toLowerCase();
   return (
@@ -413,9 +422,9 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
   const transactionType = isServed ? 'WASTAGE' : 'ITEM_CANCELLED';
   const reasonList = isServed ? WASTAGE_REASONS : CANCELLATION_REASONS;
   const typeLabel = isServed ? 'Wastage' : 'Cancellation';
-  const typeColor = isServed ? 'text-red-600' : 'text-orange-600';
-  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200';
-  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600';
+  const typeColor = isServed ? 'text-red-600' : 'text-red-600';
+  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-red-50 border-red-200';
+  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700';
 
   useEffect(() => {
     if (isOpen) { setReason(''); setCustomReason(''); setRemoveQty(1); }
@@ -467,7 +476,7 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
                   onClick={() => setReason(r)}
                   className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
                     ${reason === r
-                      ? isServed ? 'bg-red-600 text-white border-red-600' : 'bg-orange-500 text-white border-orange-500'
+                      ? isServed ? 'bg-red-600 text-white border-red-600' : 'bg-red-600 text-white border-red-600'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
                 >{r}</button>
               ))}
@@ -510,10 +519,10 @@ export const OrderItemsViewModal = ({ isOpen, onClose, order, onRequestDeleteIte
 
   const getItemStatusStyle = (status) => {
     switch (status?.toLowerCase()) {
-      case 'pending': return 'bg-orange-100 text-orange-700';
-      case 'preparing': return 'bg-blue-100 text-blue-700';
-      case 'ready': return 'bg-green-100 text-green-700';
-      case 'served': return 'bg-gray-100 text-gray-600';
+      case 'pending': return 'bg-status-pending text-text-white';
+      case 'preparing': return 'bg-status-preparing text-text-white';
+      case 'ready': return 'bg-status-ready text-text-white';
+      case 'served': return 'bg-status-served text-text-white';
       default: return 'bg-bg-tertiary text-text-secondary';
     }
   };

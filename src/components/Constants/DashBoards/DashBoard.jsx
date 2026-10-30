@@ -22,8 +22,8 @@ const fullConfig = resolveConfig(tailwindConfig);
 const ACTION_PRIMARY = fullConfig.theme.colors.action?.primary || "#f97316";
 
 const PIE_COLORS = ["#a855f7", "#f59e0b", "#10b981"];
-const ITEM_COLORS = ["#f97316", "#fb923c", "#fbbf24", "#34d399", "#60a5fa"];
-const DINEIN_COLOR = "#f97316";
+const ITEM_COLORS = ["#5c1ba4", "#8128ed", "#b77cff", "#e7d6ff", "#60a5fa"];
+const DINEIN_COLOR = "#5c1ba4";
 const TAKEAWAY_COLOR = "#8b5cf6";
 
 const fmt = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
@@ -46,8 +46,7 @@ function SectionHeading({ label, sub }) {
 function SalesKPI({ icon, value, label, sub }) {
   return (
     <div className="relative overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-3">
-      <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-orange-50 pointer-events-none" />
-      <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-action-primary text-xl relative z-10">
+      <div className="w-10 h-10 rounded-xl bg-brand-100 flex items-center justify-center text-brand-800 text-xl relative z-10">
         {icon}
       </div>
       <div className="relative z-10">
@@ -83,8 +82,8 @@ function SplitKPI({ label, dinein, takeaway, icon, sub }) {
         <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</span>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-orange-50 rounded-xl p-3">
-          <div className="text-[11px] font-bold text-orange-500 uppercase tracking-wider mb-1">Dine-in</div>
+        <div className="bg-brand-50 rounded-xl p-3">
+          <div className="text-[11px] font-bold text-action-primary uppercase tracking-wider mb-1">Dine-in</div>
           <div className="text-lg font-extrabold text-gray-900">{dinein}</div>
         </div>
         <div className="bg-purple-50 rounded-xl p-3">
@@ -235,7 +234,7 @@ function TwoHrSalesCard({
         <select
           value={salesDuration}
           onChange={(e) => setSalesDuration(Number(e.target.value))}
-          className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-semibold bg-white outline-none"
+          className="border border-border-default rounded-lg px-3 py-1.5 text-xs font-semibold bg-text-white outline-none"
         >
           <option value={1}>Last 1 Hour</option>
           <option value={2}>Last 2 Hours</option>
@@ -249,8 +248,8 @@ function TwoHrSalesCard({
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="bg-orange-50 rounded-xl p-4">
-          <div className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">
+        <div className="bg-brand-50 rounded-xl p-4">
+          <div className="text-[10px] font-bold text-brand-800 uppercase tracking-wider mb-1">
             Dine-in
           </div>
 
@@ -273,8 +272,8 @@ function TwoHrSalesCard({
           </div>
         </div>
 
-        <div className="bg-purple-50 rounded-xl p-4">
-          <div className="text-[10px] font-bold text-purple-500 uppercase tracking-wider mb-1">
+        <div className="bg-brand-50 rounded-xl p-4">
+          <div className="text-[10px] font-bold text-brand-800 uppercase tracking-wider mb-1">
             Takeaway
           </div>
 
@@ -845,7 +844,7 @@ const latestCancellation =
           background:transparent; transition:all .15s;
           white-space:nowrap;
         }
-        .filter-strip button.active { background:#f97316; color:#fff; }
+        .filter-strip button.active { background:#5c1ba4; color:#fff; }
 
         .prog-track { height:6px; border-radius:4px; background:#f3f4f6; overflow:hidden; flex:1; }
         .prog-fill  { height:100%; border-radius:4px; transition:width .5s ease; }
@@ -875,12 +874,12 @@ const latestCancellation =
                 <span className="live-dot" />
                 <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Live</span>
               </div>
-              <h1 className="text-2xl lg:text-3xl font-extrabold text-gray-900 tracking-tight leading-none">
+              <h1 className="text-2xl lg:text-3xl font-extrabold text-brand-900 tracking-tight leading-none">
                Dashboard
               </h1>
               <p className="text-sm text-gray-400 mt-1">
                 Showing data for&nbsp;
-                <span className="font-semibold text-gray-700">{filterLabel}</span>
+                <span className="font-semibold text-brand-800">{filterLabel}</span>
               </p>
             </div>
 
@@ -1070,7 +1069,7 @@ const latestCancellation =
                   <div>
                     <div className="flex items-center gap-1.5 mb-3">
                       <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
-                      <span className="text-xs font-bold text-orange-600">Dine-in</span>
+                      <span className="text-xs font-bold text-action-primary">Dine-in</span>
                     </div>
                     <div className="space-y-3">
                       {[
@@ -1160,7 +1159,7 @@ const latestCancellation =
               {/* Dine-in top items */}
               <div className="card">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-brand-800" />
                   <p className="card-title">Dine-in Top Items</p>
                 </div>
                 <p className="card-sub">Top 5 most ordered in dine-in</p>
