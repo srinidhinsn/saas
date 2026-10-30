@@ -13,7 +13,48 @@ from models.order_model import DineinOrderModel , resolve_base_status
 from .order_status import _status_label
 from models.saas_context import SaasContext
 from entity.billing_entity import BillingDocumentEntity
+import os,re
+from datetime import datetime, timedelta, time
+from zoneinfo import ZoneInfo
+from sqlalchemy import text, or_
 
+TIMEZONE   = os.getenv("TIMEZONE", "UTC")
+DEFAULT_RESET_HOUR = int(os.getenv("ORDER_NUMBER_RESET_HOUR", "0"))
+
+def _reset_hour(client_id=None) -> int:
+    if client_id:
+        key = "ORDER_NUMBER_RESET_HOUR_" + re.sub(r"[^A-Za-z0-9]", "_", str(client_id)).upper()
+        raw = os.getenv(key)
+        if raw not in (None, ""):
+            try:
+                h = int(raw)
+                if 0 <= h <= 23:
+                    return h
+            except ValueError:
+                pass
+    return DEFAULT_RESET_HOUR
+
+def _day_bounds(dt=None, client_id=None):
+    h = _reset_hour(client_id)
+    dt = (dt or datetime.now(ZoneInfo(TIMEZONE))).replace(tzinfo=None)
+    start = datetime.combine((dt - timedelta(hours=h)).date(), time.min) + timedelta(hours=h)
+    return start, start + timedelta(days=1)
+
+def next_order_number(db, client_id: str) -> int:
+    db.execute(text("SELECT 1 FROM client WHERE id = :c FOR UPDATE"), {"c": client_id})
+    s, e = _day_bounds(client_id=client_id)
+    return db.execute(text("""
+    SELECT COALESCE(MAX(
+             CASE WHEN dinein_order_id ~ '^[0-9]+(-[0-9]+)?$'
+                  THEN split_part(dinein_order_id,'-',1)::bigint END), 0) + 1
+    FROM dinein_order WHERE client_id = :c AND created_at >= :s AND created_at < :e """), {"c": client_id, "s": s, "e": e}).scalar_one()
+
+def group_filters(order):
+    root = _root_dinein_id(order.dinein_order_id or str(order.id))
+    s, e = _day_bounds(order.created_at, order.client_id)
+    return [
+        Db_Order_Entity.client_id == order.client_id,  or_(Db_Order_Entity.dinein_order_id == root,Db_Order_Entity.dinein_order_id.like(f"{root}-%")),
+        Db_Order_Entity.created_at >= s,Db_Order_Entity.created_at < e,]
 
 def _is_rental_realm(context) -> bool:
     return (resolve_realm_from_context(context) or "").strip().lower() == "rental"
@@ -133,6 +174,7 @@ def _merge_group(orders: list,context=None, db: Session = None) -> dict:
             "created_at": o.created_at,
             "status": o.status,
             "total_price": o.total_price or 0,
+            "created_by": o.created_by, 
         }
         for o in orders
     ]
@@ -156,6 +198,8 @@ def _merge_group(orders: list,context=None, db: Session = None) -> dict:
         "item_names": [i.get("item_name", "") for i in merged_items],
         "sub_orders": sub_orders_meta,           # for TakeOrder count + timer
         "order_count": len(orders),              # total batches incl. root
+        "created_by": root.created_by,  
+        "handler_id": root.handler_id, 
         "invoice_id": root.invoice_id,
         "invoice_number": (invoice.document_number
         if invoice
@@ -356,19 +400,14 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
             status_code=404,
             detail=f"Order {body.id} not found"
         )
-
+    if ((order.dinein_order_id or "").startswith("D")
+        and body.status is not None and body.status not in (OrderStatusEnum.draft, OrderStatusEnum.cancelled)):
+        order.dinein_order_id = str(next_order_number(db, client_id))
+        order.created_at = datetime.now(ZoneInfo(TIMEZONE))
+        body.dinein_order_id = None
     # ── Cancel entire order group ───────────────────────────────────────────
     if body.status == OrderStatusEnum.cancelled:
-        root_id = _root_dinein_id(order.dinein_order_id)
-
-        related_orders = (
-            db.query(Db_Order_Entity)
-            .filter(
-                Db_Order_Entity.client_id == client_id,
-                Db_Order_Entity.dinein_order_id.like(f"{root_id}%"),
-            )
-            .all()
-        )
+        related_orders = db.query(Db_Order_Entity).filter(*group_filters(order)).all()
 
         for o in related_orders:
             o.status = _status_label(context, body.status) or body.status

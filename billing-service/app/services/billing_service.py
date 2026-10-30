@@ -6,13 +6,37 @@ from typing import List, Dict, Any, Optional
 # billing_service.py
 from models.billing_model import PaymentStatusEnum, ApprovalStatusEnum 
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_,func, text
 from datetime import datetime, timedelta
-import os
+import os, zlib
 from entity.billing_entity import BillingDocumentEntity
+from zoneinfo import ZoneInfo
 TIMEZONE = os.getenv("TIMEZONE", "UTC")
 
+def _next_invoice_number(db: Session, client_id: str) -> str:
+    """INV-YYYY-000001, sequence restarts every day, per client."""
+    now_local = datetime.now(ZoneInfo(TIMEZONE)).replace(tzinfo=None)
+    day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start + timedelta(days=1)
 
+    # Serialize concurrent issues for the same client + day (released on commit/rollback)
+    lock_key = zlib.crc32(f"{client_id}:{day_start.date()}".encode())
+    db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": lock_key})
+
+    # Invoices already numbered today for this client (inactive ones included on purpose,
+    # so a soft-deleted invoice never frees up its number)
+    issued_today = (
+        db.query(func.count(BillingDocumentEntity.id))
+        .filter(
+            BillingDocumentEntity.client_id == client_id,
+            BillingDocumentEntity.document_number.isnot(None),
+            BillingDocumentEntity.invoice_date >= day_start,
+            BillingDocumentEntity.invoice_date < day_end,
+        )
+        .scalar()
+    ) or 0
+
+    return f"INV-{now_local.year}-{issued_today + 1:06d}"
 
 # ---------------------------------- support functions ----------------------------------
 # Get Items by Document ID
@@ -499,12 +523,10 @@ def issue_invoice(db: Session, client_id: str, invoice_id: int) -> dict:
 
     # Assign number if missing
     if not doc.document_number:
-        # Simple sequence: INV-YYYY-<id>  (replace with your own numbering logic)
-        year = datetime.now().strftime("%Y")
-        doc.document_number = f"INV-{year}-{invoice_id:06d}"
+        doc.document_number = _next_invoice_number(db, client_id)
 
     doc.status = "Issued"
-    doc.invoice_date = datetime.now()
+    doc.invoice_date = datetime.now(ZoneInfo(TIMEZONE)).replace(tzinfo=None)
     if not doc.payment_status:
         doc.payment_status = PaymentStatusEnum.pending
     db.commit()
