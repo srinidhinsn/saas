@@ -157,27 +157,27 @@ export const CancelOrderConfirmModal = ({ isOpen, onClose, onConfirm }) => {
   const effectiveReason = reason === 'Other' ? customReason : reason;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-red-600">Cancel Order</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Cancel order">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h2 className="text-panel-title text-brand-dark">Cancel Order</h2>
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
+            <X size={16} />
           </button>
         </div>
-        <div className="px-6 py-5 space-y-4">
-          <p className="text-sm text-gray-600">
-            The order will be marked as <span className="font-semibold text-red-600">cancelled</span> and kept for records. Select a reason:
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
+          <p className="text-ui text-ink-muted">
+            The order will be marked as <span className="font-semibold text-brand-dark">cancelled</span> and kept for records. Select a reason:
           </p>
-          <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1">
+          <div className="grid grid-cols-2 gap-item-sm max-h-52 overflow-y-auto pr-1">
             {ORDER_CANCEL_REASONS.map(r => (
               <button
                 key={r}
                 onClick={() => setReason(r)}
-                className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
+                className={`px-2 py-2 rounded-button-sm text-ui-sm font-semibold border text-left transition-colors
                   ${reason === r
-                    ? 'bg-red-600 text-white border-red-600'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+                    ? 'bg-brand text-text-white border-brand'
+                    : 'bg-surface text-ink-soft border-line hover:border-brand-line hover:bg-brand-tint'}`}
               >
                 {r}
               </button>
@@ -188,24 +188,21 @@ export const CancelOrderConfirmModal = ({ isOpen, onClose, onConfirm }) => {
               value={customReason}
               onChange={e => setCustomReason(e.target.value)}
               placeholder="Describe the reason…"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
+              className="w-full h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink outline-none placeholder:text-ink-faint transition-colors focus:border-brand-ring focus:shadow-focus-ring"
             />
           )}
         </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            className="ui-btn"
           >
             Go Back
           </button>
           <button
             disabled={!reason || (reason === 'Other' && !customReason.trim())}
             onClick={() => { onConfirm(effectiveReason); onClose(); }}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${reason && !(reason === 'Other' && !customReason.trim())
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-gray-300 cursor-not-allowed'}`}
+            className="ui-btn ui-btn-danger"
           >
             Cancel Order
           </button>
@@ -228,9 +225,9 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
   const transactionType = isServed ? 'WASTAGE' : 'ITEM_CANCELLED';
   const reasonList = isServed ? WASTAGE_REASONS : CANCELLATION_REASONS;
   const typeLabel = isServed ? 'Wastage' : 'Cancellation';
-  const typeColor = isServed ? 'text-red-600' : 'text-red-600';
-  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-red-50 border-red-200';
-  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700';
+  const typeColor = isServed ? 'text-brand-dark' : 'text-brand-dark';
+  const typeBg = isServed ? 'bg-brand-light border-brand-line' : 'bg-brand-light border-brand-line';
+  const buttonColor = isServed ? 'ui-btn-danger' : 'ui-btn-danger';
 
 
   useEffect(() => {
@@ -248,24 +245,24 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
   const effectiveReason = reason === 'Other' ? customReason : reason;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className={`text-lg font-bold ${typeColor}`}>Remove Item</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Remove item">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h2 className={`text-panel-title ${typeColor}`}>Remove Item</h2>
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
+            <X size={16} />
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
           <div>
-            <p className="text-sm text-gray-700 font-semibold">{item.name}</p>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Ordered quantity: <span className="font-semibold">{maxQty}</span>
+            <p className="text-ui text-brand-dark font-bold">{item.name}</p>
+            <p className="text-ui-sm text-ink-muted mt-0.5">
+              Ordered quantity: <span className="font-semibold text-ink-soft">{maxQty}</span>
             </p>
           </div>
 
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-semibold ${typeBg} ${typeColor}`}>
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-button-sm border text-ui-sm font-semibold ${typeBg} ${typeColor}`}>
             <span className="w-2 h-2 rounded-full bg-current inline-block" />
             {typeLabel} — {isServed
               ? 'Item was already served. Stock will be reversed.'
@@ -274,26 +271,26 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
 
           {maxQty > 1 && (
             <div>
-              <p className="text-xs font-semibold text-gray-600 mb-2">How many to remove?</p>
+              <p className="mb-2 text-micro font-bold uppercase tracking-wide text-ink-muted">How many to remove?</p>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setRemoveQty(q => Math.max(1, q - 1))}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold"
+                  className="grid place-items-center h-8 w-8 rounded-button-sm border border-brand-line bg-surface text-brand-dark text-lg font-bold hover:bg-brand-light transition-colors"
                 >−</button>
-                <span className="w-10 text-center text-lg font-bold text-gray-800">{removeQty}</span>
+                <span className="w-10 text-center text-kpi text-brand-dark">{removeQty}</span>
                 <button
                   onClick={() => setRemoveQty(q => Math.min(maxQty, q + 1))}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold"
+                  className="grid place-items-center h-8 w-8 rounded-button-sm border border-brand-line bg-surface text-brand-dark text-lg font-bold hover:bg-brand-light transition-colors"
                 >+</button>
-                <span className="text-xs text-gray-400 ml-1">of {maxQty}</span>
+                <span className="text-ui-sm text-ink-muted ml-1">of {maxQty}</span>
                 <button
                   onClick={() => setRemoveQty(maxQty)}
-                  className="ml-auto text-xs text-red-500 underline font-semibold"
+                  className="ml-auto text-ui-sm text-brand-dark underline font-semibold"
                 >Remove all</button>
               </div>
-              <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="mt-2 h-1.5 bg-brand-light rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-red-400 rounded-full transition-all"
+                  className="h-full bg-brand rounded-full transition-all"
                   style={{ width: `${(removeQty / maxQty) * 100}%` }}
                 />
               </div>
@@ -301,18 +298,18 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
           )}
 
           <div>
-            <p className="text-xs font-semibold text-gray-600 mb-2">Reason</p>
-            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+            <p className="mb-2 text-micro font-bold uppercase tracking-wide text-ink-muted">Reason</p>
+            <div className="grid grid-cols-2 gap-item-sm max-h-48 overflow-y-auto pr-1">
               {reasonList.map(r => (
                 <button
                   key={r}
                   onClick={() => setReason(r)}
-                  className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
+                  className={`px-2 py-2 rounded-button-sm text-ui-sm font-semibold border text-left transition-colors
                     ${reason === r
                       ? isServed
-                        ? 'bg-red-600 text-white border-red-600'
-                        : 'bg-red-600 text-white border-red-600'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+                        ? 'bg-brand text-text-white border-brand'
+                        : 'bg-brand text-text-white border-brand'
+                      : 'bg-surface text-ink-soft border-line hover:border-brand-line hover:bg-brand-tint'}`}
                 >
                   {r}
                 </button>
@@ -323,16 +320,16 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
                 value={customReason}
                 onChange={e => setCustomReason(e.target.value)}
                 placeholder="Describe the reason…"
-                className="mt-2 w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
+                className="mt-2 w-full h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink outline-none placeholder:text-ink-faint transition-colors focus:border-brand-ring focus:shadow-focus-ring"
               />
             )}
           </div>
         </div>
 
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            className="ui-btn"
           >
             Cancel
           </button>
@@ -345,10 +342,7 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
                 onRemoveOne(transactionType, effectiveReason, removeQty);
               }
             }}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${reason && !(reason === 'Other' && !customReason.trim())
-                ? buttonColor
-                : 'bg-gray-300 cursor-not-allowed'}`}
+            className={`ui-btn ${buttonColor}`}
           >
             {isRemoveAll
               ? `Remove All (${maxQty})`
@@ -913,6 +907,15 @@ export const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove 
 // TableReservation — floor view
 // ─────────────────────────────────────────────────────────────────────────────
 
+
+const ORDER_STATUS_BAR = {
+  pending: { bar: 'border-t-status-pending', dot: 'bg-status-pending' },
+  preparing: { bar: 'border-t-status-preparing', dot: 'bg-status-preparing' },
+  ready: { bar: 'border-t-status-ready', dot: 'bg-status-ready' },
+  served: { bar: 'border-t-status-served', dot: 'bg-status-served' },
+  cancelled: { bar: 'border-t-gray-300', dot: 'bg-gray-300' },
+};
+
 export const TableReservation = ({
   tables = [],
   orderMode = 'dinein',
@@ -968,139 +971,134 @@ export const TableReservation = ({
     const h = Math.floor(m / 60);
     const d = Math.floor(h / 24);
     if (s < 60) return 'Just now';
-    if (m === 1) return '1 min ago';
-    if (m < 60) return `${m} mins ago`;
-    if (h === 1) return '1 hr ago';
-    if (h < 24) return `${h} hrs ago`;
-    if (d === 1) return '1 day ago';
-    return `${d} days ago`;
+    if (m === 1) return '1 min ';
+    if (m < 60) return `${m} mins `;
+    if (h === 1) return '1 hr ';
+    if (h < 24) return `${h} hrs `;
+    if (d === 1) return '1 day ';
+    return `${d} days `;
   };
 
-  const getOrderStatusStyle = (status) => {
-    const map = {
-      pending: 'bg-status-pending text-text-white',
-      preparing: 'bg-status-preparing text-text-white',
-      ready: 'bg-status-ready text-text-white',
-      served: 'bg-status-served text-text-white',
-      cancelled: 'bg-gray-100 text-gray-500',
-    };
-    return map[status] || 'bg-gray-100 text-gray-700';
-  };
+
+  const modeBtn = (active) => `ui-tab inline-flex items-center gap-1 ${active ? 'ui-tab-active' : ''}`;
 
   return (
-    <div className="p-4 bg-bg-primary overflow-y-auto h-[calc(100vh-4rem)]">
+    <div className="ui-page !min-h-0 h-[calc(100vh-4rem)] overflow-y-auto">
 
       {/* ── Filter bar ── */}
-      <div className="mb-3 sticky top-0 z-10 bg-bg-primary">
-        <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-border-default bg-bg-tertiary">
-          <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl">
+      <section className="ui-panel sticky top-0 z-10">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="ui-tabs" role="group" aria-label="Filter by section">
             <button
+              type="button"
+              aria-pressed={selectedSections.length === 0 && selectedZones.length === 0}
               onClick={() => { setSelectedSections([]); setSelectedZones([]); }}
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                ${selectedSections.length === 0 && selectedZones.length === 0
-                  ? 'bg-action-primary text-white'
-                  : 'bg-white text-text-secondary hover:bg-gray-100'}`}
+              className={`ui-tab ${selectedSections.length === 0 && selectedZones.length === 0 ? 'ui-tab-active' : ''}`}
             >
               All
             </button>
-            <div className="w-px bg-border-default mx-1" />
             {sectionsFromDB.map(sec => (
               <button
                 key={sec}
+                type="button"
+                aria-pressed={selectedSections.includes(sec)}
                 onClick={() => toggleFilter(sec, setSelectedSections)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                  ${selectedSections.includes(sec)
-                    ? 'bg-action-primary text-white'
-                    : 'bg-white text-text-secondary hover:bg-gray-100'}`}
+                className={`ui-tab ${selectedSections.includes(sec) ? 'ui-tab-active' : ''}`}
               >
                 {sec}
               </button>
             ))}
-            <div className="w-px bg-border-default mx-1" />
             {/* {zonesFromDB.map(zone => (
               <button
                 key={zone}
+                type="button"
+                aria-pressed={selectedZones.includes(zone)}
                 onClick={() => toggleFilter(zone, setSelectedZones)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                  ${selectedZones.includes(zone)
-                    ? 'bg-action-primary text-white'
-                    : 'bg-white text-text-secondary hover:bg-gray-100'}`}
+                className={`ui-toggle-btn ${selectedZones.includes(zone) ? 'ui-toggle-btn-active' : ''}`}
               >
                 {zone}
               </button>
             ))} */}
           </div>
 
-          {/* Dine-in / Takeaway toggle */}
-          <div className="ml-auto flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
+          <div className="flex items-center gap-x-3 gap-y-1 text-micro text-ink-muted">
+          {Object.entries(ORDER_STATUS_BAR).map(([status, s]) => (
+            <span key={status} className="inline-flex items-center gap-1 capitalize">
+              <span className={`h-2 w-2 rounded-badge ${s.dot}`} />
+              {status}
+            </span>
+          ))}
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-badge bg-state-reserved" /> Draft
+          </span>
+        </div>
+
+          {/* Order-mode toggle */}
+          <div className="ui-tabs" role="group" aria-label="Order type">
             {hasDinein && (
-            <button
-              onClick={onSelectDineIn}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all
-                ${orderMode === 'dinein'
-                  ? 'bg-action-primary text-text-white shadow'
-                  : 'text-text-secondary hover:bg-gray-100'}`}
-            >
-              Dine In
-            </button>
+              <button type="button" aria-pressed={orderMode === 'dinein'} onClick={onSelectDineIn} className={modeBtn(orderMode === 'dinein')}>
+                Dine In
+              </button>
             )}
             {hasWalkin && (
-            <button
-    onClick={onSelectWalkIn}
-    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
-      ${orderMode === 'walkin'
-        ? 'bg-teal-500 text-white shadow'
-        : 'text-gray-600 hover:bg-gray-100'}`}
-  >
-    <User size={12} /> Walk In
-  </button>
+              <button type="button" aria-pressed={orderMode === 'walkin'} onClick={onSelectWalkIn} className={modeBtn(orderMode === 'walkin')}>
+                <User size={12} /> Walk In
+              </button>
             )}
             {hasTakeaway && (
-            <button
-              onClick={onSelectTakeaway}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
-                ${orderMode === 'takeaway'
-                  ? 'bg-action-primary text-white shadow'
-                  : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              <Package size={12} /> Takeaway
-            </button>
+              <button type="button" aria-pressed={orderMode === 'takeaway'} onClick={onSelectTakeaway} className={modeBtn(orderMode === 'takeaway')}>
+                <Package size={12} /> Takeaway
+              </button>
             )}
             {hasDelivery && (
-   
-            <button
-    onClick={onSelectDelivery}
-    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
-      ${orderMode === 'delivery'
-        ? 'bg-purple-500 text-white shadow'
-        : 'text-gray-600 hover:bg-gray-100'}`}
-  >
-    <Truck size={12} /> Delivery
-  </button>
+              <button type="button" aria-pressed={orderMode === 'delivery'} onClick={onSelectDelivery} className={modeBtn(orderMode === 'delivery')}>
+                <Truck size={12} /> Delivery
+              </button>
             )}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* ── Table grid ── */}
+      {/* ── Zones → sections → table cards ── */}
       {orderMode === 'dinein' && visibleZones.map(zone => {
         const sections = getSectionsByZone(zone);
+        const zoneTables = filteredTables.filter(t => getZone(t) === zone);
+        const isVac = t => ['vacant', 'available'].includes(t.status?.toLowerCase().trim());
+        const vac = zoneTables.filter(isVac).length;
+        const occ = zoneTables.filter(t => t.status?.toLowerCase() === 'occupied').length;
+
         return (
-          <div key={zone} className="mb-10">
-            <h3 className="text-xl font-bold mb-4 text-gray-800">{zone}</h3>
-            {sections.map(section => (
-              <div key={section} className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm font-semibold px-3 py-1 rounded-full bg-gray-200">
-                    {section}
-                  </span>
-                </div>
-                <div className="grid gap-4 grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-5">
-                  {filteredTables
-                    .filter(t => getZone(t) === zone && getSection(t) === section)
-                    .map(table => {
-                      const statusKey = table.status?.toLowerCase();
+          <section key={zone} className="ui-panel">
+            {/* Zone header */}
+            <div className="flex items-center gap-2.5 pb-2.5 mb-3 border-b border-line-divider">
+              <h3 className="text-panel-title text-brand-dark">{zone}</h3>
+              <span className="text-micro font-bold px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line">
+                {zoneTables.length} table{zoneTables.length !== 1 ? 's' : ''}
+              </span>
+              <div className="ml-auto hidden sm:flex gap-2.5 text-ui-sm text-ink-muted">
+                <span><b className="text-ink-soft">{vac}</b> vacant</span>
+                <span><b className="text-ink-soft">{occ}</b> occupied</span>
+              </div>
+            </div>
+
+            {sections.map(section => {
+              const sectionTables = zoneTables.filter(t => getSection(t) === section);
+              return (
+                <div key={section} className="mb-3.5 last:mb-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h4 className="text-ui font-bold text-ink-soft">{section}</h4>
+                    <span className="text-micro text-ink-muted">
+                      {sectionTables.length} table{sectionTables.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-tiles gap-tiles">
+                    {sectionTables.map(table => {
+                      const rawStatus = table.status?.toLowerCase().trim();
+                      const statusKey = rawStatus === 'available' ? 'vacant' : rawStatus;
+                      const isVacant = statusKey === 'vacant';
                       const config = TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
+                      const canSelect = isVacant || config.clickable;
                       const orderInfo = tableOrders[table.id];
                       const hasViewableOrder = (statusKey === 'occupied' || statusKey === 'served') && orderInfo;
                       const tableHasDraft = draftTableIds.includes(table.id.toString());
@@ -1111,135 +1109,135 @@ export const TableReservation = ({
                         : null;
 
                       const invoiceStatus = orderInfo?.invoice_status?.toLowerCase();
+                      const orderStatus = orderInfo?.status?.toLowerCase();
                       const showConfirmPayment = hasViewableOrder && invoiceStatus === 'pending';
+                      const showMarkServed = hasViewableOrder && orderStatus === 'ready' && !showConfirmPayment;
+
+                      const bar = hasViewableOrder
+                      ? (ORDER_STATUS_BAR[orderStatus]?.bar || 'border-t-line-strong')
+                      : 'border-t-line-strong';
 
                       const handleCardClick = () => {
-                        if (config.clickable) onSelectTable(table);
+                        if (canSelect) onSelectTable(table);
                         else if (hasViewableOrder && onViewOrder) onViewOrder(table);
                       };
 
                       return (
                         <div
                           key={table.id}
-                          className="rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition bg-white"
+                          className={`flex flex-col overflow-hidden bg-surface border border-line border-t-bar ${bar} rounded-panel shadow-panel hover:shadow-panel-hover transition-shadow duration-fast`}
                         >
+                          {/* Clickable area: header + body */}
                           <div
                             onClick={handleCardClick}
-                            className={config.clickable || hasViewableOrder ? 'cursor-pointer' : ''}
+                            className={canSelect || hasViewableOrder ? 'cursor-pointer' : ''}
                           >
-                            {/* Card header */}
-                            <div className="flex justify-between items-center px-3 py-2 bg-action-primary text-white">
-                              <span className="font-bold text-lg tracking-wide">{table.table_number}</span>
-                              {tableHasDraft && !hasViewableOrder && (
-                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-yellow-300 text-yellow-900">
-                                  DRAFT
+                            {/* Header: table name + timer */}
+                            <div className="flex items-center justify-between gap-4 p-2">
+                              <span className="text-body-sm font-bold text-brand-dark break-words">{table.table_number}</span>
+
+                              {hasViewableOrder && elapsedTime && (
+                                <span className="inline-flex items-center gap-1 text-micro font-bold text-ink-muted whitespace-nowrap">
+                                  <Clock size={12} className="text-brand" />
+                                  {elapsedTime}
                                 </span>
                               )}
                               {hasViewableOrder && (
+                                <span className="mr-auto text-body-sm font-bold text-brand-dark">#{orderInfo.dinein_order_id || orderInfo.id}</span>
+                              )}
+                              {tableHasDraft && !hasViewableOrder && (
+                                <span className="ui-chip bg-state-reserved-bg text-state-reserved">Draft</span>
+                              )}
+                            </div>
+
+                            {/* Body */}
+                            <div className={`grid gap-0.5 px-3 pb-2.5 text-ui-sm text-ink-muted min-h-[1.75rem] ${isVacant ? 'bg-gradient-to-b from-state-vacant-bg/60 to-surface' : ''}`}>
+                              {hasViewableOrder ? (
+                                <div className="flex items-center justify-between gap-2">
+                                  <span><b className="text-ink-soft">Orders -{orderCount}</b></span>
+                                  
+                                </div>
+                              ) : statusKey === 'reserved' ? (
+                                <span className="inline-flex items-center gap-1.5 text-ui-sm font-semibold text-state-reserved">
+                                  <Lock size={14} /> Reserved
+                                </span>
+                              ) : isVacant ? (
                                 <>
-                                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${getOrderStatusStyle(orderInfo.status)}`}>
-                                    {orderInfo.status?.toUpperCase()}
-                                  </span>
-                                  <span className="text-xl opacity-80 font-bold">
-                                    #{orderInfo.dinein_order_id || orderInfo.id}
-                                  </span>
+                                 
                                 </>
+                              ) : statusKey === 'occupied' || statusKey === 'served' ? (
+                                <Eye size={18} className="text-brand" />
+                              ) : (
+                                <span className="text-heading-sm leading-none text-brand-soft">—</span>
                               )}
                             </div>
-
-                            {/* Card body */}
-                            <div
-                              className={`p-3 flex items-center justify-between gap-2
-                                ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50'
-                                  : statusKey === 'served' ? 'text-purple-600 bg-purple-50'
-                                    : statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50'
-                                      : 'text-green-600 bg-green-50'}`}
-                            >
-                              {statusKey === 'vacant' && <span className="text-2xl text-green-400">—</span>}
-                              {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={22} />}
-                              {statusKey === 'reserved' && <Lock size={22} />}
-
-                              {hasViewableOrder && (
-                                <div className="flex flex-col items-center flex-1">
-                                  <span className="text-xs font-bold text-gray-700">
-                                    {orderCount} time ordered
-                                  </span>
-                                  {totalPrice && (
-                                    <span className="text-sm font-bold text-action-primary">{totalPrice}</span>
-                                  )}
-                                </div>
-                              )}
-
-                              {hasViewableOrder && (
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={e => { e.stopPropagation(); onPrintBill?.(orderInfo.id, table.id); }}
-                                    className="text-yellow-600 hover:scale-110 transition-transform"
-                                    title="Print Bill"
-                                  >
-                                    <Printer size={22} />
-                                  </button>
-                                  <button
-                                    onClick={e => { e.stopPropagation(); onCancelOrder?.(orderInfo.id, table.id); }}
-                                    className="text-red-600 hover:scale-110 transition-transform"
-                                    title="Cancel Order"
-                                  >
-                                    <Trash2 size={22} />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Elapsed time */}
-                            {hasViewableOrder && elapsedTime && (
-                              <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100">
-                                <div className="flex items-center justify-center gap-1 text-xs font-semibold text-gray-600">
-                                  <Clock size={13} className="text-orange-500" />
-                                  <span>{elapsedTime}</span>
-                                </div>
-                              </div>
-                            )}
                           </div>
 
+                          {/* Action strip */}
                           {showConfirmPayment && (
                             <button
                               onClick={e => {
                                 e.stopPropagation();
                                 onConfirmPayment?.(orderInfo.id, table.id);
                               }}
-                              className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                              className="flex items-center justify-center gap-1 w-full py-2 bg-brand text-text-white text-micro font-bold tracking-wide hover:bg-brand-dark transition-colors"
                             >
-                              <Check size={14} />
-                              Confirm Payment
+                              <Check size={13} />
+                              CONFIRM PAYMENT
                             </button>
                           )}
 
-                          {hasViewableOrder && orderInfo.status === 'ready' && !showConfirmPayment && (
+                          {showMarkServed && (
                             <button
                               onClick={e => { e.stopPropagation(); onMarkAsServed?.(orderInfo.id, table.id); }}
-                              className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
+                              className="w-full py-2 bg-brand text-text-white text-micro font-bold tracking-wide hover:bg-brand-dark transition-colors"
                             >
-                              Mark as Served
+                              MARK AS SERVED
                             </button>
+                          )}
+
+                          {/* Footer: PRINT / DELETE */}
+                          {hasViewableOrder && (
+                            <div className="grid grid-cols-3 mt-auto border-t border-line-soft text-micro font-bold tracking-wide">
+                              <button
+                                className="flex items-center justify-center gap-1 py-2 bg-canvas/40 text-brand-dark hover:bg-brand-light transition-colors"
+                                onClick={e => { e.stopPropagation(); onPrintBill?.(orderInfo.id, table.id); }}
+                                title="Print Bill"
+                              >
+                                <Printer size={12} />
+                              </button>
+                              {totalPrice && (
+                                    <span className="text-ui font-bold text-brand-dark">{totalPrice}</span>
+                                  )}
+                              <button
+                                className="flex items-center justify-center gap-1 py-2 bg-canvas/40 text-brand-dark border-l border-line-soft hover:bg-brand-soft transition-colors"
+                                onClick={e => { e.stopPropagation(); onCancelOrder?.(orderInfo.id, table.id); }}
+                                title="Cancel Order"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           )}
                         </div>
                       );
                     })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              );
+            })}
+          </section>
         );
       })}
 
       {orderMode === 'takeaway' && (
-        <div className="text-center mt-10 text-gray-500 text-sm">
+        <section className="ui-panel text-center py-10 text-ui text-ink-muted">
           Takeaway selected. Opening menu…
-        </div>
+        </section>
       )}
     </div>
   );
 };
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TakeawayOrdersModal — today's takeaway orders picker
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1300,9 +1298,9 @@ export const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeaway
     const diff = Date.now() - parseISTTimestamp(createdAt);
     const m = Math.floor(diff / 60000);
     if (m < 1) return 'Just now';
-    if (m < 60) return `${m} min ago`;
+    if (m < 60) return `${m} min `;
     const h = Math.floor(m / 60);
-    return h < 24 ? `${h} hr ago` : `${Math.floor(h / 24)} day ago`;
+    return h < 24 ? `${h} hr ` : `${Math.floor(h / 24)} day `;
   };
 
   return (

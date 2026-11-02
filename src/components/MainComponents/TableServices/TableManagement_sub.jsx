@@ -805,13 +805,17 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
                                                 >
                                                     <div className="flex items-center justify-between gap-2 px-3 pt-2.5 pb-1">
                                                         <span className="text-body-sm font-bold text-brand-dark break-words">{table.name}</span>
+                                                        <div className="flex items-center gap-1.5 text-ui text-ink-soft">
+                                                            <FaUsers className="text-brand text-ui-sm" />
+                                                            <b>{table.table_type}</b>
+                                                        </div>
                                                     </div>
 
                                                     <div className="grid gap-0.5 px-3 pb-2.5 text-ui-sm text-ink-muted">
-                                                        <div className="flex items-center gap-1.5 text-ui text-ink-soft">
+                                                        {/* <div className="flex items-center gap-1.5 text-ui text-ink-soft">
                                                             <FaUsers className="text-brand text-ui-sm" />
-                                                            <b>{table.table_type}</b> seats
-                                                        </div>
+                                                            <b>{table.table_type}</b>
+                                                        </div> */}
                                                         {/* <div>Zone: <b className="font-semibold text-ink-soft">{config?.zone || table.location_zone || "—"}</b></div>
                                                         <div>Section: <b className="font-semibold text-ink-soft">{config?.section || table.section || "—"}</b></div> */}
                                                     </div>

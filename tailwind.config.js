@@ -161,8 +161,9 @@ export default {
         },
         status: {
           new: 'lightpink',
-          pending: 'yellow',
-          preparing: 'blue',
+          pending: 'blue',
+          preparing: 'lightpink',
+          ready: '#ef4444',
           served: 'green'
         },
         bulkActions: {
@@ -328,7 +329,7 @@ export default {
       maxWidth: { modal: '420px', page: '1680px' },
       gridTemplateColumns: {
         kpi: 'repeat(auto-fit,minmax(165px,1fr))',     // KPI row (.metrics)
-        tiles: 'repeat(auto-fill,minmax(168px,1fr))',  // table cards
+        tiles: 'repeat(auto-fill,minmax(170px,1fr))',  // table cards
       },
 
       borderWidth: {
