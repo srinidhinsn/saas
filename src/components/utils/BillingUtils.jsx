@@ -8,17 +8,26 @@ export const PAYMENT_METHODS = [
   { value: "Cash", label: "Cash" },
   { value: "razorpay_upi", label: "UPI (Razorpay)" },
   { value: "razorpay_card", label: "Card (Razorpay)" },
+  { value: "phonepe", label: "PhonePe" },
   { value: "Due", label: "Due" },
 ];
+export const isRazorpayMethod = (method) =>
+  method === "razorpay_upi" || method === "razorpay_card";
 
+export const isPhonePeMethod = (method) => method === "phonepe";
 export const isOnlinePaymentMethod = (method) =>
   method === "razorpay_upi" || method === "razorpay_card";
 
 export const needsRazorpay = (splitPaymentEnabled, paymentSplits, method) =>
   splitPaymentEnabled
-    ? paymentSplits.some(s => isOnlinePaymentMethod(s.method))
-    : isOnlinePaymentMethod(method);
-
+    ? paymentSplits.some(s => isRazorpayMethod(s.method))
+    : isRazorpayMethod(method);
+export const filterPaymentMethods = (gateways = {}) =>
+      PAYMENT_METHODS.filter(m => {
+        if (isRazorpayMethod(m.value)) return !!gateways.razorpay;
+        if (isPhonePeMethod(m.value)) return !!gateways.phonepe;
+        return true;
+      });
 // Sum of all amounts across split rows
 export const sumSplits = (splits) =>
   splits.reduce((sum, s) => sum + Number(s.amount || 0), 0);
