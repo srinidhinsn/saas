@@ -472,6 +472,18 @@ export default {
           color: theme('colors.ink.note'),
         },
 
+                /* ---------- card (grid tile: table cards etc.) ---------- */
+        '.ui-card': {
+          backgroundColor: theme('colors.surface'),
+          backgroundImage: theme('backgroundImage.metric'),   // lavender fade at the top, same as .metric
+          border: `1px solid ${theme('colors.line.DEFAULT')}`,
+          borderTop: `${theme('borderWidth.bar')} solid ${brand('soft')}`,   // border-t-state-* classes override this colour
+          borderRadius: theme('borderRadius.panel'),
+          boxShadow: theme('boxShadow.panel'),
+          transition: 'box-shadow .15s ease',
+          '&:hover': { boxShadow: theme('boxShadow.panel-hover') },
+        },
+
         /* ---------- tab bar (.topTabs) ---------- */
         '.ui-tabs': {
           display: 'flex',

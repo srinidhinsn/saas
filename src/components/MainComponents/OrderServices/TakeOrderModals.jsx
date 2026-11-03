@@ -61,27 +61,27 @@ export const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, on
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-800">Transfer Table</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Transfer table">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h2 className="text-panel-title text-brand-dark">Transfer Table</h2>
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
+            <X size={16} />
           </button>
         </div>
-        <div className="px-6 py-4 max-h-72 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
           {vacantTables.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-4">No vacant tables available.</p>
+            <p className="text-ui text-ink-muted text-center py-4">No vacant tables available.</p>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-item-sm">
               {vacantTables.map(t => (
                 <button
                   key={t.id}
                   onClick={() => setSelectedNewTable(t)}
-                  className={`py-3 rounded-lg border-2 text-sm font-bold transition
+                  className={`py-3 rounded-panel border text-ui font-bold transition-colors
                     ${selectedNewTable?.id === t.id
-                      ? 'border-action-primary bg-action-primary/10 text-action-primary'
-                      : 'border-gray-200 hover:border-action-primary text-gray-700'}`}
+                      ? 'border-brand-ring bg-brand-tint text-brand-dark shadow-focus-ring'
+                      : 'border-line bg-surface text-ink-soft hover:border-brand-line hover:bg-brand-tint'}`}
                 >
                   {t.table_number}
                 </button>
@@ -89,18 +89,17 @@ export const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, on
             </div>
           )}
         </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={() => { if (selectedNewTable) { onConfirm(selectedNewTable); onClose(); } }}
             disabled={!selectedNewTable}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${selectedNewTable ? 'bg-action-primary hover:bg-action-danger' : 'bg-gray-300 cursor-not-allowed'}`}
+            className="ui-btn ui-btn-add"
           >
             Transfer
           </button>
@@ -116,15 +115,16 @@ export const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, on
 
 export const ItemStatusBadge = ({ status }) => {
   const cfg = {
-    pending: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Pending' },
-    preparing: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Preparing' },
-    ready: { bg: 'bg-green-100', text: 'text-green-700', label: 'Ready' },
-    served: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Served' },
-    cancelled: { bg: 'bg-red-50', text: 'text-red-400', label: 'Cancelled' },
-  }[status] || { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '—' };
+    pending: { dot: 'bg-status-pending', label: 'Pending' },
+    preparing: { dot: 'bg-status-preparing', label: 'Preparing' },
+    ready: { dot: 'bg-status-ready', label: 'Ready' },
+    served: { dot: 'bg-status-served', label: 'Served' },
+    cancelled: { dot: 'bg-gray-300', label: 'Cancelled' },
+  }[status] || { dot: 'bg-gray-300', label: status || '—' };
 
   return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
+    <span className="inline-flex items-center gap-1 text-micro font-bold px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line">
+      <span className={`h-1.5 w-1.5 rounded-badge ${cfg.dot}`} />
       {cfg.label}
     </span>
   );
@@ -360,21 +360,21 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
 
 export const CustomerCapturePanel = ({ value, onChange }) => {
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border-default bg-bg-tertiary shadow-sm">
-      <User size={15} className="text-text-secondary shrink-0" />
+    <div className="flex items-center gap-2 px-3 py-2 rounded-panel border border-brand-line bg-brand-tint shadow-panel">
+      <User size={15} className="text-ink-muted shrink-0" />
       <input
         value={value.customer_id}
         onChange={e => onChange({ ...value, customer_id: e.target.value })}
         placeholder="Customer name / ID (optional)"
-        className="flex-1 min-w-0 text-sm bg-transparent outline-none placeholder-text-secondary text-text-primary"
+        className="flex-1 min-w-0 text-ui bg-transparent outline-none placeholder:text-ink-faint text-ink"
       />
-      <div className="w-px h-5 bg-border-default shrink-0" />
-      <Phone size={15} className="text-text-secondary shrink-0" />
+      <div className="w-px h-5 bg-brand-line shrink-0" />
+      <Phone size={15} className="text-ink-muted shrink-0" />
       <input
         value={value.contact_phone}
         onChange={e => onChange({ ...value, contact_phone: e.target.value })}
         placeholder="Phone (optional)"
-        className="w-32 text-sm bg-transparent outline-none placeholder-text-secondary text-text-primary"
+        className="w-32 text-ui bg-transparent outline-none placeholder:text-ink-faint text-ink"
         inputMode="tel"
       />
     </div>
@@ -383,17 +383,17 @@ export const CustomerCapturePanel = ({ value, onChange }) => {
 export const AddressSelectPanel = ({ addresses, selectedAddressId, setSelectedAddressId }) => {
   if (!addresses || addresses.length === 0) {
     return (
-      <div className="px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs text-red-600">
+      <div className="px-3 py-2 rounded-panel border border-state-occupied/30 bg-state-occupied-bg text-ui-sm text-state-occupied">
         No saved address found for this customer.
       </div>
     );
   }
   return (
-    <div className="px-3 py-2 rounded-xl border border-border-default bg-bg-tertiary shadow-sm">
+    <div className="px-3 py-2 rounded-panel border border-brand-line bg-brand-tint shadow-panel">
       <select
         value={selectedAddressId}
         onChange={e => setSelectedAddressId(e.target.value)}
-        className="w-full text-sm px-2 py-1.5 rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+        className="w-full text-ui px-2 py-1.5 rounded-button-sm border border-brand-line bg-surface text-ink focus:outline-none focus:border-brand-ring focus:shadow-focus-ring"
       >
         <option value="">Select delivery address</option>
         {addresses.map(addr => (
@@ -412,23 +412,23 @@ export const DeliveryDetailsSummary = ({ value, onClick }) => {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-left shadow-sm transition
-        ${isComplete ? 'border-purple-200 bg-purple-50 hover:bg-purple-100' : 'border-red-300 bg-red-50 hover:bg-red-100'}`}
+      className={`w-full flex items-center gap-2 px-3 py-2 rounded-panel border text-left shadow-panel transition-colors
+        ${isComplete ? 'border-brand-line bg-brand-tint hover:bg-brand-light' : 'border-state-occupied/40 bg-state-occupied-bg hover:border-state-occupied'}`}
     >
-      <MapPin size={16} className={isComplete ? 'text-purple-600 shrink-0' : 'text-red-500 shrink-0'} />
+      <MapPin size={16} className={isComplete ? 'text-brand shrink-0' : 'text-state-occupied shrink-0'} />
       <div className="flex-1 min-w-0">
         {isComplete ? (
           <>
-            <div className="text-xs font-semibold text-purple-700 truncate">
+            <div className="text-ui-sm font-semibold text-brand-dark truncate">
                {value.contact_phone}
             </div>
-            <div className="text-xs text-purple-600 truncate">{value.shipping_address}</div>
+            <div className="text-ui-sm text-ink-muted truncate">{value.shipping_address}</div>
           </>
         ) : (
-          <div className="text-xs font-semibold text-red-600">Tap to add delivery details</div>
+          <div className="text-ui-sm font-semibold text-state-occupied">Tap to add delivery details</div>
         )}
       </div>
-      <span className="text-xs font-semibold text-purple-500 shrink-0">Edit</span>
+      <span className="text-ui-sm font-semibold text-brand shrink-0">Edit</span>
     </button>
   );
 };
@@ -456,19 +456,19 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <Truck size={18} className="text-purple-600" />
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Delivery details">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h2 className="text-panel-title text-brand-dark flex items-center gap-2">
+            <Truck size={16} className="text-brand" />
             Delivery Details
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
+            <X size={16} />
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-3 max-h-[65vh] overflow-y-auto">
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
           {/* <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">Customer Name</label>
             <CustomerAutocomplete
@@ -482,8 +482,8 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
           </div> */}
 
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">
-              Phone <span className="text-red-500">*</span>
+            <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">
+              Phone <span className="text-state-occupied">*</span>
             </label>
             <CustomerAutocomplete
               value={draft.contact_phone}
@@ -496,7 +496,7 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">Email</label>
+            <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">Email</label>
             <CustomerAutocomplete
               value={draft.contact_email}
               onChange={(val) => setDraft(d => ({ ...d, contact_email: val }))}
@@ -508,8 +508,8 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">
-              Delivery Address <span className="text-red-500">*</span>
+            <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">
+              Delivery Address <span className="text-state-occupied">*</span>
             </label>
             <CustomerAutocomplete
               value={draft.shipping_address}
@@ -522,18 +522,17 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
           </div>
         </div>
 
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={() => { onSave(draft); onClose(); }}
             disabled={!canSave}
-            className={`flex-1 py-2.5 rounded-lg font-bold text-sm text-white transition
-              ${canSave ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-300 cursor-not-allowed'}`}
+            className="ui-btn ui-btn-add"
           >
             Save Details
           </button>
@@ -549,27 +548,27 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
 export const TablePaymentConfirmModal = ({ isOpen, orderId,displayId, onClose, onConfirm }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-green-700">Confirm Payment</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Confirm payment">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h2 className="text-panel-title text-brand-dark">Confirm Payment</h2>
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors"><X size={16} /></button>
         </div>
-        <div className="px-6 py-5">
-          <p className="text-sm text-gray-600">
-            Mark order <span className="font-semibold">#{displayId ?? orderId}</span> as paid and free the table?
+        <div className="flex-1 overflow-y-auto px-modal py-card">
+          <p className="text-ui text-ink-muted">
+            Mark order <span className="font-semibold text-brand-dark">#{displayId ?? orderId}</span> as paid and free the table?
           </p>
         </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={() => { onConfirm(orderId); onClose(); }}
-            className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-green-600 hover:bg-green-700 text-white"
+            className="ui-btn ui-btn-add"
           >
             Confirm Paid
           </button>
@@ -604,72 +603,71 @@ export const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWith
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg max-w-lg w-full bg-bg-primary max-h-[80vh] flex flex-col overflow-hidden">
-        <div className="px-6 pt-6 pb-2 shrink-0">
-        <h3 className="text-xl font-semibold mb-2 text-text-primary">{mainItem?.name}</h3>
-        <p className="mb-4 text-text-secondary">Select add-ons:</p>
-        <div className="relative mt-3">
-    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-lg max-h-[80vh] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Select add-ons">
+        <div className="px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+        <h3 className="text-panel-title text-brand-dark">{mainItem?.name}</h3>
+        <p className="text-micro text-ink-muted">Select add-ons:</p>
+        </div>
+        <div className="px-modal py-item border-b border-line-soft shrink-0">
+        <div className="relative">
+    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
     <input
       value={addonSearch}
       onChange={e => setAddonSearch(e.target.value)}
       placeholder="Search add-ons..."
-      className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+      className="ui-input"
     />
   </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-2 space-y-2">
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-item-sm">
   {filteredLineItems.length === 0 ? (
-    <p className="text-sm text-text-secondary text-center py-6">No add-ons match "{addonSearch}"</p>
+    <p className="text-ui text-ink-muted text-center py-6">No add-ons match "{addonSearch}"</p>
   ) : (
     filteredLineItems.map(item => (
       <div
         key={item.id}
         onClick={() => toggleAddon(item.id)}
-        className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-all
+        className={`flex justify-between items-center p-item rounded-panel border cursor-pointer transition-colors
           ${selectedAddons.includes(item.id)
-            ? 'bg-action-primary/10 border-2 border-action-primary'
-            : 'bg-bg-tertiary border border-border-default hover:border-action-primary/50'}`}
+            ? 'border-brand-ring bg-brand-tint'
+            : 'border-line bg-surface hover:border-brand-line hover:bg-brand-tint'}`}
       >
         <div className="flex items-center gap-3 flex-1">
           <div
-            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all
+            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors
               ${selectedAddons.includes(item.id)
-                ? 'bg-action-primary border-action-primary'
-                : 'border-gray-300'}`}
+                ? 'bg-brand border-brand'
+                : 'border-line-strong bg-surface'}`}
           >
             {selectedAddons.includes(item.id) && <Check size={14} className="text-white" />}
           </div>
-          <span className="text-text-primary font-medium">{item.name}</span>
+          <span className="text-ui font-semibold text-ink">{item.name}</span>
         </div>
-        <span className="font-semibold text-action-primary">₹{item.unit_price}</span>
+        <span className="text-ui font-bold text-brand-dark">₹{item.unit_price}</span>
       </div>
     ))
   )}
 </div>
 
-        <div className="flex gap-3 px-6 py-4 border-t border-border-default shrink-0 bg-bg-primary">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg border border-border-default bg-bg-tertiary text-text-primary hover:bg-gray-100"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={onAddMainOnly}
-            className="flex-1 px-4 py-2 rounded-lg bg-gray-600 text-white hover:bg-gray-700"
+            className="ui-btn"
           >
             Main Only
           </button>
           <button
             onClick={() => onAddWithSelectedAddons(selectedAddons)}
             disabled={selectedAddons.length === 0}
-            className={`flex-1 px-4 py-2 rounded-lg transition-colors
-              ${selectedAddons.length > 0
-                ? 'bg-action-primary text-white hover:bg-action-danger'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+            className="ui-btn ui-btn-add"
           >
             Add ({selectedAddons.length})
           </button>
@@ -692,70 +690,70 @@ export const ComboDetailModal = ({ isOpen, onClose, comboItem, comboComponents, 
   const savings = aLaCarteTotal - Number(comboItem.unit_price);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="rounded-2xl w-full max-w-md bg-white shadow-2xl overflow-hidden">
-        <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-4 flex items-start justify-between">
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Combo details">
+        <div className="flex items-start justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
           <div>
-            <h3 className="text-lg font-bold text-white">{comboItem.name}</h3>
+            <h3 className="text-panel-title text-brand-dark">{comboItem.name}</h3>
             {comboItem.description && (
-              <p className="text-xs text-violet-200 mt-0.5">{comboItem.description}</p>
+              <p className="text-ui-sm text-ink-muted mt-0.5">{comboItem.description}</p>
             )}
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center text-white">
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
             <X size={16} />
           </button>
         </div>
 
-        <div className="px-6 py-3 bg-violet-50 border-b border-violet-100 flex items-center justify-between">
+        <div className="px-modal py-item bg-brand-tint border-b border-brand-line flex items-center justify-between shrink-0">
           <div>
-            <span className="text-2xl font-bold text-violet-700">₹{Number(comboItem.unit_price).toFixed(0)}</span>
+            <span className="text-kpi text-brand-dark">₹{Number(comboItem.unit_price).toFixed(0)}</span>
             {savings > 0 && (
-              <span className="ml-2 text-xs text-gray-400 line-through">₹{aLaCarteTotal.toFixed(0)}</span>
+              <span className="ml-2 text-ui-sm text-ink-muted line-through">₹{aLaCarteTotal.toFixed(0)}</span>
             )}
           </div>
           {savings > 0 && (
-            <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded-full">
+            <span className="text-micro font-bold bg-state-vacant-bg text-state-vacant px-2 py-1 rounded-badge">
               Save ₹{savings.toFixed(0)}
             </span>
           )}
         </div>
 
-        <div className="px-6 py-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+        <div className="flex-1 overflow-y-auto px-modal py-card">
+          <p className="text-micro font-bold text-ink-muted uppercase tracking-wide mb-item-sm">
             What's included ({comboComponents.length} items)
           </p>
-          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+          <div className="space-y-item-sm">
             {comboComponents.length === 0 ? (
-              <p className="text-sm text-gray-400 italic text-center py-4">No component details available</p>
+              <p className="text-ui text-ink-muted italic text-center py-4">No component details available</p>
             ) : (
               comboComponents.map((c, idx) => (
                 <div
                   key={c.id || idx}
-                  className="flex items-center justify-between px-3 py-2 rounded-xl bg-violet-50 border border-violet-100"
+                  className="flex items-center justify-between px-3 py-2 rounded-panel bg-brand-tint border border-brand-line"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-violet-200 text-violet-700 text-xs font-bold flex items-center justify-center shrink-0">
+                    <span className="w-5 h-5 rounded-full bg-brand-soft text-brand-dark text-micro font-bold flex items-center justify-center shrink-0">
                       {idx + 1}
                     </span>
-                    <span className="text-sm font-medium text-gray-800">{c.name}</span>
+                    <span className="text-ui font-semibold text-ink">{c.name}</span>
                   </div>
-                  <span className="text-xs text-violet-600 font-semibold">₹{Number(c.unit_price).toFixed(0)}</span>
+                  <span className="text-ui-sm text-brand-dark font-semibold">₹{Number(c.unit_price).toFixed(0)}</span>
                 </div>
               ))
             )}
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={() => { onAddCombo(); onClose(); }}
-            className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-violet-600 hover:bg-violet-700 text-white transition-colors"
+            className="ui-btn ui-btn-add"
           >
             Add Combo · ₹{Number(comboItem.unit_price).toFixed(0)}
           </button>
@@ -774,9 +772,9 @@ export const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequ
   const { main, addons } = group;
   return (
     <div className="space-y-1">
-      <div className="flex items-start gap-2 p-3 rounded-xl border bg-white shadow-sm">
+      <div className="flex items-start gap-2 p-3 rounded-panel border border-line bg-surface shadow-panel">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-11 h-11 rounded-lg overflow-hidden border bg-white shrink-0">
+          <div className="w-11 h-11 rounded-button-sm overflow-hidden border border-line bg-surface shrink-0">
             <ImagePreview
               clientId={clientId}
               imageId={main.image_id}
@@ -789,13 +787,13 @@ export const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequ
             />
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
-            <p className="text-xs font-bold text-action-primary">
+            <h4 className="text-ui font-bold truncate text-ink">{main.name}</h4>
+            <p className="text-ui-sm font-bold text-brand-dark">
             ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {main.batch_label && main.batch_label !== activeDineinOrderId && (
-                <span className="text-xs text-orange-500 font-mono font-semibold">
+                <span className="text-micro text-ink-muted font-mono font-semibold">
                   #{main.batch_label}
                 </span>
               )}
@@ -804,10 +802,10 @@ export const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequ
           </div>
         </div>
         <div className="flex items-center gap-2 self-center">
-          <span className="text-sm font-semibold text-gray-500">×{main.quantity}</span>
+          <span className="text-ui font-semibold text-ink-muted">×{main.quantity}</span>
           <button
             onClick={() => onRequestDelete && onRequestDelete(main)}
-            className="text-red-400 hover:text-red-600 transition-colors"
+            className="text-ink-muted hover:text-brand-dark transition-colors"
             title="Remove item"
           >
             <Trash2 size={15} />
@@ -818,14 +816,14 @@ export const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequ
       {addons.map(addon => (
         <div
           key={addon.frontend_unique_key || addon.id}
-          className="flex items-center gap-2 p-2 pl-8 rounded-lg border border-dashed bg-blue-50/50"
+          className="flex items-center gap-2 p-2 pl-8 rounded-button-sm border border-dashed border-brand-line bg-brand-tint"
         >
-          <span className="text-xs text-blue-600">↳</span>
-          <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
-          <span className="text-xs font-semibold text-blue-600">
+          <span className="text-ui-sm text-brand">↳</span>
+          <span className="text-ui text-ink-soft truncate flex-1">{addon.name}</span>
+          <span className="text-ui-sm font-semibold text-brand-dark">
           ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
-          <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
+          <span className="text-ui-sm text-ink-muted w-6 text-center">×{addon.quantity}</span>
         </div>
       ))}
     </div>
@@ -840,9 +838,9 @@ export const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove 
   const { main, addons } = group;
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-2 p-3 rounded-xl border bg-orange-50 shadow-sm">
+      <div className="flex items-center gap-2 p-3 rounded-panel border border-brand-line bg-brand-tint shadow-panel">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-11 h-11 rounded-lg overflow-hidden border bg-white shrink-0">
+          <div className="w-11 h-11 rounded-button-sm overflow-hidden border border-line bg-surface shrink-0">
             <ImagePreview
               clientId={clientId}
               imageId={main.image_id}
@@ -855,8 +853,8 @@ export const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove 
             />
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
-            <p className="text-xs font-bold text-action-primary">
+            <h4 className="text-ui font-bold truncate text-ink">{main.name}</h4>
+            <p className="text-ui-sm font-bold text-brand-dark">
             ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
           </div>
@@ -865,14 +863,14 @@ export const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove 
         <div className="flex items-center gap-1">
           <button
             onClick={() => onUpdateQuantity(main.id, -1, main.frontend_unique_key)}
-            className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+            className="grid place-items-center w-7 h-7 border border-brand-line rounded-button-sm bg-surface text-brand-dark hover:bg-brand-light transition-colors"
           >
             <Minus size={14} />
           </button>
-          <span className="w-6 text-center text-sm font-semibold">{main.quantity}</span>
+          <span className="w-6 text-center text-ui font-semibold text-ink">{main.quantity}</span>
           <button
             onClick={() => onUpdateQuantity(main.id, 1, main.frontend_unique_key)}
-            className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+            className="grid place-items-center w-7 h-7 border border-brand-line rounded-button-sm bg-surface text-brand-dark hover:bg-brand-light transition-colors"
           >
             <Plus size={14} />
           </button>
@@ -880,7 +878,7 @@ export const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove 
 
         <button
           onClick={() => onRemove(main.id, main.frontend_unique_key)}
-          className="text-action-primary hover:text-red-700"
+          className="text-ink-muted hover:text-brand-dark transition-colors"
         >
           <X size={16} />
         </button>
@@ -889,14 +887,14 @@ export const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove 
       {addons.map(addon => (
         <div
           key={addon.frontend_unique_key}
-          className="flex items-center gap-2 p-2 pl-8 rounded-lg border border-dashed bg-orange-100/50"
+          className="flex items-center gap-2 p-2 pl-8 rounded-button-sm border border-dashed border-brand-line bg-brand-light"
         >
-          <span className="text-xs text-orange-600">↳</span>
-          <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
-          <span className="text-xs font-semibold text-orange-600">
+          <span className="text-ui-sm text-brand">↳</span>
+          <span className="text-ui text-ink-soft truncate flex-1">{addon.name}</span>
+          <span className="text-ui-sm font-semibold text-brand-dark">
           ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
-          <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
+          <span className="text-ui-sm text-ink-muted w-6 text-center">×{addon.quantity}</span>
         </div>
       ))}
     </div>
@@ -1125,7 +1123,7 @@ export const TableReservation = ({
                       return (
                         <div
                           key={table.id}
-                          className={`flex flex-col overflow-hidden bg-surface border border-line border-t-bar ${bar} rounded-panel shadow-panel hover:shadow-panel-hover transition-shadow duration-fast`}
+                          className={`flex flex-col overflow-hidden ui-card ${bar}`}
                         >
                           {/* Clickable area: header + body */}
                           <div
@@ -1136,14 +1134,9 @@ export const TableReservation = ({
                             <div className="flex items-center justify-between gap-4 p-2">
                               <span className="text-body-sm font-bold text-brand-dark break-words">{table.table_number}</span>
 
-                              {hasViewableOrder && elapsedTime && (
-                                <span className="inline-flex items-center gap-1 text-micro font-bold text-ink-muted whitespace-nowrap">
-                                  <Clock size={12} className="text-brand" />
-                                  {elapsedTime}
-                                </span>
-                              )}
+                              
                               {hasViewableOrder && (
-                                <span className="mr-auto text-body-sm font-bold text-brand-dark">#{orderInfo.dinein_order_id || orderInfo.id}</span>
+                                <span className="text-body-sm font-bold text-brand-dark">#{orderInfo.dinein_order_id || orderInfo.id}</span>
                               )}
                               {tableHasDraft && !hasViewableOrder && (
                                 <span className="ui-chip bg-state-reserved-bg text-state-reserved">Draft</span>
@@ -1151,10 +1144,16 @@ export const TableReservation = ({
                             </div>
 
                             {/* Body */}
-                            <div className={`grid gap-0.5 px-3 pb-2.5 text-ui-sm text-ink-muted min-h-[1.75rem] ${isVacant ? 'bg-gradient-to-b from-state-vacant-bg/60 to-surface' : ''}`}>
+                            <div className={`grid gap-0.5 px-3 pb-2.5 text-ui-sm text-ink-muted min-h-[1.75rem] ${isVacant ? '' : ''}`}>
                               {hasViewableOrder ? (
                                 <div className="flex items-center justify-between gap-2">
-                                  <span><b className="text-ink-soft">Orders -{orderCount}</b></span>
+                                  <span><b className="text-ink-soft">Ordered -{orderCount}</b></span>
+                                  {hasViewableOrder && elapsedTime && (
+                                <span className="inline-flex items-center gap-1 text-micro font-bold text-ink-muted whitespace-nowrap">
+                                  <Clock size={12} className="text-brand" />
+                                  {elapsedTime}
+                                </span>
+                              )}
                                   
                                 </div>
                               ) : statusKey === 'reserved' ? (
@@ -1206,9 +1205,7 @@ export const TableReservation = ({
                               >
                                 <Printer size={12} />
                               </button>
-                              {totalPrice && (
-                                    <span className="text-ui font-bold text-brand-dark">{totalPrice}</span>
-                                  )}
+                              <span className="flex items-center justify-center py-2 border-l border-line-soft text-ui font-bold text-brand-dark">{totalPrice}</span>
                               <button
                                 className="flex items-center justify-center gap-1 py-2 bg-canvas/40 text-brand-dark border-l border-line-soft hover:bg-brand-soft transition-colors"
                                 onClick={e => { e.stopPropagation(); onCancelOrder?.(orderInfo.id, table.id); }}
@@ -1286,12 +1283,7 @@ export const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeaway
 
   if (!isOpen) return null;
 
-  const statusStyle = (s) => ({
-    pending: 'bg-orange-100 text-orange-700',
-    preparing: 'bg-blue-100 text-blue-700',
-    ready: 'bg-green-100 text-green-700',
-    served: 'bg-purple-100 text-purple-700',
-  }[s?.toLowerCase()] || 'bg-gray-100 text-gray-600');
+  const statusStyle = (s) => ORDER_STATUS_BAR[s?.toLowerCase()]?.bar || 'border-t-line-strong';
 
   const calcElapsed = (createdAt) => {
     if (!createdAt) return '';
@@ -1304,55 +1296,53 @@ export const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeaway
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-xl w-full max-w-md bg-white shadow-xl flex flex-col max-h-[80vh]">
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-md max-h-[80vh] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Takeaway orders">
         {/* Header */}
-        <div className="px-5 py-4 border-b flex justify-between items-center">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-gray-800">Today's Takeaway Orders</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Select an order to add more items</p>
+            <h2 className="text-panel-title text-brand-dark">Today's Takeaway Orders</h2>
+            <p className="text-micro text-ink-muted mt-0.5">Select an order to add more items</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X size={20} />
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
+            <X size={16} />
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+        <div className="flex-1 overflow-y-auto bg-canvas px-modal py-card space-y-item-sm">
           {loading && (
-            <p className="text-sm text-center text-gray-400 py-6">Loading…</p>
+            <p className="text-ui text-center text-ink-muted py-6">Loading…</p>
           )}
           {!loading && orders.length === 0 && (
-            <p className="text-sm text-center text-gray-400 py-6">No takeaway orders today yet.</p>
+            <p className="text-ui text-center text-ink-muted py-6">No takeaway orders today yet.</p>
           )}
           {!loading && orders.map(order => (
             <button
               key={order.id}
               onClick={() => { onSelectOrder(order); onClose(); }}
-              className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-action-primary hover:bg-orange-50 transition group"
+              className={`w-full text-left p-3 rounded-panel border border-line border-t-bar ${statusStyle(order.status)} bg-surface shadow-panel hover:shadow-panel-hover transition-shadow`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-gray-800 font-mono">
+                  <span className="text-ui font-bold text-brand-dark font-mono">
                     #{order.dinein_order_id || order.id}
                   </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${statusStyle(order.status)}`}>
-                    {order.status?.toUpperCase()}
-                  </span>
+                  <ItemStatusBadge status={order.status?.toLowerCase()} />
                 </div>
-                <span className="text-sm font-bold text-action-primary">
+                <span className="text-ui font-bold text-brand-dark">
                   ₹{Number(order.total_price || 0).toFixed(0)}
                 </span>
               </div>
-              <div className="flex items-center justify-between mt-1.5 text-xs text-gray-500">
+              <div className="flex items-center justify-between mt-1.5 text-ui-sm text-ink-muted">
                 <span>{(order.items || []).length} item{(order.items || []).length !== 1 ? 's' : ''}</span>
                 <span className="flex items-center gap-1">
-                  <Clock size={11} className="text-orange-400" />
+                  <Clock size={11} className="text-brand" />
                   {calcElapsed(order.created_at)}
                 </span>
               </div>
               {(order.items || []).length > 0 && (
-                <p className="mt-1 text-xs text-gray-400 truncate">
+                <p className="mt-1 text-ui-sm text-ink-muted truncate">
                   {order.items.slice(0, 3).map(i => i.item_name).join(', ')}
                   {order.items.length > 3 ? ` +${order.items.length - 3} more` : ''}
                 </p>
@@ -1362,10 +1352,10 @@ export const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeaway
         </div>
 
         {/* Footer — new order option */}
-        <div className="px-4 py-3 border-t bg-gray-50 rounded-b-xl">
+        <div className="px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={() => { onSelectOrder(null); onClose(); }}
-            className="w-full py-2.5 rounded-lg border-2 border-dashed border-action-primary text-action-primary text-sm font-semibold hover:bg-action-primary/10 transition"
+            className="w-full h-control rounded-button-sm border-2 border-dashed border-brand-line bg-surface text-brand-dark text-ui font-semibold hover:bg-brand-light transition-colors"
           >
             + Start a new takeaway order
           </button>
@@ -1378,19 +1368,19 @@ export const StockConfirmModal = ({ pending, onCancel, onConfirmed }) => {
   if (!pending) return null;
   const { item } = pending;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-xl w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-action-primary">Stock Alert</h2>
-          <button onClick={onCancel} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Stock alert">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h2 className="text-panel-title text-brand-dark">Stock Alert</h2>
+          <button onClick={onCancel} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors"><X size={16} /></button>
         </div>
-        <div className="px-6 py-5">
-          <p className="text-sm text-gray-700 font-semibold mb-1">{item?.name}</p>
-          <p className="text-sm text-gray-500">Availability reached zero. Do you still want to proceed?</p>
+        <div className="flex-1 overflow-y-auto px-modal py-card">
+          <p className="text-ui text-brand-dark font-bold mb-1">{item?.name}</p>
+          <p className="text-ui text-ink-muted">Availability reached zero. Do you still want to proceed?</p>
         </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
-          <button onClick={onCancel} className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Cancel</button>
-          <button onClick={onConfirmed} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-action-primary hover:bg-action-primary/90 text-white">Proceed</button>
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
+          <button onClick={onCancel} className="ui-btn">Cancel</button>
+          <button onClick={onConfirmed} className="ui-btn ui-btn-add">Proceed</button>
         </div>
       </div>
     </div>

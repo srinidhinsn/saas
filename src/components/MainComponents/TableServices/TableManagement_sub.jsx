@@ -801,7 +801,7 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
                                             return (
                                                 <div
                                                     key={table.id}
-                                                    className={`flex flex-col overflow-hidden bg-surface border border-line border-t-bar ${st.bar} rounded-panel shadow-panel hover:shadow-panel-hover transition-shadow duration-fast`}
+                                                    className={`flex flex-col overflow-hidden ui-card ${st.bar}`}
                                                 >
                                                     <div className="flex items-center justify-between gap-2 px-3 pt-2.5 pb-1">
                                                         <span className="text-body-sm font-bold text-brand-dark break-words">{table.name}</span>
