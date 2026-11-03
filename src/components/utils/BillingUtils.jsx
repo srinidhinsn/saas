@@ -333,10 +333,10 @@ export const getInitialOrderMode = (order, tablesMap = {}) => {
 
 export const StatusBadge = ({ status }) => {
   const styles = {
-    pending: 'bg-status-pending text-text-white border-orange-200',
-    preparing: 'bg-status-preparing text-text-white border-blue-200',
-    ready: 'bg-status-ready text-text-white border-green-200',
-    served: 'bg-status-served text-text-white border-gray-200',
+    pending: 'ui-btn ui-btn-config',
+    preparing: 'ui-btn ui-btn-update',
+    ready: 'ui-btn ui-btn-delete',
+    served: 'ui-btn ui-btn-add ',
   };
   const s = status?.toLowerCase();
   return (
