@@ -19,6 +19,7 @@ import {
   OrderItemsViewModal,
   StatusBadge,
   getInitialOrderMode,
+  hasInvoiceBeenGenerated
 } from '../../utils/BillingUtils';
 
 const normaliseItem = (item) => {
@@ -913,14 +914,26 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       cellRenderer: (params) => renderPaymentPill(params.data),
     },
     {
-      headerName: 'Actions',
-      colId: 'actions',
-      minWidth: 170,
-      sortable: false,
-      filter: false,
-      floatingFilter: false,
-      cellRenderer: (params) => renderActionButtons(params.data),
-    },
+  headerName: 'Actions',
+  colId: 'actions',
+  minWidth: 240,
+  sortable: false,
+  filter: false,
+  floatingFilter: false,
+  cellRenderer: (params) => (
+    <OrderRowActions
+      order={params.data}
+      invoiceGenerated={hasInvoiceBeenGenerated(params.data, billingDocMap)}
+      onView={(order) => {
+        setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) });
+        setShowViewModal(true);
+      }}
+      onPrint={(order) => handlePrintBill(order.id)}
+      onCancel={(order) => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+      onMarkServed={(order) => handleStatusChange(order.id, 'served')}
+    />
+  ),
+},
   ];
 
   // ─────────────────────────────────────────────────────────────────────────

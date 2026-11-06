@@ -419,26 +419,26 @@ export default function BillingPage({ clientId, token }) {
       },
     },
     {
-      headerName: 'Actions',
-      colId: 'actions',
-      minWidth: 240,
-      sortable: false,
-      filter: false,
-      floatingFilter: false,
-      cellRenderer: (params) => (
-        <OrderRowActions
-          order={params.data}
-          invoiceGenerated={hasInvoiceBeenGenerated(params.data, billingDocMap)}
-          onView={(order) => {
-            setViewOrder({ ...order, _tableName: tablesMap[order.table_id]?.name || String(order.table_id) });
-            setShowViewModal(true);
-          }}
-          onPrint={(order) => handleSelectOrder(order)}
-          onCancel={(order) => setCancelOrderModal({ isOpen: true, orderId: order.id })}
-          onMarkServed={(order) => handleStatusChange(order.id, 'served')}
-        />
-      ),
-    },
+  headerName: 'Actions',
+  colId: 'actions',
+  minWidth: 240,
+  sortable: false,
+  filter: false,
+  floatingFilter: false,
+  cellRenderer: (params) => (
+    <OrderRowActions
+      order={params.data}
+      invoiceGenerated={hasInvoiceBeenGenerated(params.data, billingDocMap)}
+      onView={(order) => {
+        setViewOrder({ ...order, _tableName: tablesMap[order.table_id]?.name || String(order.table_id) });
+        setShowViewModal(true);
+      }}
+      onPrint={(order) => handleSelectOrder(order)}
+      onCancel={(order) => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+      onMarkServed={(order) => handleStatusChange(order.id, 'served')}
+    />
+  ),
+},
   ];
 
   const billingToolbarLeft = (
