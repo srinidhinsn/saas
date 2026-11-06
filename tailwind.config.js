@@ -472,7 +472,7 @@ export default {
           color: theme('colors.ink.note'),
         },
 
-                /* ---------- card (grid tile: table cards etc.) ---------- */
+        /* ---------- card (grid tile: table cards etc.) ---------- */
         '.ui-card': {
           backgroundColor: theme('colors.surface'),
           backgroundImage: theme('backgroundImage.metric'),   // lavender fade at the top, same as .metric
@@ -724,6 +724,16 @@ export default {
           position: 'fixed',
           inset: '0',
           zIndex: '1200',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: theme('spacing.card'),
+          backgroundColor: theme('colors.backdrop'),
+        },
+        '.ui-backdrop-nested': {
+          position: 'fixed',
+          inset: '0',
+          zIndex: '1300',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

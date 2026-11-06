@@ -8,27 +8,25 @@ const INV_URL = import.meta.env.VITE_API_INVENTORY_SERVICE_URL;
 
 /* shared style tokens */
 const inputBase =
-  "w-full px-3 py-2 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary " +
-  "placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-slate-400/60 " +
-  "focus:border-slate-500 transition";
+  "w-full h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink " +
+  "placeholder:text-ink-faint outline-none transition-colors " +
+  "focus:border-brand-ring focus:shadow-focus-ring";
 const labelBase =
-  "block text-[11px] font-semibold uppercase tracking-wide mb-1 text-text-secondary";
+  "block text-micro font-bold uppercase tracking-wide mb-1 text-ink-muted";
 const btnGreen =
-  "flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-buttons-add hover:bg-buttonsHover-add text-white " +
-  "font-semibold text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 " +
-  "disabled:shadow-none disabled:cursor-not-allowed shrink-0";
+  "ui-btn ui-btn-add shrink-0";
 const chipBase =
-  "flex items-center gap-1.5 bg-bg-primary border border-border-default pl-3 pr-2 py-1 rounded-full text-sm text-text-primary shadow-sm";
+  "flex items-center gap-1.5 bg-surface border border-brand-line pl-3 pr-2 py-1 rounded-badge text-ui text-ink shadow-button";
 const chipRemove =
-  "w-5 h-5 flex items-center justify-center rounded-full text-red-500 hover:bg-red-100 transition-colors";
+  "w-5 h-5 flex items-center justify-center rounded-badge text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors";
 
 /* small reusable card wrapper */
 const Card = ({ title, count, children }) => (
-  <div className="border border-border-default rounded-xl bg-bg-tertiary p-3 sm:p-4">
+  <div className="border border-brand-line rounded-panel bg-brand-tint p-3 sm:p-4">
     <div className="flex items-center justify-between mb-3">
-      <h4 className="text-sm font-bold text-text-primary">{title}</h4>
+      <h4 className="text-panel-title text-brand-dark">{title}</h4>
       {count !== undefined && (
-        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+        <span className="text-micro font-bold px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line">
           {count}
         </span>
       )}
@@ -206,28 +204,28 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
   if (!show) return null;
 
   const tabClass = (id) =>
-    `flex-1 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+    `ui-toggle-btn flex-1 ${
       activeTab === id
-        ? "bg-bg-primary text-text-primary shadow-sm"
-        : "text-text-secondary hover:text-text-primary"
+        ? "ui-toggle-btn-active"
+        : ""
     }`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
-      <div className="bg-bg-primary w-full sm:max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden border border-border-default">
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full sm:max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Menu configuration">
 
         {/* HEADER */}
-        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 bg-slate-500 text-white shrink-0">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 bg-brand-light border-b border-brand-line shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <IoSettingsOutline className="w-5 h-5 shrink-0" />
+            <IoSettingsOutline className="w-5 h-5 shrink-0 text-brand" />
             <div className="min-w-0">
-              <h2 className="text-base sm:text-lg font-bold leading-tight truncate">Menu Configuration</h2>
-              <p className="text-xs opacity-80 truncate">Dietary types, timings, units and price display</p>
+              <h2 className="text-panel-title text-brand-dark truncate">Menu Configuration</h2>
+              <p className="text-micro text-ink-muted truncate">Dietary types, timings, units and price display</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg bg-buttons-configure/90 hover:bg-text-white text-text-white hover:text-text-primary transition-colors shrink-0"
+            className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors"
             aria-label="Close"
           >
             <FaTimes size={14} />
@@ -236,7 +234,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
 
         {/* TABS */}
         <div className="px-4 sm:px-6 pt-3 shrink-0">
-          <div className="flex gap-1 p-1 rounded-xl bg-bg-tertiary border border-border-default">
+          <div className="ui-toggle w-full">
             <button className={tabClass("masters")} onClick={() => setActiveTab("masters")}>
               Manage
             </button>
@@ -270,7 +268,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
 
                 <div className="flex flex-wrap gap-2 min-h-[32px]">
                   {dietaryOptions.length === 0 ? (
-                    <span className="text-xs text-text-secondary italic">No dietary types yet</span>
+                    <span className="text-ui-sm text-ink-muted italic">No dietary types yet</span>
                   ) : (
                     dietaryOptions.map((v) => (
                       <span key={v} className={chipBase}>
@@ -330,7 +328,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
 
                 <div className="flex flex-wrap gap-2 min-h-[32px]">
                   {timingOptions.length === 0 && (
-                    <span className="text-xs text-text-secondary italic">No timings available</span>
+                    <span className="text-ui-sm text-ink-muted italic">No timings available</span>
                   )}
 
                   {timingOptions.map((v) => {
@@ -343,7 +341,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
                       <span key={v} className={chipBase}>
                         <span className="font-semibold capitalize">{name}</span>
                         {start && end && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                          <span className="text-micro px-1.5 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line">
                             {start} – {end}
                           </span>
                         )}
@@ -382,7 +380,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
 
                 <div className="flex flex-wrap gap-2 min-h-[32px]">
                   {unitOptions.length === 0 ? (
-                    <span className="text-xs text-text-secondary italic">No units available</span>
+                    <span className="text-ui-sm text-ink-muted italic">No units available</span>
                   ) : (
                     unitOptions.map((v) => (
                       <span key={v} className={chipBase}>
@@ -403,7 +401,7 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
               {/* ===== PRICE DISPLAY ===== */}
               <Card title="Price Display">
                 {priceRoundingOptions.length === 0 ? (
-                  <span className="text-xs text-text-secondary italic">No price mode configured</span>
+                  <span className="text-ui-sm text-ink-muted italic">No price mode configured</span>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {priceRoundingOptions.map((v) => {
@@ -411,10 +409,10 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
                       return (
                         <label
                           key={v}
-                          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border-2 cursor-pointer transition-all select-none ${
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded-panel border cursor-pointer transition-colors select-none ${
                             active
-                              ? "border-slate-500 bg-slate-50"
-                              : "border-border-default bg-bg-primary hover:border-slate-300"
+                              ? "border-brand-ring bg-surface shadow-focus-ring"
+                              : "border-line bg-surface hover:border-brand-line"
                           }`}
                         >
                           <input
@@ -422,9 +420,9 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
                             name="price_rounding"
                             checked={active}
                             onChange={() => selectPriceRounding(v)}
-                            className="w-4 h-4 accent-slate-500 cursor-pointer"
+                            className="w-4 h-4 accent-brand cursor-pointer"
                           />
-                          <span className="text-sm font-medium capitalize text-text-primary">
+                          <span className="text-ui font-semibold capitalize text-ink">
                             {v.replace(/_/g, " ")}
                           </span>
                         </label>
@@ -438,20 +436,20 @@ const MenuConfigModal = ({ show, onClose, clientId, token }) => {
         </div>
 
         {/* FOOTER */}
-        <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-t border-border-default shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <div className="px-4 sm:px-6 py-3 bg-canvas border-t border-line shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
           <button
             onClick={onClose}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-slate-100 font-semibold text-sm transition-colors"
+            className="ui-btn w-full sm:w-auto"
           >
             Close
           </button>
           <button
             onClick={saveAll}
             disabled={saving}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-buttons-configure hover:bg-buttonsHover-configure text-white font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+            className="ui-btn ui-btn-add w-full sm:w-auto"
           >
             {saving && (
-              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-badge animate-spin-slow" />
             )}
             {saving ? "Saving..." : "Save"}
           </button>

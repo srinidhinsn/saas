@@ -257,30 +257,43 @@ const UniversalAddModal = ({
   };
 
   if (!showModal) return null;
-
+  
   if (modalType === 'menu') {
+    const label = "block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted";
+    const field =
+      "w-full h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink " +
+      "outline-none placeholder:text-ink-faint transition-colors " +
+      "focus:border-brand-ring focus:shadow-focus-ring disabled:opacity-50 disabled:cursor-not-allowed";
+    const area =
+      "w-full px-item py-2 rounded-button-sm border border-brand-line bg-surface text-ui text-ink " +
+      "outline-none placeholder:text-ink-faint transition-colors " +
+      "focus:border-brand-ring focus:shadow-focus-ring";
+    const dashedBtn =
+      "w-full h-control rounded-button-sm bg-surface border-2 border-dashed border-brand-line text-brand-dark " +
+      "hover:bg-brand-light transition-colors flex items-center justify-center gap-2 text-ui font-semibold";
+
     return (
       <>
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
-          <div className="rounded-lg max-w-2xl w-full p-6 bg-bg-primary max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
+        <div className="ui-backdrop font-sans">
+          <div className="flex flex-col w-full max-w-2xl max-h-[90vh] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label={isComboCategory ? 'Add combo' : 'Add menu item'}>
+            <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
               <div>
-                <h3 className="text-xl font-semibold text-text-primary">
+                <h3 className="text-panel-title text-brand-dark">
                   {isComboCategory ? 'Add New Combo' : 'Add New Menu Item'}
                 </h3>
                 {isComboCategory && (
-                  <p className="text-xs text-violet-600 mt-0.5">
+                  <p className="text-micro text-ink-muted mt-0.5">
                     Set a flat combo price — component prices are for reference only
                   </p>
                 )}
               </div>
-              <button onClick={handleClose} className="p-1.5 rounded-lg bg-buttons-delete text-text-white hover:opacity-90"><X className='h-5 w-5' /></button>
+              <button onClick={handleClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors"><X className='h-4 w-4' /></button>
             </div>
 
-            <div className="space-y-4">
+            <div className="flex-1 overflow-y-auto px-modal py-card space-y-4">
               {/* Category Selector */}
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Category *</label>
+                <label className={label}>Category *</label>
                 <select
                   value={newItem?.category_id || ''}
                   onChange={(e) => {
@@ -292,7 +305,7 @@ const UniversalAddModal = ({
                     }));
                   }}
 
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
+                  className={field}
                   required
                 >
                   <option value="">Select a category</option>
@@ -308,12 +321,12 @@ const UniversalAddModal = ({
 
               {/* Item Name */}
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary"> {isComboCategory ? 'Combo Name *' : 'Item Name *'}</label>
+                <label className={label}> {isComboCategory ? 'Combo Name *' : 'Item Name *'}</label>
                 <input
                   type="text"
                   value={newItem?.name ?? ''}
                   onChange={(e) => setNewItem(prev => ({ ...(prev || {}), name: e.target.value }))}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
+                  className={field}
                   placeholder={isComboCategory ? "e.g. Family Combo, Weekend Special" : "Enter item name"} 
                   required
                 />
@@ -321,44 +334,44 @@ const UniversalAddModal = ({
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Description</label>
+                <label className={label}>Description</label>
                 <textarea
                   value={newItem?.description ?? ''}
                   onChange={(e) => setNewItem(prev => ({ ...(prev || {}), description: e.target.value }))}
-                  className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
+                  className={area}
                   placeholder={isComboCategory ? "What's included, portion details…" : "Enter item description"} rows="3" />
               </div>
               {isRentalRealm(normalizedRealm) &&  (
                   <div>
-                       <label className="block text-sm font-medium mb-2 text-text-primary">
-                             Rental Tier <span className="text-buttons-delete">*</span>
+                       <label className={label}>
+                             Rental Tier <span className="text-state-occupied">*</span>
                        </label>
 
-                       <div className="flex gap-2 items-center bg-bg-tertiary border border-border-default rounded-lg p-2">
+                       <div className="flex gap-2 items-center bg-brand-tint border border-brand-line rounded-panel p-2">
                            <input value={newItem?.rentalTier?.label || ''}  placeholder="e.g. Half Day"
                                   onChange={(e) => setNewItem(prev => ({ ...(prev || {}),
                                                    rentalTier: { ...(prev?.rentalTier || {}), label: e.target.value }}))}
-                                  className="flex-1 px-3 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                                  className={`${field} flex-1`}/>
                            <input type="number" min="0" value={newItem?.rentalTier?.days ?? ''} placeholder="Days"
                                   onChange={(e) => setNewItem(prev => ({ ...(prev || {}),
                                                    rentalTier: { ...(prev?.rentalTier || {}), days: e.target.value }}))}
-                                  className="w-16 px-2 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                                  className={`${field} !w-16 !px-2`}/>
                            <input type="number" min="0"  value={newItem?.rentalTier?.hours ?? ''}  placeholder="Hrs"
                                   onChange={(e) =>  setNewItem(prev => ({ ...(prev || {}),
                                                     rentalTier: { ...(prev?.rentalTier || {}), hours: e.target.value }}))}
-                                  className="w-16 px-2 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                                  className={`${field} !w-16 !px-2`}/>
                            <input type="number" min="0" value={newItem?.rentalTier?.minutes ?? ''} placeholder="Min"
                                   onChange={(e) => setNewItem(prev => ({ ...(prev || {}),
                                                   rentalTier: { ...(prev?.rentalTier || {}), minutes: e.target.value }}))}
-                                  className="w-16 px-2 py-2 rounded-lg border border-border-default text-sm bg-bg-primary"/>
+                                  className={`${field} !w-16 !px-2`}/>
                        </div>
 
-                       {!newItem?.rentalTier?.label && ( <p className="text-xs text-red-500 mt-1">Enter rental tier details</p> )}
+                       {!newItem?.rentalTier?.label && ( <p className="mt-1 text-micro font-semibold text-state-occupied">Enter rental tier details</p> )}
                   </div>
               )}
               {normalizedRealm === 'restaurant' && (
   <div>
-    <label className="block text-sm font-medium mb-2 text-text-primary">
+    <label className={label}>
       Dietary Type
     </label>
     <div className="flex flex-wrap gap-2">
@@ -375,28 +388,28 @@ const UniversalAddModal = ({
         onClick={() =>
           setNewItem(prev => ({ ...prev, dietary_type: selected ? '' : d }))
         }
-        className={`px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-all capitalize flex items-center gap-2 ${
+        className={`px-3 py-1.5 rounded-button-sm text-ui font-semibold border transition-colors capitalize flex items-center gap-2 ${
           selected
-            ? `${style.selected} shadow-sm`
-            : 'bg-bg-tertiary text-text-primary border-border-default hover:border-slate-400'
+            ? `${style.selected} shadow-seg-active`
+            : 'bg-surface text-ink-soft border-line hover:border-brand-line hover:bg-brand-tint'
         }`}
       >
         <span className={`w-2.5 h-2.5 rounded-full ${dotClass}`} />
         {d}
-        {selected && <span className="text-xs font-bold">✓</span>}
+        {selected && <span className="text-micro font-bold">✓</span>}
       </button>
     );
   })}
 </div>
     </div>
     {!newItem?.dietary_type && (
-      <p className="text-xs text-text-secondary mt-1">No dietary type selected</p>
+      <p className="text-ui-sm text-ink-muted mt-1">No dietary type selected</p>
     )}
   </div>
 )}
               {normalizedRealm === 'restaurant' && (
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className={label}>
                     Availability Timing
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -414,9 +427,9 @@ const UniversalAddModal = ({
                               : [...current, key];
                             setNewItem(prev => ({ ...prev, availability_time: next }));
                           }}
-                          className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selected
-                              ? 'bg-buttons-add text-text-white border-buttons-add'
-                              : 'bg-bg-tertiary border-border-default text-text-primary hover:border-buttonsHover-add'
+                          className={`px-3 py-1.5 rounded-button-sm text-ui font-semibold border transition-colors ${selected
+                              ? 'bg-brand text-text-white border-brand'
+                              : 'bg-surface border-line text-ink-soft hover:border-brand-line hover:bg-brand-tint'
                             }`}
                         >
                           {t.name} {t.start && t.end ? `(${t.start}–${t.end})` : ''}
@@ -425,31 +438,31 @@ const UniversalAddModal = ({
                     })}
                   </div>
                   {(newItem?.availability_time || []).length === 0 && (
-                    <p className="text-xs text-text-secondary mt-1">No timing selected = available all day</p>
+                    <p className="text-ui-sm text-ink-muted mt-1">No timing selected = available all day</p>
                   )}
                 </div>
               )}
               {/* Unit Price & Discount */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary"> {isComboCategory ? 'Combo Price * (flat, not sum of parts)' : 'Unit Price *'}</label>
+                  <label className={label}> {isComboCategory ? 'Combo Price * (flat, not sum of parts)' : 'Unit Price *'}</label>
                   <input
                     type="number"
                     value={newItem?.unit_price ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), unit_price: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
+                    className={field}
                     placeholder="0.00"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Discount</label>
+                  <label className={label}>Discount</label>
                   <input
                     type="number"
                     value={newItem?.discount ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), discount: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
+                    className={field}
                     placeholder="0.00"
                   />
                 </div>
@@ -457,19 +470,19 @@ const UniversalAddModal = ({
 
               {/* Zone pricing */}
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">
+                <label className={label}>
                   Pricing by Zone & Section
                 </label>
                 {/* Base price row — already exists above, just keep it */}
                 {configs.map(c => (
-                  <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-xl border border-border-default bg-bg-tertiary">
-                    <span className="text-sm font-medium text-text-primary">
-                      <span className="font-semibold text-buttons-add">{c.section}</span>
-                      <span className="text-text-secondary mx-1">—</span>
-                      <span className='text-text-primary'>{c.zone}</span>
+                  <div key={c.id} className="flex items-center justify-between gap-3 px-3 py-2 mb-1 rounded-panel border border-brand-line bg-brand-tint">
+                    <span className="text-ui font-semibold text-ink">
+                      <span className="font-bold text-brand-dark">{c.section}</span>
+                      <span className="text-ink-muted mx-1">—</span>
+                      <span className='text-ink-soft'>{c.zone}</span>
                     </span>
                     <div className="flex items-center gap-1">
-                      <span className="text-xs text-gray-400">₹</span>
+                      <span className="text-ui-sm text-ink-muted">₹</span>
                       <input
                         type="number"
                         min="0"
@@ -479,7 +492,7 @@ const UniversalAddModal = ({
                           ...prev,
                           zonePrices: { ...(prev.zonePrices || {}), [c.id]: e.target.value }
                         }))}
-                        className="w-24 px-2 py-1 rounded-lg border border-border-default bg-bg-primary text-sm text-right focus:outline-none focus:ring-2 focus:ring-buttons-add"
+                        className={`${field} !w-24 !h-8 !px-2 text-right`}
                       />
                     </div>
                   </div>
@@ -488,11 +501,11 @@ const UniversalAddModal = ({
               {/* Code & Unit */}
               <div className="grid grid-cols-2 gap-4">
               <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Unit</label>
+                  <label className={label}>Unit</label>
                   <select
                     value={newItem?.unit ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), unit: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
+                    className={field}
                   >
                     <option value="">Select unit</option>
                     {(units || []).map((u) => (
@@ -501,7 +514,7 @@ const UniversalAddModal = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">
+                  <label className={label}>
                     Availability
                   </label>
                   <input
@@ -514,16 +527,16 @@ const UniversalAddModal = ({
                         availability: e.target.value
                       }))
                     }
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default focus:outline-none focus:ring-2 focus:ring-buttons-add"
+                    className={field}
                     placeholder="Enter stock / quantity"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Serving Unit</label>
+                  <label className={label}>Serving Unit</label>
                   <select
                     value={newItem?.serving_unit ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_unit: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
+                    className={field}
                   >
                     <option value="">Select unit</option>
                     {(units || []).map((u) => (
@@ -532,23 +545,23 @@ const UniversalAddModal = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Serving Quantity</label>
+                  <label className={label}>Serving Quantity</label>
                   <input
                     type="number"
                     value={newItem?.serving_quantity ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), serving_quantity: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
+                    className={field}
                     placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-text-primary">Code *</label>
+                  <label className={label}>Code *</label>
                   <input
                     type="text"
                     value={newItem?.code ?? ''}
                     onChange={(e) => setNewItem(prev => ({ ...(prev || {}), code: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-buttons-add"
+                    className={field}
                     placeholder="0"
                   />
                 </div>
@@ -557,23 +570,23 @@ const UniversalAddModal = ({
                 <div>
                   {isComboCategory ? (
                     <>
-                      <label className="block text-sm font-medium mb-2 text-text-primary">
+                      <label className={label}>
                         Combo Items
-                        <span className="ml-1 text-xs text-gray-400 font-normal">(what's included)</span>
+                        <span className="ml-1 text-ui-sm text-ink-muted font-normal normal-case tracking-normal">(what's included)</span>
                       </label>
 
                       {newItem?.line_item_id?.length > 0 && (
-                        <div className="mb-2 p-2 bg-violet-50 border border-violet-200 rounded-lg space-y-1 max-h-28 overflow-y-auto">
+                        <div className="mb-2 p-2 bg-brand-tint border border-brand-line rounded-panel space-y-1 max-h-28 overflow-y-auto">
                           {newItem.line_item_id.map(id => {
                             const it = dedupedMenuItems?.find(i => i.id === id);
                             return it ? (
-                              <div key={id} className="flex items-center justify-between text-xs">
-                                <span className="font-medium text-violet-800 truncate">{it.name}</span>
+                              <div key={id} className="flex items-center justify-between text-ui-sm">
+                                <span className="font-semibold text-brand-dark truncate">{it.name}</span>
                                 <div className="flex items-center gap-1 shrink-0 ml-2">
-                                  <span className="text-violet-500">₹{Number(it.unit_price).toFixed(0)}</span>
+                                  <span className="text-ink-muted">₹{Number(it.unit_price).toFixed(0)}</span>
                                   <button type="button" onClick={() => setNewItem(prev => ({ ...prev, line_item_id: prev.line_item_id.filter(x => x !== id) }))}
-                                    className="w-4 h-4 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center">
-                                    <X size={9} className="text-buttons-delete" />
+                                    className="w-4 h-4 rounded-full bg-brand-light hover:bg-brand-soft flex items-center justify-center">
+                                    <X size={9} className="text-brand-dark" />
                                   </button>
                                 </div>
                               </div>
@@ -583,26 +596,26 @@ const UniversalAddModal = ({
                       )}
 
                       <button type="button" onClick={() => setShowAddonPopup(true)}
-                        className="w-full px-3 py-2.5 rounded-lg bg-bg-tertiary border-2 border-dashed border-violet-300 text-violet-700 hover:border-violet-500 hover:bg-violet-50 transition-all flex items-center justify-center gap-2 text-sm font-medium">
+                        className={dashedBtn}>
                         <Plus size={16} />
                         <span>{newItem?.line_item_id?.length > 0 ? `Edit Items (${newItem.line_item_id.length})` : 'Select Combo Items'}</span>
                       </button>
                     </>
                   ) : (
                     <>
-                      <label className="block text-sm font-medium mb-2 text-text-primary">Add-ons</label>
+                      <label className={label}>Add-ons</label>
                       {newItem?.line_item_id?.length > 0 && (
                         <div className="mb-3 flex flex-wrap gap-2">
                           {newItem.line_item_id.map(addonId => (
-                            <div key={addonId} className="flex items-center gap-2 bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm">
+                            <div key={addonId} className="flex items-center gap-2 bg-brand-light text-brand-dark border border-brand-line px-3 py-1 rounded-badge text-ui font-semibold">
                               <span>{getAddonNameById(addonId)}</span>
-                              <button type="button" onClick={() => removeAddon(addonId)} className="hover:bg-blue-200 rounded-full p-0.5"><X size={14} /></button>
+                              <button type="button" onClick={() => removeAddon(addonId)} className="hover:bg-brand-soft rounded-full p-0.5"><X size={14} /></button>
                             </div>
                           ))}
                         </div>
                       )}
                       <button type="button" onClick={() => setShowAddonPopup(true)}
-                        className="w-full px-4 py-2 rounded-lg bg-bg-tertiary border-default border-border-default text-text-primary hover:bg-slate-200 transition-all flex items-center justify-center gap-2 font-medium">
+                        className={dashedBtn}>
                         <Plus size={18} />
                         <span>{newItem?.line_item_id?.length > 0 ? `Manage Add-ons (${newItem.line_item_id.length} selected)` : 'Select Add-ons'}</span>
                       </button>
@@ -615,9 +628,9 @@ const UniversalAddModal = ({
 
               {/* Item Image Upload */}
               <div>
-                <label className="block text-sm font-medium mb-2 text-text-primary">Item Image</label>
+                <label className={label}>Item Image</label>
                 <div
-                  className={`relative border-2 border-dashed rounded-lg p-4 transition-colors ${dragActive ? 'bg-buttons-add' : 'border-border-default'
+                  className={`relative border-2 border-dashed rounded-panel p-4 transition-colors ${dragActive ? 'border-brand-ring bg-brand-tint' : 'border-brand-line bg-surface'
                     }`}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
@@ -626,22 +639,22 @@ const UniversalAddModal = ({
                 >
                   {newItemImageUrl ? (
                     <div className="relative">
-                      <img src={newItemImageUrl} alt="Preview" className="w-full h-48 object-cover rounded-lg" />
+                      <img src={newItemImageUrl} alt="Preview" className="w-full h-48 object-cover rounded-panel" />
                       <button
                         type="button"
                         onClick={() => {
                           setNewItemImage(null);
                           setNewItemImageUrl('');
                         }}
-                        className="absolute top-2 right-2 bg-buttons-delete text-text-white p-2 rounded-full hover:opacity-90"
+                        className="absolute top-2 right-2 bg-brand text-text-white p-2 rounded-full hover:bg-brand-dark"
                       >
                         <X size={16} />
                       </button>
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <Upload className="mx-auto mb-2 text-text-secondary" size={32} />
-                      <p className="text-sm text-text-secondary mb-2">
+                      <Upload className="mx-auto mb-2 text-brand-ring" size={32} />
+                      <p className="text-ui text-ink-muted mb-2">
                         Drag & drop an image here, or click to browse
                       </p>
                       <input
@@ -653,7 +666,7 @@ const UniversalAddModal = ({
                       />
                       <label
                         htmlFor="imageUpload"
-                        className="inline-block px-4 py-2 bg-buttons-add text-text-white rounded-lg cursor-pointer hover:opacity-90"
+                        className="ui-btn ui-btn-add cursor-pointer"
                       >
                         Choose File
                       </label>
@@ -661,24 +674,23 @@ const UniversalAddModal = ({
                   )}
                 </div>
               </div>
+            </div>
 
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={handleClose}
-                  className="flex-1 px-4 py-2 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-slate-200 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddItem}
-                  disabled={isSubmitting}
-                  className={`flex-1 px-4 py-2 rounded-lg bg-buttons-add text-text-white hover:bg-buttonsHover-add  ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-action-primary hover:opacity-90'}`}
-                >
-                  {isComboCategory ? 'Add Combo' : 'Add Item'}
-                </button>
-              </div>
+            {/* Action Buttons */}
+            <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
+              <button
+                onClick={handleClose}
+                className="ui-btn"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddItem}
+                disabled={isSubmitting}
+                className="ui-btn ui-btn-add"
+              >
+                {isComboCategory ? 'Add Combo' : 'Add Item'}
+              </button>
             </div>
           </div>
         </div>

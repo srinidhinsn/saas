@@ -300,12 +300,20 @@ const UniversalBulkUpdateModal = ({
   // Render Menu Bulk Update Modal
   if (modalType === 'menu') {
     const inputBase =
-      "w-full px-3 py-2 border border-border-default rounded-lg text-sm bg-bg-primary text-text-primary " +
-      "focus:outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-500 transition";
+      "w-full h-8 px-2 rounded-button-sm border border-brand-line bg-surface text-ui text-ink " +
+      "outline-none placeholder:text-ink-faint transition-colors " +
+      "focus:border-brand-ring focus:shadow-focus-ring";
     const labelBase =
-      "block text-[11px] font-semibold uppercase tracking-wide mb-1 text-text-secondary";
+      "block text-micro font-bold uppercase tracking-wide mb-1 text-ink-muted";
     const thBase =
-      "px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-text-secondary bg-bg-tertiary whitespace-nowrap";
+      "px-3 py-3 text-left text-micro font-bold uppercase tracking-wide text-brand-dark bg-brand-light whitespace-nowrap";
+    const checkBase = "w-4 h-4 accent-brand rounded cursor-pointer";
+    const zoneInput =
+      "w-20 h-7 px-2 rounded-button-sm border border-brand-line bg-surface text-ui-sm text-right text-ink " +
+      "outline-none focus:border-brand-ring focus:shadow-focus-ring";
+    const dashedBtn =
+      "w-full px-3 py-2 rounded-button-sm bg-surface border-2 border-dashed border-brand-line text-brand-dark " +
+      "hover:bg-brand-light transition-colors text-ui font-semibold flex items-center justify-center gap-1";
 
     const getZoneValue = (item, editData, c) =>
       editData.zonePrices?.[c.id] ??
@@ -321,41 +329,41 @@ const UniversalBulkUpdateModal = ({
 
     const availabilityBadge = (item) =>
       Number(item.availability) === 0
-        ? "bg-red-100 text-red-700 border-red-200"
-        : "bg-green-100 text-green-700 border-green-200";
+        ? "bg-state-occupied-bg text-state-occupied border-state-occupied/30"
+        : "bg-state-vacant-bg text-state-vacant border-state-vacant/30";
 
     return (
       <>
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 sm:p-4">
-          <div className="bg-bg-primary w-full sm:max-w-6xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[92vh] h-full rounded-xl shadow-2xl flex flex-col overflow-hidden border border-border-default">
+        <div className="ui-backdrop font-sans">
+          <div className="flex flex-col w-full sm:max-w-6xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[92vh] h-full overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Bulk update menu items">
             {/* HEADER */}
-            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 bg-buttons-update text-gray-900 shrink-0">
+            <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 bg-brand-light border-b border-brand-line shrink-0">
               <div className="flex items-center gap-2 min-w-0">
-                <Edit className="w-5 h-5 shrink-0" />
+                <Edit className="w-5 h-5 shrink-0 text-brand" />
                 <div className="min-w-0">
-                  <h2 className="text-base sm:text-lg font-bold leading-tight truncate">Bulk Update & Delete</h2>
-                  <p className="text-xs opacity-80 truncate">Select items, edit inline, then save</p>
+                  <h2 className="text-panel-title text-brand-dark truncate">Bulk Update & Delete</h2>
+                  <p className="text-micro text-ink-muted truncate">Select items, edit inline, then save</p>
                 </div>
               </div>
               <button
                 onClick={handleClose}
-                className="p-1.5 rounded-lg bg-white/30 hover:bg-white/50 transition-colors shrink-0"
+                className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors"
                 aria-label="Close"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* GLOBAL ADD-ONS */}
-            <div className="px-4 sm:px-6 py-3 bg-amber-50 border-b border-amber-200 shrink-0">
-              <p className="text-xs font-semibold text-text-secondary mb-2">
+            <div className="px-4 sm:px-6 py-3 bg-brand-tint border-b border-brand-line shrink-0">
+              <p className="text-micro font-bold uppercase tracking-wide text-brand-dark mb-2">
                 Apply add-ons to all selected items
               </p>
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                 <div className="grid grid-cols-2 sm:flex gap-2">
                   <button
                     onClick={() => setShowGlobalAddonPopup(true)}
-                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-buttons-update hover:bg-buttonsHover-update text-gray-900 font-semibold text-sm shadow-sm transition-colors whitespace-nowrap"
+                    className="ui-btn ui-btn-add whitespace-nowrap"
                   >
                     <Plus size={16} />
                     {globalAddons.length > 0 ? `${globalAddons.length} add-on(s)` : 'Select Add-ons'}
@@ -363,7 +371,7 @@ const UniversalBulkUpdateModal = ({
                   <button
                     onClick={clearGlobalAddons}
                     disabled={globalAddons.length === 0 && selectedRows.length === 0}
-                    className="px-4 py-2 rounded-lg bg-buttons-configure hover:bg-buttonsHover-configure text-text-white font-semibold text-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed whitespace-nowrap"
+                    className="ui-btn whitespace-nowrap"
                   >
                     Clear All
                   </button>
@@ -372,19 +380,19 @@ const UniversalBulkUpdateModal = ({
                 {globalAddons.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {globalAddons.slice(0, 3).map(id => (
-                      <span key={id} className="bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full text-xs font-medium">
+                      <span key={id} className="bg-brand-light text-brand-dark border border-brand-line px-2 py-0.5 rounded-badge text-ui-sm font-semibold">
                         {getAddonNameById(id)}
                       </span>
                     ))}
                     {globalAddons.length > 3 && (
-                      <span className="bg-gray-100 text-gray-600 border border-gray-200 px-2 py-0.5 rounded-full text-xs font-medium">
+                      <span className="bg-surface text-ink-muted border border-line px-2 py-0.5 rounded-badge text-ui-sm font-semibold">
                         +{globalAddons.length - 3} more
                       </span>
                     )}
                   </div>
                 )}
               </div>
-              <p className="text-xs text-text-secondary mt-2">
+              <p className="text-ui-sm text-ink-muted mt-2">
                 {selectedRows.length > 0
                   ? `${globalAddons.length > 0 ? 'Add-ons applied to' : 'Select add-ons to apply to'} ${selectedRows.length} selected item(s)`
                   : globalAddons.length > 0
@@ -394,18 +402,18 @@ const UniversalBulkUpdateModal = ({
             </div>
 
             {/* ACTION BAR */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-3 border-b border-border-default bg-bg-tertiary shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-6 py-3 border-b border-line bg-canvas shrink-0">
               <label className="flex items-center justify-between sm:justify-start gap-3 cursor-pointer select-none">
                 <span className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={selectAllChecked}
                     onChange={toggleSelectAll}
-                    className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                    className={checkBase}
                   />
-                  <span className="text-sm font-semibold text-text-primary">Select All</span>
+                  <span className="text-ui font-semibold text-ink">Select All</span>
                 </span>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                <span className="text-micro font-bold px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line">
                   {selectedRows.length} / {filteredItems.length}
                 </span>
               </label>
@@ -421,7 +429,7 @@ const UniversalBulkUpdateModal = ({
                     setBulkEditData(updated);
                   }}
                   disabled={selectedRows.length === 0}
-                  className="flex items-center justify-center px-3 sm:px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-semibold text-xs sm:text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+                  className="ui-btn"
                 >
                   <span className="sm:hidden">Unavail.</span>
                   <span className="hidden sm:inline">Mark Unavailable</span>
@@ -436,7 +444,7 @@ const UniversalBulkUpdateModal = ({
                     setBulkEditData(updated);
                   }}
                   disabled={selectedRows.length === 0}
-                  className="flex items-center justify-center px-3 sm:px-4 py-2 rounded-lg bg-buttons-add hover:bg-buttonsHover-add text-text-white font-semibold text-xs sm:text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+                  className="ui-btn"
                 >
                   <span className="sm:hidden">Avail.</span>
                   <span className="hidden sm:inline">Mark Available</span>
@@ -444,7 +452,7 @@ const UniversalBulkUpdateModal = ({
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
                   disabled={selectedRows.length === 0}
-                  className="flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg bg-buttons-delete hover:bg-buttonsHover-delete text-text-white font-semibold text-xs sm:text-sm shadow-sm transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+                  className="ui-btn ui-btn-delete"
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete
@@ -453,19 +461,19 @@ const UniversalBulkUpdateModal = ({
             </div>
 
             {/* CONTENT */}
-            <div className="flex-1 overflow-y-auto bg-bg-primary px-3 sm:px-4 py-3">
+            <div className="flex-1 overflow-y-auto bg-canvas px-3 sm:px-4 py-3">
 
               {/* DESKTOP TABLE */}
-              <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+              <div className="hidden md:block overflow-x-auto rounded-panel border border-line bg-surface shadow-panel">
                 <table className="w-full border-collapse min-w-[1000px]">
                   <thead className="sticky top-0 z-10">
-                    <tr className="border-b border-border-default">
+                    <tr className="border-b border-brand-line">
                       <th className={`${thBase} w-10`}>
                         <input
                           type="checkbox"
                           checked={selectAllChecked}
                           onChange={toggleSelectAll}
-                          className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                          className={checkBase}
                         />
                       </th>
                       <th className={thBase}>Name</th>
@@ -491,11 +499,11 @@ const UniversalBulkUpdateModal = ({
                       return (
                         <tr
                           key={item.id}
-                          className={`border-b border-border-default transition-colors ${isSelected
-                              ? 'bg-amber-50/60'
+                          className={`border-b border-line-soft transition-colors ${isSelected
+                              ? 'bg-brand-tint'
                               : index % 2 === 0
-                                ? 'bg-bg-primary hover:bg-bg-tertiary'
-                                : 'bg-bg-tertiary/50 hover:bg-bg-tertiary'
+                                ? 'bg-surface hover:bg-brand-tint'
+                                : 'bg-canvas/50 hover:bg-brand-tint'
                             }`}
                         >
                           <td className="px-3 py-2.5">
@@ -503,7 +511,7 @@ const UniversalBulkUpdateModal = ({
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleRowSelection(item.id)}
-                              className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                              className={checkBase}
                             />
                           </td>
 
@@ -517,7 +525,7 @@ const UniversalBulkUpdateModal = ({
                                 placeholder="Item name"
                               />
                             ) : (
-                              <span className="text-sm font-medium text-text-primary">{item.name}</span>
+                              <span className="text-ui font-semibold text-ink">{item.name}</span>
                             )}
                           </td>
 
@@ -531,7 +539,7 @@ const UniversalBulkUpdateModal = ({
                                 placeholder="Description"
                               />
                             ) : (
-                              <span className="text-sm text-text-secondary truncate block max-w-[220px]">
+                              <span className="text-ui text-ink-muted truncate block max-w-[220px]">
                                 {item.description || '-'}
                               </span>
                             )}
@@ -548,7 +556,7 @@ const UniversalBulkUpdateModal = ({
                                 placeholder="0.00"
                               />
                             ) : (
-                              <span className="text-sm font-semibold text-text-primary">
+                              <span className="text-ui font-bold text-brand-dark">
                                 ₹{typeof item.unit_price === 'number' ? item.unit_price.toFixed(2) : '0.00'}
                               </span>
                             )}
@@ -565,7 +573,7 @@ const UniversalBulkUpdateModal = ({
                                 placeholder="0.00"
                               />
                             ) : (
-                              <span className="text-sm text-text-primary">
+                              <span className="text-ui text-ink-soft">
                                 {Number(item.discount) > 0 ? `${Number(item.discount)}%` : '-'}
                               </span>
                             )}
@@ -576,10 +584,10 @@ const UniversalBulkUpdateModal = ({
                               <div className="space-y-1.5">
                                 {configs.map(c => (
                                   <div key={c.id} className="flex items-center gap-2">
-                                    <span className="text-xs text-text-secondary font-medium w-24 truncate shrink-0">
+                                    <span className="text-ui-sm text-ink-muted font-semibold w-24 truncate shrink-0">
                                       {c.section}-{c.zone}
                                     </span>
-                                    <span className="text-xs text-text-secondary">₹</span>
+                                    <span className="text-ui-sm text-ink-muted">₹</span>
                                     <input
                                       type="number"
                                       min="0"
@@ -591,13 +599,13 @@ const UniversalBulkUpdateModal = ({
                                           [c.id]: e.target.value
                                         })
                                       }
-                                      className="w-20 px-2 py-1 border border-border-default rounded-lg text-xs text-right bg-bg-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-500"
+                                      className={zoneInput}
                                     />
                                   </div>
                                 ))}
                               </div>
                             ) : zoneVariants.length === 0 || !configs.length ? (
-                              <span className="text-xs text-text-secondary">-</span>
+                              <span className="text-ui-sm text-ink-muted">-</span>
                             ) : (
                               <div className="flex flex-wrap gap-1">
                                 {zoneVariants.map(s => {
@@ -605,7 +613,7 @@ const UniversalBulkUpdateModal = ({
                                   return c ? (
                                     <span
                                       key={`${s.id}-${s.zone_config_id}`}
-                                      className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200"
+                                      className="text-micro px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line font-semibold"
                                     >
                                       {c.section}-{c.zone}: ₹{s.unit_price}
                                     </span>
@@ -625,7 +633,7 @@ const UniversalBulkUpdateModal = ({
                                 placeholder="Code"
                               />
                             ) : (
-                              <span className="text-sm text-text-primary">{item.code ?? '-'}</span>
+                              <span className="text-ui text-ink-soft">{item.code ?? '-'}</span>
                             )}
                           </td>
 
@@ -637,28 +645,28 @@ const UniversalBulkUpdateModal = ({
                                   min="0"
                                   value={editData.availability !== undefined ? editData.availability : item.availability ?? ''}
                                   onChange={e => updateBulkEditData(item.id, 'availability', e.target.value)}
-                                  className={`${inputBase} w-20`}
+                                  className={`${inputBase} !w-20`}
                                   placeholder="0"
                                 />
                                 <div className="flex flex-col gap-1">
                                   <button
                                     type="button"
                                     onClick={() => updateBulkEditData(item.id, 'availability', 0)}
-                                    className="px-2 py-0.5 rounded text-xs bg-red-100 text-red-700 hover:bg-red-200 font-semibold whitespace-nowrap transition-colors"
+                                    className="px-2 py-0.5 rounded-seg text-micro bg-state-occupied-bg text-state-occupied hover:opacity-80 font-bold whitespace-nowrap transition-opacity"
                                   >
                                     × Off
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => updateBulkEditData(item.id, 'availability', 999)}
-                                    className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700 hover:bg-green-200 font-semibold whitespace-nowrap transition-colors"
+                                    className="px-2 py-0.5 rounded-seg text-micro bg-state-vacant-bg text-state-vacant hover:opacity-80 font-bold whitespace-nowrap transition-opacity"
                                   >
                                     ✓ On
                                   </button>
                                 </div>
                               </div>
                             ) : (
-                              <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${availabilityBadge(item)}`}>
+                              <span className={`text-micro font-bold px-2 py-1 rounded-badge border ${availabilityBadge(item)}`}>
                                 {Number(item.availability) === 0 ? 'Off' : item.availability ?? '—'}
                               </span>
                             )}
@@ -669,13 +677,13 @@ const UniversalBulkUpdateModal = ({
                               <button
                                 type="button"
                                 onClick={() => openItemAddonPopup(item.id)}
-                                className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border-2 border-dashed border-border-default text-text-primary hover:border-amber-500 hover:bg-amber-50 transition-all text-sm font-medium flex items-center justify-center gap-1"
+                                className={dashedBtn}
                               >
                                 <Plus size={14} />
                                 {currentAddons.length > 0 ? `${currentAddons.length} add-on(s)` : 'Select'}
                               </button>
                             ) : (
-                              <span className="text-sm text-text-primary">
+                              <span className="text-ui text-ink-soft">
                                 {Array.isArray(item.line_item_id) && item.line_item_id.length > 0
                                   ? `${item.line_item_id.length} add-on(s)`
                                   : '-'}
@@ -703,9 +711,9 @@ const UniversalBulkUpdateModal = ({
                   return (
                     <div
                       key={item.id}
-                      className={`rounded-xl border-2 overflow-hidden transition-all ${isSelected
-                          ? 'border-amber-400 bg-amber-50/40 shadow-sm'
-                          : 'border-border-default bg-bg-primary'
+                      className={`rounded-panel border overflow-hidden transition-colors shadow-panel ${isSelected
+                          ? 'border-brand-ring bg-brand-tint'
+                          : 'border-line bg-surface'
                         }`}
                     >
                       {/* Card header */}
@@ -714,15 +722,15 @@ const UniversalBulkUpdateModal = ({
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleRowSelection(item.id)}
-                          className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                          className={checkBase}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-text-primary text-sm truncate">{item.name}</p>
-                          <p className="text-xs text-text-secondary truncate">{item.description || '—'}</p>
+                          <p className="font-bold text-brand-dark text-ui truncate">{item.name}</p>
+                          <p className="text-ui-sm text-ink-muted truncate">{item.description || '—'}</p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-sm font-bold text-text-primary">₹{item.unit_price}</p>
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${availabilityBadge(item)}`}>
+                          <p className="text-ui font-bold text-brand-dark">₹{item.unit_price}</p>
+                          <span className={`text-micro font-bold px-1.5 py-0.5 rounded-badge border ${availabilityBadge(item)}`}>
                             {Number(item.availability) === 0 ? 'Off' : item.availability ?? '—'}
                           </span>
                         </div>
@@ -736,7 +744,7 @@ const UniversalBulkUpdateModal = ({
                             return c ? (
                               <span
                                 key={`${s.id}-${s.zone_config_id}`}
-                                className="text-[11px] bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full"
+                                className="text-micro bg-brand-light text-brand-dark border border-brand-line px-2 py-0.5 rounded-badge font-semibold"
                               >
                                 {c.section}-{c.zone}: ₹{s.unit_price}
                               </span>
@@ -747,7 +755,7 @@ const UniversalBulkUpdateModal = ({
 
                       {/* Edit fields when selected */}
                       {isSelected && (
-                        <div className="px-3 pb-3 pt-3 space-y-3 border-t border-amber-200">
+                        <div className="px-3 pb-3 pt-3 space-y-3 border-t border-brand-line">
                           <div>
                             <label className={labelBase}>Name</label>
                             <input
@@ -821,14 +829,14 @@ const UniversalBulkUpdateModal = ({
                             <button
                               type="button"
                               onClick={() => updateBulkEditData(item.id, 'availability', 0)}
-                              className="py-2 rounded-lg text-xs bg-red-100 text-red-700 hover:bg-red-200 font-semibold transition-colors"
+                              className="py-2 rounded-button-sm text-micro bg-state-occupied-bg text-state-occupied hover:opacity-80 font-bold transition-opacity"
                             >
                               × Mark Off
                             </button>
                             <button
                               type="button"
                               onClick={() => updateBulkEditData(item.id, 'availability', 999)}
-                              className="py-2 rounded-lg text-xs bg-green-100 text-green-700 hover:bg-green-200 font-semibold transition-colors"
+                              className="py-2 rounded-button-sm text-micro bg-state-vacant-bg text-state-vacant hover:opacity-80 font-bold transition-opacity"
                             >
                               ✓ Mark On
                             </button>
@@ -841,12 +849,12 @@ const UniversalBulkUpdateModal = ({
                                 {configs.map(c => (
                                   <div
                                     key={c.id}
-                                    className="flex items-center gap-2 bg-bg-primary border border-border-default rounded-lg px-3 py-1.5"
+                                    className="flex items-center gap-2 bg-surface border border-brand-line rounded-button-sm px-3 py-1.5"
                                   >
-                                    <span className="text-xs font-medium text-text-primary flex-1 truncate">
+                                    <span className="text-ui-sm font-semibold text-ink flex-1 truncate">
                                       {c.section} — {c.zone}
                                     </span>
-                                    <span className="text-xs text-text-secondary">₹</span>
+                                    <span className="text-ui-sm text-ink-muted">₹</span>
                                     <input
                                       type="number"
                                       min="0"
@@ -858,7 +866,7 @@ const UniversalBulkUpdateModal = ({
                                           [c.id]: e.target.value
                                         })
                                       }
-                                      className="w-20 px-2 py-1 border border-border-default rounded-lg text-sm text-right bg-bg-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-amber-400/60 focus:border-amber-500"
+                                      className={zoneInput}
                                     />
                                   </div>
                                 ))}
@@ -871,7 +879,7 @@ const UniversalBulkUpdateModal = ({
                             <button
                               type="button"
                               onClick={() => openItemAddonPopup(item.id)}
-                              className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border-2 border-dashed border-border-default text-text-primary hover:border-amber-500 hover:bg-amber-50 transition-all text-sm font-medium flex items-center justify-center gap-2"
+                              className={dashedBtn}
                             >
                               <Plus size={14} />
                               {currentAddons.length > 0 ? `${currentAddons.length} add-on(s) selected` : 'Select Add-ons'}
@@ -886,25 +894,25 @@ const UniversalBulkUpdateModal = ({
 
               {filteredItems.length === 0 && (
                 <div className="text-center py-16">
-                  <Search className="w-12 h-12 text-text-secondary mx-auto mb-3 opacity-30" />
-                  <p className="text-text-secondary font-medium">No items to display</p>
-                  <p className="text-text-secondary text-sm mt-1 opacity-80">Try adjusting your filters or search</p>
+                  <Search className="w-12 h-12 text-brand-soft mx-auto mb-3" />
+                  <p className="text-ui font-semibold text-ink-soft">No items to display</p>
+                  <p className="text-ui-sm text-ink-muted mt-1">Try adjusting your filters or search</p>
                 </div>
               )}
             </div>
 
             {/* FOOTER */}
-            <div className="px-4 sm:px-6 py-3 bg-bg-tertiary border-t border-border-default shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="px-4 sm:px-6 py-3 bg-surface border-t border-line shrink-0 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               <button
                 onClick={handleClose}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-bg-secondary font-semibold text-sm transition-colors"
+                className="ui-btn w-full sm:w-auto"
               >
                 Close
               </button>
               <button
                 onClick={handleBulkUpdate}
                 disabled={selectedRows.length === 0}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-buttons-update hover:bg-buttonsHover-update text-gray-900 font-semibold text-sm shadow-md transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+                className="ui-btn ui-btn-add w-full sm:w-auto"
               >
                 <Edit className="w-4 h-4" />
                 Update Selected ({selectedRows.length})
@@ -925,36 +933,36 @@ const UniversalBulkUpdateModal = ({
         />
         {/* Bulk Delete Confirmation */}
         {showDeleteConfirm && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-3 sm:p-4">
-            <div className="bg-bg-primary w-full max-w-md max-h-[calc(100dvh-1.5rem)] rounded-xl shadow-2xl border border-border-default flex flex-col overflow-hidden">
+          <div className="ui-backdrop font-sans">
+            <div className="flex flex-col w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Delete selected items">
 
               {/* Header */}
-              <div className="flex items-center gap-3 px-5 py-4 bg-red-50 border-b border-red-200 shrink-0">
-                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                  <Trash2 className="w-5 h-5 text-red-600" />
+              <div className="flex items-center gap-3 px-5 py-4 bg-brand-light border-b border-brand-line shrink-0">
+                <div className="w-10 h-10 rounded-full bg-surface border border-brand-line flex items-center justify-center shrink-0">
+                  <Trash2 className="w-5 h-5 text-brand-dark" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-base font-bold text-red-900">Delete selected items?</h3>
-                  <p className="text-xs text-red-700">This action cannot be undone</p>
+                  <h3 className="text-panel-title text-brand-dark">Delete selected items?</h3>
+                  <p className="text-micro text-ink-muted">This action cannot be undone</p>
                 </div>
               </div>
 
               {/* Body */}
               <div className="px-5 py-4 overflow-y-auto">
-                <p className="text-sm text-text-secondary mb-3">
+                <p className="text-ui text-ink-muted mb-3">
                   You are about to permanently delete{" "}
-                  <strong className="text-red-600 text-base">{selectedRows.length}</strong>{" "}
+                  <strong className="text-brand-dark text-body-sm">{selectedRows.length}</strong>{" "}
                   item{selectedRows.length !== 1 ? "s" : ""}, including all of their zone prices.
                   They will also be removed from any item that uses them as an add-on.
                 </p>
 
-                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 rounded-lg bg-bg-tertiary border border-border-default">
+                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 rounded-button-sm bg-brand-light border border-brand-line">
                   {filteredItems
                     .filter(i => selectedRows.includes(i.id))
                     .map(i => (
                       <span
                         key={i.id}
-                        className="px-2.5 py-1 rounded-full bg-red-100 text-red-700 border border-red-200 text-xs font-semibold"
+                        className="px-2.5 py-1 rounded-badge bg-surface text-brand-dark border border-brand-line text-ui-sm font-semibold"
                       >
                         {i.name}
                       </span>
@@ -963,22 +971,22 @@ const UniversalBulkUpdateModal = ({
               </div>
 
               {/* Footer */}
-              <div className="px-5 py-3 bg-bg-tertiary border-t border-border-default flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
+              <div className="px-5 py-3 bg-canvas border-t border-line flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
                   disabled={isDeleting}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-bg-primary text-text-primary border border-border-default hover:bg-bg-secondary font-semibold text-sm transition-colors disabled:opacity-50"
+                  className="ui-btn w-full sm:w-auto"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmBulkDeleteAction}
                   disabled={isDeleting}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-sm shadow-md transition-colors disabled:bg-red-300 disabled:cursor-not-allowed"
+                  className="ui-btn ui-btn-danger w-full sm:w-auto"
                 >
                   {isDeleting ? (
                     <>
-                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-badge animate-spin-slow" />
                       Deleting...
                     </>
                   ) : (

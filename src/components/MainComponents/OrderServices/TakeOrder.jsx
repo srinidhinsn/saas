@@ -2123,7 +2123,7 @@ const handleBillFromCart = async () => {
                 </div>
 
                 {/* Item grid */}
-                <div className={`grid gap-2 grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${showCart ? 'xl:grid-cols-3' : 'xl:grid-cols-4'} w-full min-w-0`}>
+                <div className="grid grid-cols-tiles gap-tiles w-full min-w-0">
                   {filteredItems.map(item => {
                     const dp = item.discount && Number(item.discount) > 0
                       ? Number(item.discount).toFixed(0) : null;
@@ -2138,7 +2138,7 @@ const handleBillFromCart = async () => {
                       <div
                         key={`${item.id}_${item.zone_config_id ?? 0}`}
                         onClick={() => handleItemClick(item)}
-                        className="flex gap-2 items-center bg-surface border border-line rounded-panel p-2 min-w-0 w-full overflow-hidden shadow-panel hover:shadow-panel-hover transition cursor-pointer"
+                        className="ui-card flex gap-2 items-center p-2 min-w-0 w-full overflow-hidden cursor-pointer"
                       >
                         <div className={`w-[4px] self-stretch rounded-l-panel flex-shrink-0 ${dietaryColor}`} />
                         <div className="w-14 h-16 rounded-button-sm overflow-hidden shrink-0 bg-brand-light">
@@ -2192,6 +2192,7 @@ const handleBillFromCart = async () => {
                     );
                   })}
                 </div>
+
               </div>
 
               {/* ── Cart panel (desktop only, slide in) ── */}

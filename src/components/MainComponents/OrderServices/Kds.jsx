@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-icons/fa';
-import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw } from 'lucide-react';
+import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw, LayoutGrid, ListChecks, Store } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import { parseISTTimestamp, getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
 import { isPackagingMenuRecord  } from '../../utils/Menu-utils/menuUtils';
@@ -47,6 +47,18 @@ const ORDER_FILTER_OPTIONS = [
   { key: KDS_CONFIG.FILTERS.TAKEAWAY, label: 'Takeaway', Icon: Package },
   { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery', Icon: Truck },
 ];
+
+const VIEWS = { ORDER: 'order', ITEM: 'item', COUNTER: 'counter' };
+
+const VIEW_TABS = [
+  { key: VIEWS.ORDER, label: 'Order View', Icon: LayoutGrid },
+  { key: VIEWS.ITEM, label: 'Item View', Icon: ListChecks },
+  { key: VIEWS.COUNTER, label: 'Counter View', Icon: Store },
+];
+
+const INVENTORY_API = import.meta.env.VITE_API_INVENTORY_SERVICE_URL;
+const COUNTER_ROOT = import.meta.env.VITE_MENU_COUNTER;
+const CATEGORY_ROOT = import.meta.env.VITE_MENU_DEFAULT_ROOT;
 
 // ─── Elapsed time helper ───────────────────────────────────────────────────────
 
@@ -153,82 +165,11 @@ const isComboItem = (orderItem, menuRecord) => {
   return isComboCategory && hasLineItems;
 };
 
-// ─── Delete item confirmation modal ───────────────────────────────────────────
+// ─── Shared aggregation logic ──────────────────────────────────────────────────
+// Groups active (not served / cancelled) items by name. `predicate` lets the
+// counter view reuse this for each counter.
 
-const DeleteItemModal = ({ isOpen, onClose, onConfirm, itemName }) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="w-full max-w-sm rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
-        <div className="px-6 py-4 border-b">
-          <h3 className="text-lg font-semibold text-red-600">Remove Item</h3>
-        </div>
-        <div className="px-6 py-4">
-          <p className="text-sm text-gray-600">
-            Remove <span className="font-semibold">{itemName}</span> from this order?
-          </p>
-        </div>
-        <div className="px-6 py-4 flex justify-end gap-3 border-t">
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
-          >
-            Remove
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-
-// ─── Delete order confirmation modal ──────────────────────────────────────────
-
-const DeleteOrderModal = ({ isOpen, onClose, onConfirm, cardToDelete }) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="w-full max-w-md rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
-        <div className="px-6 py-5 border-b">
-          <h3 className="text-lg font-semibold">Confirm Delete</h3>
-        </div>
-        <div className="px-6 py-4">
-          <p className="text-sm text-gray-600">
-            {!cardToDelete?.is_sub_order
-              ? 'Delete this order and ALL its sub-orders?'
-              : `Delete sub-order #${cardToDelete?.dinein_order_id}?`}
-          </p>
-        </div>
-        <div className="px-6 py-4 flex justify-end gap-3 border-t">
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
-          >
-            Yes
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-          >
-            No
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─── AggregatePanel ─────────────────────────────────────────────────────────────
-
-const AggregatePanel = ({ cards, tablesMap,menuItemsMap, onClose }) => {
+const buildItemEntries = (cards, tablesMap, predicate = () => true) => {
   const aggregateMap = {};
 
   cards.forEach((card) => {
@@ -236,10 +177,9 @@ const AggregatePanel = ({ cards, tablesMap,menuItemsMap, onClose }) => {
       tablesMap[card.table_id] || `${KDS_CONFIG.DEFAULT_TABLE_PREFIX}${card.table_id}`;
     (card.items || []).forEach((item) => {
       if (item.status === KDS_CONFIG.STATUS.SERVED || isCancelledStatus(item.status)) return;
+      if (!predicate(item)) return;
       const name = item.item_name || 'Unnamed';
-      if (!aggregateMap[name]) {
-        aggregateMap[name] = { totalQty: 0, orders: [] };
-      }
+      if (!aggregateMap[name]) aggregateMap[name] = { totalQty: 0, orders: [] };
       aggregateMap[name].totalQty += item.quantity || 1;
       aggregateMap[name].orders.push({
         tableLabel,
@@ -252,105 +192,232 @@ const AggregatePanel = ({ cards, tablesMap,menuItemsMap, onClose }) => {
     });
   });
 
-  const entries = Object.entries(aggregateMap).sort(
-    (a, b) => b[1].totalQty - a[1].totalQty
-  );
-
+  const entries = Object.entries(aggregateMap).sort((a, b) => b[1].totalQty - a[1].totalQty);
   entries.forEach(([, data]) => {
     data.orders.sort(
       (a, b) => parseISTTimestamp(a.createdAt || 0) - parseISTTimestamp(b.createdAt || 0)
     );
   });
+  return entries;
+};
 
-  const urgencyColor = (createdAt) => {
-    const m = minutesElapsed(createdAt);
-    if (m >= 20) return 'bg-red-100 text-red-700 border-red-300';
-    if (m >= 10) return 'bg-orange-100 text-orange-700 border-orange-300';
-    return 'bg-green-50 text-green-700 border-green-200';
-  };
+// ─── ItemCard — one card per item, same structure as KitchenCard ───────────────
 
-  const urgencyDot = (createdAt) => {
-    const m = minutesElapsed(createdAt);
-    if (m >= 20) return 'bg-red-500';
-    if (m >= 10) return 'bg-orange-400';
-    return 'bg-green-400';
-  };
+const ItemCard = ({ itemName, data }) => {
+  const orderCount = data.orders.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-action-primary rounded-t-2xl">
-          <div className="flex items-center gap-3">
-            <BarChart2 size={22} className="text-white" />
-            <h2 className="text-lg font-bold text-white">Kitchen Aggregate View</h2>
-            <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full font-semibold">
-              {entries.length} items
-            </span>
-          </div>
-          <button onClick={onClose} className="text-white hover:text-white/70 transition-colors">
-            <X size={22} />
-          </button>
-        </div>
+    <div className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5 flex flex-col">
 
-        <div className="flex items-center gap-4 px-6 py-2 bg-gray-50 border-b text-xs text-gray-500">
-          <span className="font-semibold">Priority:</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> &gt;20 min — urgent</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400 inline-block" /> 10–20 min — watch</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> &lt;10 min — fresh</span>
-        </div>
-
-        <div className="overflow-y-auto flex-1 p-6 space-y-4">
-          {entries.length === 0 ? (
-            <p className="text-center text-gray-400 py-8">No active items</p>
-          ) : (
-            entries.map(([itemName, data]) => (
-              <div key={itemName} className="rounded-xl border border-gray-200 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-                  <span className="font-bold text-gray-800 text-base">{itemName}</span>
-                  <span className="bg-action-primary text-white text-sm font-bold px-3 py-1 rounded-full">
-                    × {data.totalQty} total
-                  </span>
-                </div>
-                <div className="divide-y divide-gray-100">
-                  {data.orders.map((ord, idx) => (
-                    <div
-                      key={`${ord.cardId}-${idx}`}
-                      className={`flex items-center justify-between px-4 py-2.5 ${urgencyColor(ord.createdAt)} border-l-4`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${urgencyDot(ord.createdAt)}`}
-                        />
-                        <div>
-                          <span className="font-semibold text-sm">{ord.tableLabel}</span>
-                          <span className="text-xs ml-2 opacity-70">#{ord.dineinOrderId}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-semibold opacity-60">
-                          {idx === 0 ? '🔴 Serve first' : `#${idx + 1}`}
-                        </span>
-                        <span className="text-xs opacity-60">
-                          {calculateElapsedTime(ord.createdAt)} ago
-                        </span>
-                        <span className="font-bold text-sm">× {ord.qty}</span>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-semibold
-                            ${ord.itemStatus === 'ready' ? 'bg-green-200 text-green-800' :
-                              ord.itemStatus === 'preparing' ? 'bg-orange-200 text-orange-800' :
-                                'bg-blue-100 text-blue-700'}`}
-                        >
-                          {ord.itemStatus}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
+      {/* ── Card header ── */}
+      <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-text-white">
+        <div className="flex items-center justify-between w-full gap-3">
+          <span className="text-sm md:text-base font-semibold truncate" title={itemName}>
+            {itemName}
+          </span>
+          <span className="text-xl font-semibold text-white flex-shrink-0">× {data.totalQty}</span>
         </div>
       </div>
+
+      {/* ── Card body — order list ── */}
+      <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
+        {data.orders.map((ord, idx) => (
+          <div key={`${ord.cardId}-${idx}`} className="flex flex-col w-full rounded-lg bg-white">
+            <div className="flex items-center justify-between w-full">
+              <span className="font-medium text-sm">
+                <span className="mr-1">{ord.qty} x</span>
+                <span>{ord.tableLabel}</span>
+                <span className="text-xs ml-2 text-gray-500">#{ord.dineinOrderId}</span>
+              </span>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-semibold
+                  ${ord.itemStatus === 'ready' ? 'bg-green-200 text-green-800' :
+                    ord.itemStatus === 'preparing' ? 'bg-orange-200 text-orange-800' :
+                      'bg-blue-100 text-blue-700'}`}
+              >
+                {ord.itemStatus}
+              </span>
+            </div>
+            <div className="mt-0.5 flex items-center justify-between text-[11px] text-gray-500">
+              <span>{calculateElapsedTime(ord.createdAt)} ago</span>
+              <span className="font-semibold">{idx === 0 ? 'Serve first' : `#${idx + 1}`}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Card footer ── */}
+      <div className="px-4 py-3 border-t border-gray-100 bg-white flex items-center justify-between">
+        <span className="font-semibold uppercase">
+          {orderCount} {orderCount === 1 ? 'order' : 'orders'}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// ─── ItemView (formerly AggregatePanel) ────────────────────────────────────────
+
+const ItemView = ({ cards, tablesMap }) => {
+  const entries = buildItemEntries(cards, tablesMap);
+
+  if (entries.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-lg font-medium text-gray-400">No active items</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+      {entries.map(([itemName, data]) => (
+        <ItemCard key={itemName} itemName={itemName} data={data} />
+      ))}
+    </div>
+  );
+};
+
+// ─── CounterView — items grouped by the counter they belong to ─────────────────
+// Counter → assigned category ids (can be a level-one group or a child category,
+// same as CounterManager). An item belongs to a counter if its category, or any
+// ancestor of its category, is assigned to that counter.
+
+const collectIds = (nodes = []) =>
+  nodes.flatMap((n) => [n.id, ...collectIds(n.subCategories || [])]);
+
+const buildParentMap = (nodes = [], parentId = null, map = {}) => {
+  nodes.forEach((n) => {
+    if (parentId) map[n.id] = parentId;
+    buildParentMap(n.subCategories || [], n.id, map);
+  });
+  return map;
+};
+
+const CounterView = ({ cards, tablesMap, menuItemsMap, clientId, token }) => {
+  const [counters, setCounters] = useState([]);
+  const [parentMap, setParentMap] = useState({});
+  const [loadingCounters, setLoadingCounters] = useState(true);
+
+  useEffect(() => {
+    if (!clientId || !token) return;
+    let cancelled = false;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const load = async () => {
+      try {
+        const [counterRes, catRes] = await Promise.all([
+          axios.get(`${INVENTORY_API}/${clientId}/inventory/read_category?category_id=${COUNTER_ROOT}`, {
+            params: { client_id: clientId }, headers,
+          }),
+          axios.get(`${INVENTORY_API}/${clientId}/inventory/read_category?category_id=${CATEGORY_ROOT}`, {
+            params: { client_id: clientId }, headers,
+          }),
+        ]);
+        if (cancelled) return;
+        setCounters(counterRes.data?.data?.[0]?.subCategories || []);
+        setParentMap(buildParentMap(catRes.data?.data?.[0]?.subCategories || [], catRes.data?.data?.[0]?.id));
+      } catch (err) {
+        console.error('Error loading counters:', err);
+        toast.error('Failed to load counters');
+      } finally {
+        if (!cancelled) setLoadingCounters(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [clientId, token]);
+
+  // counterId -> Set of assigned category ids (including descendants)
+  const counterCategorySets = useMemo(() => {
+    const m = {};
+    counters.forEach((c) => { m[c.id] = new Set(collectIds(c.subCategories || [])); });
+    return m;
+  }, [counters]);
+
+  // Which counters does this order item belong to?
+  const countersForItem = useCallback((item) => {
+    const rec = menuItemsMap[String(item.item_id)];
+    const catId = rec?.category_id;
+    if (!catId) return [];
+    const chain = [];
+    let cur = catId;
+    const seen = new Set();
+    while (cur && !seen.has(cur)) {
+      chain.push(cur);
+      seen.add(cur);
+      cur = parentMap[cur];
+    }
+    return counters
+      .filter((c) => chain.some((id) => counterCategorySets[c.id]?.has(id)))
+      .map((c) => c.id);
+  }, [menuItemsMap, parentMap, counters, counterCategorySets]);
+
+  const sections = useMemo(() => {
+    const result = counters.map((c) => ({
+      id: c.id,
+      name: c.name,
+      entries: buildItemEntries(cards, tablesMap, (item) => countersForItem(item).includes(c.id)),
+    }));
+    result.push({
+      id: '__unassigned__',
+      name: 'Unassigned',
+      entries: buildItemEntries(cards, tablesMap, (item) => countersForItem(item).length === 0),
+    });
+    return result;
+  }, [counters, cards, tablesMap, countersForItem]);
+
+  if (loadingCounters) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-lg font-medium text-gray-500">Loading counters...</div>
+      </div>
+    );
+  }
+
+  const shownSections = sections.filter((s) => s.id !== '__unassigned__' || s.entries.length > 0);
+  const totalQty = (s) => s.entries.reduce((sum, [, d]) => sum + d.totalQty, 0);
+
+  if (shownSections.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-lg font-medium text-gray-400">
+          No counters configured. Create them from Counter Management.
+        </div>
+      </div>
+    );
+  }
+
+  // Counters sit side by side so every counter is visible at once.
+  // Each column stacks its item cards vertically; with many counters the
+  // row scrolls horizontally instead of squeezing the cards.
+  return (
+    <div className="flex items-start gap-5 overflow-x-auto pb-2">
+      {shownSections.map((section) => (
+        <section key={section.id} className="flex-1 min-w-[280px]">
+          <div className="flex items-center justify-between px-4 py-3 mb-4 rounded-xl bg-action-primary text-text-white">
+            <div className="flex items-center gap-2">
+              <Store size={16} />
+              <h3 className="text-sm md:text-base font-semibold">{section.name}</h3>
+            </div>
+            <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full font-semibold">
+              {section.entries.length} items · {totalQty(section)} qty
+            </span>
+          </div>
+
+          {section.entries.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-sm font-medium text-gray-400">No active items</div>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {section.entries.map(([itemName, data]) => (
+                <ItemCard key={itemName} itemName={itemName} data={data} />
+              ))}
+            </div>
+          )}
+        </section>
+      ))}
     </div>
   );
 };
@@ -446,13 +513,13 @@ const KitchenCard = ({
 
   const statusColorClass =
   allReady
-    ? 'text-status-ready'
+    ? 'text-yellow-500'
     : card.status === KDS_CONFIG.STATUS.SERVED
-      ? 'text-status-served'
+      ? 'text-green-600'
       : card.status === KDS_CONFIG.STATUS.PENDING
-        ? 'text-status-pending'
+        ? 'text-blue-600'
         : card.status === KDS_CONFIG.STATUS.PREPARING
-          ? 'text-status-preparing'
+          ? 'text-orange-600'
           : '';
 
   const handleStatusClick = async (cardId, itemId, newStatus) => {
@@ -569,7 +636,7 @@ const KitchenCard = ({
                   >
                     <FaClock
                       size={20}
-                      className={item.status === 'pending' ? 'text-status-pending' : 'text-gray-400'}
+                      className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'}
                     />
                   </button>
                   <button
@@ -581,7 +648,7 @@ const KitchenCard = ({
                   >
                     <FaHourglassHalf
                       size={20}
-                      className={item.status === 'preparing' ? 'text-status-preparing' : 'text-gray-400'}
+                      className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'}
                     />
                   </button>
                   <button
@@ -593,7 +660,7 @@ const KitchenCard = ({
                   >
                     <FaCheckCircle
                       size={20}
-                      className={item.status === 'ready' ? 'text-status-ready' : 'text-gray-400'}
+                      className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'}
                     />
                   </button>
                   <button
@@ -605,7 +672,7 @@ const KitchenCard = ({
                   >
                     <FaConciergeBell
                       size={20}
-                      className={item.status === 'served' ? 'text-status-served' : 'text-gray-400'}
+                      className={item.status === 'served' ? 'text-purple-500' : 'text-gray-400'}
                     />
                   </button></>)} 
                 </div>
@@ -681,7 +748,7 @@ const KitchenDisplay = ({clientId, token, realm}) => {
   const [menuItemsMap, setMenuItemsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [orderFilter, setOrderFilter] = useState('ALL');
-  const [showAggregate, setShowAggregate] = useState(false);
+  const [activeView, setActiveView] = useState(VIEWS.ORDER);
   const [nowTick, setNowTick] = useState(Date.now());
   // ── Date filter ──────────────────────────────────────────────────────────
   // Defaults to today (live view). Selecting an earlier date switches the
@@ -1053,92 +1120,94 @@ useEffect(() => {                                      // ← add
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <>
-      <div className="min-h-screen w-full bg-gray-50 text-gray-900">
-        <div className="mx-auto p-6 lg:py-8">
+  <div className="min-h-screen w-full bg-gray-50 text-gray-900">
+    <div className="mx-auto p-6 lg:py-8">
 
-          {/* ── Filter bar ── */}
-          <div className="mb-3 overflow-x-auto">
-            <div className="flex gap-2 items-center min-w-max">
-              {ORDER_FILTER_OPTIONS.map(({ key, label, Icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setOrderFilter(key)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
-                     ? 'bg-action-primary text-text-white shadow-sm'
-                     : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-                    }`}
-                >
-                  <Icon size={16} />
-                  {label}
-                </button>
-              ))}
+      {/* ── Toolbar: view tabs on the left, filters on the right ── */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-2 items-center">
+          {VIEW_TABS.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveView(key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeView === key
+                ? 'bg-action-primary text-text-white shadow-sm'
+                : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                }`}
+            >
+              <Icon size={16} />
+              {label}
+            </button>
+          ))}
+        </div>
 
-              <button
-                onClick={() => setShowAggregate(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-sm ml-2"
-              >
-                <BarChart2 size={16} />
-                Aggregate View
-                {filteredCards.length > 0 && (
-                  <span className="bg-white/20 text-white text-xs px-1.5 py-0.5 rounded-full font-bold">
-                    {filteredCards.length}
-                  </span>
-                )}
-              </button>
+        <div className="flex flex-wrap gap-2 items-center">
+          {ORDER_FILTER_OPTIONS.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              onClick={() => setOrderFilter(key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
+                ? 'bg-action-primary text-text-white shadow-sm'
+                : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+                }`}
+            >
+              <Icon size={16} />
+              {label}
+            </button>
+          ))}
 
-              {/* ── Date filter — defaults to today, lets staff look back for
-                   missed orders on a previous date. Future dates disabled. ── */}
-              <DateRangeFilter
-                datePreset={datePreset}
-                setDatePreset={setDatePreset}
-                customFrom={customFrom}
-                setCustomFrom={setCustomFrom}
-                customTo={customTo}
-                setCustomTo={setCustomTo}
-              />
-            </div>
-          </div>
-
-          {/* ── Cards grid ── */}
-          <div className="w-full">
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-lg font-medium text-gray-500">Loading orders...</div>
-              </div>
-            ) : filteredCards.length === 0 ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-lg font-medium text-gray-400">
-                  { 'No active orders'}
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                {filteredCards.map((card) => (
-                  <KitchenCard
-                    key={card.card_id}
-                    card={card}
-                    tablesMap={tablesMap}
-                    menuItemsMap={menuItemsMap}
-                    onItemStatusChange={handleItemStatusChange} nowTick={nowTick} isRental={isRental} 
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <DateRangeFilter
+            datePreset={datePreset}
+            setDatePreset={setDatePreset}
+            customFrom={customFrom}
+            setCustomFrom={setCustomFrom}
+            customTo={customTo}
+            setCustomTo={setCustomTo}
+          />
         </div>
       </div>
 
-      {showAggregate && (
-        <AggregatePanel
-          cards={filteredCards}
-          tablesMap={tablesMap}
-          menuItemsMap={menuItemsMap}
-          onClose={() => setShowAggregate(false)}
-        />
-      )}
-    </>
-  );
+      {/* ── Active view ── */}
+      <div className="w-full">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-lg font-medium text-gray-500">Loading orders...</div>
+          </div>
+        ) : activeView === VIEWS.ORDER ? (
+          filteredCards.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-lg font-medium text-gray-400">No active orders</div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {filteredCards.map((card) => (
+                <KitchenCard
+                  key={card.card_id}
+                  card={card}
+                  tablesMap={tablesMap}
+                  menuItemsMap={menuItemsMap}
+                  onItemStatusChange={handleItemStatusChange}
+                  nowTick={nowTick}
+                  isRental={isRental}
+                />
+              ))}
+            </div>
+          )
+        ) : activeView === VIEWS.ITEM ? (
+          <ItemView cards={filteredCards} tablesMap={tablesMap} />
+        ) : (
+          <CounterView
+            cards={filteredCards}
+            tablesMap={tablesMap}
+            menuItemsMap={menuItemsMap}
+            clientId={clientId}
+            token={token}
+          />
+        )}
+      </div>
+    </div>
+  </div>
+);
 };
 
 export default KitchenDisplay;

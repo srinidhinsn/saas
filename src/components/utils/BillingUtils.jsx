@@ -2,32 +2,23 @@ import axios from 'axios';
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { deduplicateOrderItems } from '../utils/Menu-utils/menuUtils';
-import { X, Trash2, Printer, Eye } from "lucide-react";
+import { X, Trash2, Printer, Eye, Lock } from "lucide-react";
 
 export const PAYMENT_METHODS = [
   { value: "Cash", label: "Cash" },
   { value: "razorpay_upi", label: "UPI (Razorpay)" },
   { value: "razorpay_card", label: "Card (Razorpay)" },
-  { value: "phonepe", label: "PhonePe" },
   { value: "Due", label: "Due" },
 ];
-export const isRazorpayMethod = (method) =>
-  method === "razorpay_upi" || method === "razorpay_card";
 
-export const isPhonePeMethod = (method) => method === "phonepe";
 export const isOnlinePaymentMethod = (method) =>
   method === "razorpay_upi" || method === "razorpay_card";
 
 export const needsRazorpay = (splitPaymentEnabled, paymentSplits, method) =>
   splitPaymentEnabled
-    ? paymentSplits.some(s => isRazorpayMethod(s.method))
-    : isRazorpayMethod(method);
-export const filterPaymentMethods = (gateways = {}) =>
-      PAYMENT_METHODS.filter(m => {
-        if (isRazorpayMethod(m.value)) return !!gateways.razorpay;
-        if (isPhonePeMethod(m.value)) return !!gateways.phonepe;
-        return true;
-      });
+    ? paymentSplits.some(s => isOnlinePaymentMethod(s.method))
+    : isOnlinePaymentMethod(method);
+
 // Sum of all amounts across split rows
 export const sumSplits = (splits) =>
   splits.reduce((sum, s) => sum + Number(s.amount || 0), 0);
@@ -333,10 +324,10 @@ export const getInitialOrderMode = (order, tablesMap = {}) => {
 
 export const StatusBadge = ({ status }) => {
   const styles = {
-    pending: 'ui-btn ui-btn-config',
-    preparing: 'ui-btn ui-btn-update',
-    ready: 'ui-btn ui-btn-delete',
-    served: 'ui-btn ui-btn-add ',
+    pending: 'bg-orange-100 text-orange-700 border-orange-200',
+    preparing: 'bg-blue-100 text-blue-700 border-blue-200',
+    ready: 'bg-green-100 text-green-700 border-green-200',
+    served: 'bg-gray-100 text-gray-600 border-gray-200',
   };
   const s = status?.toLowerCase();
   return (
@@ -422,9 +413,9 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
   const transactionType = isServed ? 'WASTAGE' : 'ITEM_CANCELLED';
   const reasonList = isServed ? WASTAGE_REASONS : CANCELLATION_REASONS;
   const typeLabel = isServed ? 'Wastage' : 'Cancellation';
-  const typeColor = isServed ? 'text-red-600' : 'text-red-600';
-  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-red-50 border-red-200';
-  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700';
+  const typeColor = isServed ? 'text-red-600' : 'text-orange-600';
+  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200';
+  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600';
 
   useEffect(() => {
     if (isOpen) { setReason(''); setCustomReason(''); setRemoveQty(1); }
@@ -476,7 +467,7 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
                   onClick={() => setReason(r)}
                   className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
                     ${reason === r
-                      ? isServed ? 'bg-red-600 text-white border-red-600' : 'bg-red-600 text-white border-red-600'
+                      ? isServed ? 'bg-red-600 text-white border-red-600' : 'bg-orange-500 text-white border-orange-500'
                       : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
                 >{r}</button>
               ))}
@@ -519,10 +510,10 @@ export const OrderItemsViewModal = ({ isOpen, onClose, order, onRequestDeleteIte
 
   const getItemStatusStyle = (status) => {
     switch (status?.toLowerCase()) {
-      case 'pending': return 'bg-status-pending text-text-white';
-      case 'preparing': return 'bg-status-preparing text-text-white';
-      case 'ready': return 'bg-status-ready text-text-white';
-      case 'served': return 'bg-status-served text-text-white';
+      case 'pending': return 'bg-orange-100 text-orange-700';
+      case 'preparing': return 'bg-blue-100 text-blue-700';
+      case 'ready': return 'bg-green-100 text-green-700';
+      case 'served': return 'bg-gray-100 text-gray-600';
       default: return 'bg-bg-tertiary text-text-secondary';
     }
   };
@@ -637,7 +628,29 @@ export const OrderItemsViewModal = ({ isOpen, onClose, order, onRequestDeleteIte
 //                  Served" button never renders even when status is 'ready'
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed }) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// OrderRowActions — the ONE shared button group.
+//
+// Exactly 3 always-visible buttons (View items / Print & Invoice / Cancel),
+// plus an optional 4th "Mark As Served" button that only appears when the
+// order status is "ready". This is the single source of truth for the
+// actions column in both OrderSummaryVisible and BillingPage — don't
+// re-implement it locally in either place.
+//
+// Props:
+//   order            - the row's order object (needs .id and .status)
+//   onView           - (order) => void  — opens the items view/manage modal
+//   onPrint          - (order) => void  — opens the invoice modal / prints the bill
+//   onCancel         - (order) => void  — opens the cancel-order confirm modal
+//   onMarkServed     - (order) => void  — optional; if omitted, the "Mark As
+//                      Served" button never renders even when status is 'ready'
+//   invoiceGenerated - boolean; once true, the Cancel button is disabled —
+//                      an invoiced order can no longer be cancelled from
+//                      here, mirroring the item-level lock in
+//                      OrderItemsViewModal. View and Print stay enabled.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed, invoiceGenerated = false }) => {
   if (!order) return null;
   const status = order.status?.toLowerCase();
 
@@ -668,13 +681,25 @@ export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed
         </button>
       )}
 
-      <button
-        onClick={() => onCancel(order)}
-        className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors"
-        title="Cancel order"
-      >
-        <Trash2 size={15} />
-      </button>
+      {invoiceGenerated ? (
+        <span
+          className="p-1.5 rounded-lg bg-bg-tertiary text-text-secondary/50 cursor-not-allowed inline-flex"
+          title="Invoice already generated — order can no longer be cancelled"
+        >
+          <Lock size={15} />
+        </span>
+      ) : (
+        <button
+          onClick={() => onCancel(order)}
+          className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors"
+          title="Cancel order"
+        >
+          <Trash2 size={15} />
+        </button>
+      )}
     </div>
   );
 };
+
+export const hasInvoiceBeenGenerated = (order, billingDocMap = {}) =>
+  Boolean(billingDocMap?.[order?.id?.toString()]?.document_number);
