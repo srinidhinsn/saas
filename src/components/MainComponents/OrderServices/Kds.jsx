@@ -56,6 +56,14 @@ const VIEW_TABS = [
   { key: VIEWS.COUNTER, label: 'Counter View', Icon: Store },
 ];
 
+// Top-edge colour of an order card = order status (same tokens as the floor view)
+const STATUS_BAR = {
+  pending: 'border-t-status-pending',
+  preparing: 'border-t-status-preparing',
+  ready: 'border-t-status-ready',
+  served: 'border-t-status-served',
+};
+
 const INVENTORY_API = import.meta.env.VITE_API_INVENTORY_SERVICE_URL;
 const COUNTER_ROOT = import.meta.env.VITE_MENU_COUNTER;
 const CATEGORY_ROOT = import.meta.env.VITE_MENU_DEFAULT_ROOT;
@@ -207,48 +215,49 @@ const ItemCard = ({ itemName, data }) => {
   const orderCount = data.orders.length;
 
   return (
-    <div className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5 flex flex-col">
+    <div className="flex flex-col overflow-hidden ui-card">
 
       {/* ── Card header ── */}
-      <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-text-white">
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
         <div className="flex items-center justify-between w-full gap-3">
-          <span className="text-sm md:text-base font-semibold truncate" title={itemName}>
+          <span className="text-body-sm font-bold text-brand-dark truncate" title={itemName}>
             {itemName}
           </span>
-          <span className="text-xl font-semibold text-white flex-shrink-0">× {data.totalQty}</span>
+          <span className="text-kpi text-brand-dark flex-shrink-0">× {data.totalQty}</span>
         </div>
       </div>
 
       {/* ── Card body — order list ── */}
-      <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
+      <div className="px-3 py-2 space-y-2 flex-1">
         {data.orders.map((ord, idx) => (
-          <div key={`${ord.cardId}-${idx}`} className="flex flex-col w-full rounded-lg bg-white">
+          <div key={`${ord.cardId}-${idx}`} className="flex flex-col w-full rounded-button-sm">
             <div className="flex items-center justify-between w-full">
-              <span className="font-medium text-sm">
+              <span className="font-semibold text-ui text-ink">
                 <span className="mr-1">{ord.qty} x</span>
                 <span>{ord.tableLabel}</span>
-                <span className="text-xs ml-2 text-gray-500">#{ord.dineinOrderId}</span>
+                <span className="text-ui-sm ml-2 text-ink-muted">#{ord.dineinOrderId}</span>
               </span>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-semibold
-                  ${ord.itemStatus === 'ready' ? 'bg-green-200 text-green-800' :
-                    ord.itemStatus === 'preparing' ? 'bg-orange-200 text-orange-800' :
-                      'bg-blue-100 text-blue-700'}`}
-              >
+              <span className="inline-flex items-center gap-1 text-micro font-bold px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line">
+                <span
+                  className={`h-1.5 w-1.5 rounded-badge
+                    ${ord.itemStatus === 'ready' ? 'bg-status-ready' :
+                      ord.itemStatus === 'preparing' ? 'bg-status-preparing' :
+                        'bg-status-pending'}`}
+                />
                 {ord.itemStatus}
               </span>
             </div>
-            <div className="mt-0.5 flex items-center justify-between text-[11px] text-gray-500">
+            <div className="mt-0.5 flex items-center justify-between text-micro text-ink-muted">
               <span>{calculateElapsedTime(ord.createdAt)} ago</span>
-              <span className="font-semibold">{idx === 0 ? 'Serve first' : `#${idx + 1}`}</span>
+              <span className="font-semibold text-ink-soft">{idx === 0 ? 'Serve first' : `#${idx + 1}`}</span>
             </div>
           </div>
         ))}
       </div>
 
       {/* ── Card footer ── */}
-      <div className="px-4 py-3 border-t border-gray-100 bg-white flex items-center justify-between">
-        <span className="font-semibold uppercase">
+      <div className="px-3 py-2 border-t border-line-soft bg-canvas/40 flex items-center justify-between">
+        <span className="text-micro font-bold tracking-wide uppercase text-ink-muted">
           {orderCount} {orderCount === 1 ? 'order' : 'orders'}
         </span>
       </div>
@@ -264,13 +273,13 @@ const ItemView = ({ cards, tablesMap }) => {
   if (entries.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-lg font-medium text-gray-400">No active items</div>
+        <div className="text-ui text-ink-muted">No active items</div>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-tiles">
       {entries.map(([itemName, data]) => (
         <ItemCard key={itemName} itemName={itemName} data={data} />
       ))}
@@ -370,7 +379,7 @@ const CounterView = ({ cards, tablesMap, menuItemsMap, clientId, token }) => {
   if (loadingCounters) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-lg font-medium text-gray-500">Loading counters...</div>
+        <div className="text-ui text-ink-muted">Loading counters...</div>
       </div>
     );
   }
@@ -381,7 +390,7 @@ const CounterView = ({ cards, tablesMap, menuItemsMap, clientId, token }) => {
   if (shownSections.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-lg font-medium text-gray-400">
+        <div className="text-ui text-ink-muted">
           No counters configured. Create them from Counter Management.
         </div>
       </div>
@@ -392,25 +401,25 @@ const CounterView = ({ cards, tablesMap, menuItemsMap, clientId, token }) => {
   // Each column stacks its item cards vertically; with many counters the
   // row scrolls horizontally instead of squeezing the cards.
   return (
-    <div className="flex items-start gap-5 overflow-x-auto pb-2">
+    <div className="flex items-start gap-tiles overflow-x-auto pb-2">
       {shownSections.map((section) => (
         <section key={section.id} className="flex-1 min-w-[280px]">
-          <div className="flex items-center justify-between px-4 py-3 mb-4 rounded-xl bg-action-primary text-text-white">
+          <div className="flex items-center justify-between px-3 py-2 mb-3 rounded-panel bg-brand-light border border-brand-line">
             <div className="flex items-center gap-2">
-              <Store size={16} />
-              <h3 className="text-sm md:text-base font-semibold">{section.name}</h3>
+              <Store size={16} className="text-brand" />
+              <h3 className="text-panel-title text-brand-dark">{section.name}</h3>
             </div>
-            <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full font-semibold">
+            <span className="text-micro font-bold px-2 py-0.5 rounded-badge bg-surface text-brand-dark border border-brand-line">
               {section.entries.length} items · {totalQty(section)} qty
             </span>
           </div>
 
           {section.entries.length === 0 ? (
             <div className="flex items-center justify-center py-8">
-              <div className="text-sm font-medium text-gray-400">No active items</div>
+              <div className="text-ui text-ink-muted">No active items</div>
             </div>
           ) : (
-            <div className="space-y-5">
+            <div className="space-y-2.5">
               {section.entries.map(([itemName, data]) => (
                 <ItemCard key={itemName} itemName={itemName} data={data} />
               ))}
@@ -441,10 +450,10 @@ const ComboComponentsList = ({ menuRecord, menuItemsMap, parentQuantity = 1 }) =
         components.map((comp, idx) => (
           <div
             key={comp.id || idx}
-            className="flex items-center gap-1.5 pl-3 border-l-2 border-violet-300 py-0.5"
+            className="flex items-center gap-1.5 pl-3 border-l-2 border-brand-line py-0.5"
           >
-            <ChevronRight size={10} className="text-violet-400 flex-shrink-0" />
-            <span className="text-[11px] text-violet-700 font-medium leading-tight">
+            <ChevronRight size={10} className="text-brand flex-shrink-0" />
+            <span className="text-ui-sm text-brand-dark font-semibold leading-tight">
               {parentQuantity > 1 && (
                 <span className="font-bold mr-1">{parentQuantity}×</span>
               )}
@@ -453,8 +462,8 @@ const ComboComponentsList = ({ menuRecord, menuItemsMap, parentQuantity = 1 }) =
           </div>
         ))
       ) : (
-        <div className="pl-3 border-l-2 border-violet-200 py-0.5">
-          <span className="text-[11px] text-violet-500 font-medium">
+        <div className="pl-3 border-l-2 border-brand-line py-0.5">
+          <span className="text-ui-sm text-ink-muted font-semibold">
             {parentQuantity > 1 ? `${parentQuantity}× ` : ''}
             {componentIds.length} included item{componentIds.length !== 1 ? 's' : ''}
           </span>
@@ -513,14 +522,16 @@ const KitchenCard = ({
 
   const statusColorClass =
   allReady
-    ? 'text-yellow-500'
+    ? 'text-status-ready'
     : card.status === KDS_CONFIG.STATUS.SERVED
-      ? 'text-green-600'
+      ? 'text-status-served'
       : card.status === KDS_CONFIG.STATUS.PENDING
-        ? 'text-blue-600'
+        ? 'text-status-pending'
         : card.status === KDS_CONFIG.STATUS.PREPARING
-          ? 'text-orange-600'
+          ? 'text-status-preparing'
           : '';
+
+  const cardBar = STATUS_BAR[allReady ? KDS_CONFIG.STATUS.READY : card.status] || 'border-t-line-strong';
 
   const handleStatusClick = async (cardId, itemId, newStatus) => {
     if (pendingItemIds.has(itemId)) return; // debounce rapid taps
@@ -537,22 +548,22 @@ const KitchenCard = ({
   };
 
   return (
-    <div className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5 flex flex-col">
+    <div className={`flex flex-col overflow-hidden ui-card ${cardBar}`}>
 
       {/* ── Card header ── */}
-      <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-text-white">
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
         <div className="flex items-center justify-between w-full">
 
           {/* Table name */}
-          <span className="text-sm md:text-base font-semibold">
+          <span className="text-body-sm font-bold text-brand-dark">
             {tablesMap[card.table_id] || `${KDS_CONFIG.DEFAULT_TABLE_PREFIX}${card.table_id}`}
           </span>
-          <div className="flex items-center gap-2 text-xl font-semibold text-white">
-            <Clock size={16} />
+          <div className="flex items-center gap-1 text-ui font-bold text-ink-muted">
+            <Clock size={14} className="text-brand" />
             <span>{elapsedTime}</span>
           </div>
           <div className="flex flex-col items-end">
-            <span className="text-xl font-semibold text-orange-100/80">
+            <span className="text-body-sm font-bold text-brand-dark">
               #{card.dinein_order_id}
             </span>
           </div>
@@ -560,7 +571,7 @@ const KitchenCard = ({
       </div>
 
       {/* ── Card body — item list ── */}
-      <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
+      <div className="px-3 py-2 space-y-2 flex-1">
         {groupItemsWithAddons(card.items, menuItemsMap).map(({ main: item, addons }, idx) => {
           const menuRecord = menuItemsMap[String(item.item_id)];
           const combo = isComboItem(item, menuRecord);
@@ -568,17 +579,17 @@ const KitchenCard = ({
           const isCancelled = isCancelledStatus(item.status);
           const isReturned = isServedLikeStatus(item.status);    
           return (
-            <div key={item.id || idx} className="flex flex-col w-full rounded-lg bg-white">
+            <div key={item.id || idx} className="flex flex-col w-full rounded-button-sm">
               {/* Main item row — unchanged */}
               <div className="flex items-center w-full">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-medium text-sm">
+                    <span className="font-semibold text-ui text-ink">
                       <span className="mr-1">{item.quantity} x</span>
                       <span>{item.item_name || 'Unnamed Item'}</span>
                     </span>
                     {combo && (
-                      <span className="text-[10px] bg-violet-100 text-violet-700 font-bold px-1.5 py-0.5 rounded-full">
+                      <span className="text-micro bg-brand-pill text-brand-dark border border-brand-line font-bold px-1.5 py-0.5 rounded-badge">
                         COMBO
                       </span>
                     )}
@@ -594,8 +605,8 @@ const KitchenCard = ({
                     return (
                       <div className="mt-1">
                         <span
-                          className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full
-                            ${overdue ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}
+                          className={`inline-flex items-center gap-1 text-micro font-bold px-2 py-0.5 rounded-badge
+                            ${overdue ? 'bg-state-occupied-bg text-state-occupied' : 'bg-state-other-bg text-state-other'}`}
                           title={tier.label ? `Tier: ${tier.label}` : undefined}
                         >
                           {overdue ? `⚠ Overdue ${durationLabel}` : `⏳ ${durationLabel} left`}
@@ -608,9 +619,9 @@ const KitchenCard = ({
                 {isRental ? (
                    isReturned ? (
                     <span
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-500"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-button-sm text-ui-sm font-semibold bg-brand-light text-ink-muted border border-brand-line"
                     >
-                      <FaCheckCircle size={14} className="text-green-500" />
+                      <FaCheckCircle size={14} className="text-state-vacant" />
                       Returned
                     </span>
                   ) : (
@@ -619,10 +630,7 @@ const KitchenCard = ({
                       disabled={isPending || isCancelled}
                       onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.CANCELLED)}
                       title="Mark as Returned"
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors
-                        ${isPending || isCancelled
-                          ? 'opacity-40 cursor-not-allowed bg-gray-100 text-gray-400'
-                          : 'bg-green-600 text-white hover:bg-green-700'}`}
+                      className="ui-btn ui-btn-add !h-8"
                     >
                       <RotateCcw size={14} />
                       Mark as Returned
@@ -632,11 +640,11 @@ const KitchenCard = ({
                     disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
                     title="Mark as Pending"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     <FaClock
                       size={20}
-                      className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'}
+                      className={item.status === 'pending' ? 'text-status-pending' : 'text-ink-faint'}
                     />
                   </button>
                   <button
@@ -644,11 +652,11 @@ const KitchenCard = ({
                     disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
                     title="Mark as Preparing"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     <FaHourglassHalf
                       size={20}
-                      className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'}
+                      className={item.status === 'preparing' ? 'text-status-preparing' : 'text-ink-faint'}
                     />
                   </button>
                   <button
@@ -656,11 +664,11 @@ const KitchenCard = ({
                     disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
                     title="Mark as Ready"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     <FaCheckCircle
                       size={20}
-                      className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'}
+                      className={item.status === 'ready' ? 'text-status-ready' : 'text-ink-faint'}
                     />
                   </button>
                   <button
@@ -668,11 +676,11 @@ const KitchenCard = ({
                     disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.SERVED)}
                     title="Mark as Served"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     <FaConciergeBell
                       size={20}
-                      className={item.status === 'served' ? 'text-purple-500' : 'text-gray-400'}
+                      className={item.status === 'served' ? 'text-status-served' : 'text-ink-faint'}
                     />
                   </button></>)} 
                 </div>
@@ -690,32 +698,32 @@ const KitchenCard = ({
                     const isAddonCancelled = isCancelledStatus(addon.status);
                     return (
                       <div key={addon.id || ai}
-                        className="flex items-center gap-1.5 pl-3 border-l-2 border-blue-300 py-0.5">
-                        <ChevronRight size={10} className="text-blue-400 flex-shrink-0" />
-                        <span className="text-[11px] text-blue-700 font-medium leading-tight flex-1">
+                        className="flex items-center gap-1.5 pl-3 border-l-2 border-brand-line py-0.5">
+                        <ChevronRight size={10} className="text-brand flex-shrink-0" />
+                        <span className="text-ui-sm text-ink-soft font-semibold leading-tight flex-1">
                           {addon.quantity} × {addon.item_name || 'Addon'}
                         </span>
                         <div className="flex items-center gap-1">
                           <button type="button" disabled={isAddonPending || isAddonCancelled}
                             onClick={() => handleStatusClick(card.card_id, addon.id, KDS_CONFIG.STATUS.PENDING)}
-                            className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                            <FaClock size={14} className={addon.status === 'pending' ? 'text-blue-600' : 'text-gray-400'} />
+                            className={`p-1 rounded-seg hover:bg-brand-light ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <FaClock size={14} className={addon.status === 'pending' ? 'text-status-pending' : 'text-ink-faint'} />
                           </button>
                           <button type="button" disabled={isAddonPending || isAddonCancelled}
                             onClick={() => handleStatusClick(card.card_id, addon.id, KDS_CONFIG.STATUS.PREPARING)}
-                            className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                            <FaHourglassHalf size={14} className={addon.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'} />
+                            className={`p-1 rounded-seg hover:bg-brand-light ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <FaHourglassHalf size={14} className={addon.status === 'preparing' ? 'text-status-preparing' : 'text-ink-faint'} />
                           </button>
                           <button type="button" disabled={isAddonPending || isAddonCancelled}
                             onClick={() => handleStatusClick(card.card_id, addon.id, KDS_CONFIG.STATUS.READY)}
-                            className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                            <FaCheckCircle size={14} className={addon.status === 'ready' ? 'text-green-500' : 'text-gray-400'} />
+                            className={`p-1 rounded-seg hover:bg-brand-light ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <FaCheckCircle size={14} className={addon.status === 'ready' ? 'text-status-ready' : 'text-ink-faint'} />
                           </button>
                           <button type="button" disabled={isAddonPending || isAddonCancelled}
                             onClick={() => handleStatusClick(card.card_id, addon.id, KDS_CONFIG.STATUS.SERVED)}
                             title="Mark as Served"
-                            className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                            <FaConciergeBell size={14} className={addon.status === 'served' ? 'text-purple-500' : 'text-gray-400'} />
+                            className={`p-1 rounded-seg hover:bg-brand-light ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <FaConciergeBell size={14} className={addon.status === 'served' ? 'text-status-served' : 'text-ink-faint'} />
                           </button>
                         </div>
                       </div>
@@ -729,11 +737,11 @@ const KitchenCard = ({
       </div>
 
       {/* ── Card footer — status label ── */}
-      <div className="px-4 py-3 border-t border-gray-100 bg-white flex items-center justify-between">
-        <span className={`text-l font-semibold uppercase ${statusColorClass}`}>
+      {/* <div className="px-3 py-2 border-t border-line-soft bg-canvas/40 flex items-center justify-between">
+        <span className={`text-micro font-bold tracking-wide uppercase ${statusColorClass}`}>
           {allReady ? 'ready' : card.status}
         </span>
-      </div>
+      </div> */}
     </div>
   );
 };
@@ -1120,19 +1128,19 @@ useEffect(() => {                                      // ← add
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-  <div className="min-h-screen w-full bg-gray-50 text-gray-900">
-    <div className="mx-auto p-6 lg:py-8">
+  <div className="ui-page">
+    <div className="mx-auto">
 
       {/* ── Toolbar: view tabs on the left, filters on the right ── */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-2 items-center">
+      <div className="ui-panel flex flex-wrap items-center justify-between gap-3">
+        <div className="ui-tabs">
           {VIEW_TABS.map(({ key, label, Icon }) => (
             <button
               key={key}
               onClick={() => setActiveView(key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeView === key
-                ? 'bg-action-primary text-text-white shadow-sm'
-                : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
+              className={`ui-tab inline-flex items-center gap-2 ${activeView === key
+                ? 'ui-tab-active'
+                : ''
                 }`}
             >
               <Icon size={16} />
@@ -1142,19 +1150,21 @@ useEffect(() => {                                      // ← add
         </div>
 
         <div className="flex flex-wrap gap-2 items-center">
-          {ORDER_FILTER_OPTIONS.map(({ key, label, Icon }) => (
-            <button
-              key={key}
-              onClick={() => setOrderFilter(key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
-                ? 'bg-action-primary text-text-white shadow-sm'
-                : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-                }`}
-            >
-              <Icon size={16} />
-              {label}
-            </button>
-          ))}
+          <div className="ui-tabs">
+            {ORDER_FILTER_OPTIONS.map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                onClick={() => setOrderFilter(key)}
+                className={`ui-tab inline-flex items-center gap-2 ${orderFilter === key
+                  ? 'ui-tab-active'
+                  : ''
+                  }`}
+              >
+                <Icon size={16} />
+                {label}
+              </button>
+            ))}
+          </div>
 
           <DateRangeFilter
             datePreset={datePreset}
@@ -1171,15 +1181,15 @@ useEffect(() => {                                      // ← add
       <div className="w-full">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="text-lg font-medium text-gray-500">Loading orders...</div>
+            <div className="text-ui text-ink-muted">Loading orders...</div>
           </div>
         ) : activeView === VIEWS.ORDER ? (
           filteredCards.length === 0 ? (
             <div className="flex items-center justify-center py-12">
-              <div className="text-lg font-medium text-gray-400">No active orders</div>
+              <div className="text-ui text-ink-muted">No active orders</div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-tiles">
               {filteredCards.map((card) => (
                 <KitchenCard
                   key={card.card_id}

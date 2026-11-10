@@ -1,3 +1,4 @@
+
 import React, { useRef } from 'react';
 
 export const getDateRangeFromPreset = (preset, customFrom, customTo) => {
@@ -36,43 +37,52 @@ export const DateRangeFilter = ({ datePreset, setDatePreset, customFrom, setCust
   const todayDate = new Date().toISOString().split('T')[0];
 
   return (
-    <div className="relative flex items-center gap-2">
-      <select
-        value={datePreset}
-        onChange={e => {
-          const val = e.target.value;
-          setDatePreset(val);
-          if (val === 'custom') setTimeout(() => customFromRef.current?.showPicker?.(), 50);
-        }}
-        className="pl-3 pr-8 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm appearance-none cursor-pointer">
-        <option value="today">Today</option>
-        <option value="1w">Last 1 Week</option>
-        <option value="15d">Last 15 Days</option>
-        <option value="1m">Last 1 Month</option>
-        <option value="3m">Last 3 Months</option>
-        <option value="6m">Last 6 Months</option>
-        <option value="custom">Custom Range</option>
-      </select>
+    <div className="flex flex-wrap items-end gap-2">
+      <div className="ui-filter min-w-[155px]">
+        <select
+          value={datePreset}
+          onChange={e => {
+            const val = e.target.value;
+            setDatePreset(val);
+            if (val === 'custom') setTimeout(() => customFromRef.current?.showPicker?.(), 50);
+          }}
+          className="ui-filter-control cursor-pointer appearance-none p-2">
+          <option value="today">Today</option>
+          <option value="1w">Last 1 Week</option>
+          <option value="15d">Last 15 Days</option>
+          <option value="1m">Last 1 Month</option>
+          <option value="3m">Last 3 Months</option>
+          <option value="6m">Last 6 Months</option>
+          <option value="custom">Custom Range</option>
+        </select>
+      </div>
+
       {datePreset === 'custom' && (
         <>
-          <input
-            ref={customFromRef}
-            type="date"
-            value={customFrom}
-            max={customTo}
-            onChange={e => { setCustomFrom(e.target.value); setTimeout(() => customToRef.current?.showPicker?.(), 50); }}
-            className="px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-          />
-          <span className="text-text-secondary text-xs font-medium">→</span>
-          <input
-            ref={customToRef}
-            type="date"
-            value={customTo}
-            min={customFrom}
-            max={todayDate}
-            onChange={e => setCustomTo(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-          />
+          <div className="ui-filter min-w-[145px]">
+            <label className="ui-filter-label">From Date</label>
+            <input
+              ref={customFromRef}
+              type="date"
+              value={customFrom}
+              max={customTo}
+              onChange={e => { setCustomFrom(e.target.value); setTimeout(() => customToRef.current?.showPicker?.(), 50); }}
+              className="ui-filter-control"
+            />
+          </div>
+
+          <div className="ui-filter min-w-[145px]">
+            <label className="ui-filter-label">To Date</label>
+            <input
+              ref={customToRef}
+              type="date"
+              value={customTo}
+              min={customFrom}
+              max={todayDate}
+              onChange={e => setCustomTo(e.target.value)}
+              className="ui-filter-control"
+            />
+          </div>
         </>
       )}
     </div>

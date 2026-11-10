@@ -79,7 +79,7 @@ export const SelectFloatingFilter = React.forwardRef((props, ref) => {
         <select
             value={value || ''}
             onChange={handleChange}
-            className="w-full text-xs px-1.5 py-1 rounded-md border border-border-default bg-bg-primary text-text-primary focus:outline-none focus:ring-1 focus:ring-action-primary"
+            className="w-full text-ui-sm px-2 py-1 rounded-button-sm border border-brand-line bg-brand-light text-brand-dark focus:outline-none focus:border-brand-ring focus:shadow-focus-ring"
         >
             <option value="">All</option>
             {options.map(opt => (
@@ -118,18 +118,18 @@ const ColumnVisibilityMenu = ({ columnDefs, hiddenCols, onToggle }) => {
         <div className="relative" ref={ref}>
             <button
                 onClick={() => setOpen(o => !o)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-border-default bg-bg-primary text-text-secondary hover:text-text-primary hover:border-buttons-add transition-colors"
+                className="ui-btn ui-btn-config"
             >
                 <Columns3 size={14} /> Columns
             </button>
             {open && (
-                <div className="absolute right-0 mt-2 w-48 rounded-lg border border-border-default bg-bg-primary shadow-card z-30 py-2 max-h-64 overflow-y-auto">
+                <div className="absolute right-0 mt-2 w-48 rounded-panel border border-brand-line bg-surface shadow-panel z-30 py-2 max-h-64 overflow-y-auto">
                     {toggleable.map(c => {
                         const id = c.colId || c.field;
                         const checked = !hiddenCols.includes(id);
                         return (
-                            <label key={id} className="flex items-center gap-2 px-3 py-1.5 text-xs text-text-primary hover:bg-bg-tertiary cursor-pointer">
-                                <input type="checkbox" checked={checked} onChange={() => onToggle(id)} className="accent-action-primary" />
+                            <label key={id} className="flex items-center gap-2 px-3 py-1.5 text-ui-sm text-ink hover:bg-brand-light cursor-pointer">
+                                <input type="checkbox" checked={checked} onChange={() => onToggle(id)} className="accent-brand" />
                                 {c.headerName || id}
                             </label>
                         );
@@ -156,6 +156,7 @@ const AgGridTable = ({
     enableColumnToggle = true,
     exportFileName = 'export',
     toolbarLeft = null,
+    toolbarRight = null,
     ...rest
 }) => {
     const gridApiRef = useRef(null);
@@ -279,17 +280,19 @@ const AgGridTable = ({
     return (
         <div className="ag-modern-wrapper w-full">
             {showToolbar && (
-                <div className="flex justify-between gap-3 m-2">
-
-                    {toolbarLeft}
-                    <div className="ml-auto flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 m-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {toolbarLeft}
+                    </div>
+                    <div className="ml-auto flex flex-wrap items-center gap-2">
+                        {toolbarRight}
                         {enableColumnToggle && (
                             <ColumnVisibilityMenu columnDefs={columnDefs} hiddenCols={hiddenCols} onToggle={handleToggleColumn} />
                         )}
                         {enableExport && (
                             <button
                                 onClick={handleExport}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-buttons-add text-text-white hover:opacity-90 transition-opacity"
+                                className="ui-btn ui-btn-config"
                             >
                                 <Download size={14} /> Export
                             </button>
@@ -305,8 +308,8 @@ const AgGridTable = ({
                     '--ag-row-height': `${rowHeight}px`,
                     '--ag-header-height': `${headerHeight}px`,
                     '--ag-cell-horizontal-padding': '20px',
-                    '--ag-border-color': 'var(--color-border-default, #eee)',
-                    '--ag-row-border-color': 'var(--color-border-default, #eee)',
+                    '--ag-border-color': '#e1d4ee',
+                    '--ag-row-border-color': '#e9eff3',
                     '--ag-header-column-separator-display': 'none',
                     '--ag-wrapper-border-radius': '0px',
                 }}
@@ -350,24 +353,24 @@ const AgGridTable = ({
 
             {pagination && (
                 <div className="flex items-center justify-between mt-3 px-1">
-                    <span className="text-xs font-medium text-text-secondary">
+                    <span className="text-ui-sm font-medium text-ink-muted">
                         {pageInfo.total === 0 ? 'No rows' : `Showing ${pageInfo.from}–${pageInfo.to} of ${pageInfo.total}`}
                     </span>
                     <div className="flex items-center gap-1.5">
                         <button
                             onClick={() => gridApiRef.current?.paginationGoToPreviousPage()}
                             disabled={pageInfo.page === 0}
-                            className="w-8 h-8 flex items-center justify-center rounded-full border border-border-default text-text-secondary hover:bg-buttons-add disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-button-sm border border-brand-line text-brand-dark hover:bg-brand-light hover:border-brand-ring disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             <ChevronLeft size={15} />
                         </button>
-                        <span className="text-xs font-semibold text-text-primary px-2">
+                        <span className="text-ui-sm font-semibold text-ink px-2">
                             {pageInfo.page + 1} / {pageInfo.totalPages}
                         </span>
                         <button
                             onClick={() => gridApiRef.current?.paginationGoToNextPage()}
                             disabled={pageInfo.page >= pageInfo.totalPages - 1}
-                            className="w-8 h-8 flex items-center justify-center rounded-full border border-border-default text-text-secondary hover:bg-buttons-add disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-button-sm border border-brand-line text-brand-dark hover:bg-brand-light hover:border-brand-ring disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             <ChevronRight size={15} />
                         </button>
@@ -377,45 +380,70 @@ const AgGridTable = ({
 
             <style>{`
         .ag-modern-grid.ag-theme-quartz {
-          --ag-font-size: 13.5px;
-          --ag-foreground-color: var(--color-text-primary, #1f2937);
-          --ag-background-color: var(--color-bg-primary, #fff);
-          --ag-header-background-color: var(--color-bg-primary, #fff);
-          --ag-header-foreground-color: var(--color-text-secondary, #6b7280);
-          --ag-odd-row-background-color: var(--color-bg-primary, #fff);
-          --ag-row-hover-color: #fff7ed;
+          --ag-font-family: Inter, "Segoe UI", Arial, sans-serif;
+          --ag-font-size: 13px;
+          --ag-foreground-color: #17283b;
+          --ag-background-color: #ffffff;
+          --ag-header-background-color: #f5f0f9;
+          --ag-header-foreground-color: #695284;
+          --ag-odd-row-background-color: #faf7fd;
+          --ag-row-hover-color: #f5f0f9;
+          --ag-selected-row-background-color: #e9ddf5;
+          --ag-accent-color: #7953a7;
+          --ag-input-focus-border-color: #a47dc9;
+          --ag-checkbox-checked-color: #7953a7;
         }
-        .ag-modern-grid .ag-header{
-    border-radius:12px 12px 0 0;
-}
-        .ag-modern-grid .ag-header-cell-label{
-    font-weight:700;
-    font-size:12px;
-    letter-spacing:.05em;
-    text-transform:uppercase;
-}
-        .ag-modern-grid .ag-row{
-    transition:background .15s ease;
-}
+        .ag-modern-grid .ag-root-wrapper {
+          border: 1px solid #e1d4ee;
+          border-radius: 9px;
+          overflow: hidden;
+        }
+        .ag-modern-grid .ag-header {
+          border-bottom: 1px solid #e1d4ee;
+        }
+        .ag-modern-grid .ag-header-cell-label {
+          font-weight: 750;
+          font-size: 11px;
+          letter-spacing: .045em;
+          text-transform: uppercase;
+        }
+        .ag-modern-grid .ag-header-cell:hover {
+          background-color: #e9ddf5;
+        }
+        .ag-modern-grid .ag-row {
+          border-bottom: 1px solid #e9eff3;
+          transition: background .15s ease;
+        }
         .ag-modern-grid .ag-row-zebra {
-          background-color: #fafafa;
+          background-color: #faf7fd;
         }
         .ag-modern-grid .ag-row-hover {
-    background:#fff7ed !important;
-    transition:background .18s ease;
-}
-        .ag-modern-grid .ag-cell{
-    display:flex;
-    align-items:center;
-    font-size:13px;
-}
-    .ag-modern-grid .ag-icon{
-    opacity:.95;
-}
-
-.ag-modern-grid .ag-header-cell:hover .ag-icon{
-    opacity:1;
-}
+          background: #f5f0f9 !important;
+        }
+        .ag-modern-grid .ag-cell {
+          display: flex;
+          align-items: center;
+          font-size: 13px;
+          color: #354b60;
+        }
+        .ag-modern-grid .ag-cell-focus,
+        .ag-modern-grid .ag-cell:focus {
+          border-color: #a47dc9 !important;
+        }
+        .ag-modern-grid .ag-icon {
+          color: #7953a7;
+          opacity: .9;
+        }
+        .ag-modern-grid .ag-header-cell:hover .ag-icon {
+          opacity: 1;
+        }
+        .ag-modern-grid .ag-paging-panel {
+          border-top: 1px solid #e1d4ee;
+          color: #6d7f90;
+        }
+        .ag-modern-grid .ag-checkbox-input-wrapper.ag-checked::after {
+          color: #7953a7;
+        }
       `}</style>
         </div>
     );

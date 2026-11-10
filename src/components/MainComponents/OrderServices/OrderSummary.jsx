@@ -19,7 +19,8 @@ import {
   OrderItemsViewModal,
   StatusBadge,
   getInitialOrderMode,
-  hasInvoiceBeenGenerated
+  hasInvoiceBeenGenerated,
+  OrderRowActions
 } from '../../utils/BillingUtils';
 
 const normaliseItem = (item) => {
@@ -59,12 +60,7 @@ const GRID_THEME = [
   '[&_.ag-row-hover]:!bg-brand-light',
 ].join(' ');
 
-const PERIOD_OPTIONS = [
-  { value: 'day', label: 'Today' },
-  { value: 'week', label: 'This Week' },
-  { value: 'month', label: 'This Month' },
-  { value: 'year', label: 'This Year' },
-];
+
 
 // Sorts Order # numerically (1, 2, 3, … 10) instead of as text; ties fall back to the DB id
 const orderNoComparator = (a, b, nodeA, nodeB) => {
@@ -954,50 +950,6 @@ const OrderSummaryVisible = ({ clientId, token }) => {
           </div>
         ) : (
           <div className={`orders-purple-grid ${GRID_THEME} h-full min-h-0 flex flex-col bg-surface rounded-xl border border-line shadow-panel p-3 sm:p-4`}>
-
-            {/* Title */}
-            <h3 className="shrink-0 text-[17px] font-bold text-brand-dark">
-              Orders <span className="font-normal text-[15px] text-ink-muted">({visibleOrders.length})</span>
-            </h3>
-
-            {/* Search (left)  ·  Today / Week / Month / Year dropdown (right) */}
-            <div className="shrink-0 flex items-center justify-between gap-3 flex-wrap mt-3 mb-3">
-              <div className="relative w-full sm:w-96 sm:max-w-full">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  placeholder="Search order #, table, customer, item, invoice, status…"
-                  className="w-full pl-9 pr-9 py-2 text-[13px] rounded-lg border border-line bg-surface text-ink-soft placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-brand/25 focus:border-brand"
-                />
-                {searchText && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchText('')}
-                    aria-label="Clear search"
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-brand-dark"
-                  >
-                    <X size={15} />
-                  </button>
-                )}
-              </div>
-
-              <div className="relative ml-auto">
-                <CalendarDays size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-dark pointer-events-none" />
-                <select
-                  value={period}
-                  onChange={(e) => setPeriod(e.target.value)}
-                  aria-label="Filter orders by period"
-                  className="appearance-none cursor-pointer pl-9 pr-9 py-2 text-[13px] font-semibold rounded-lg border border-brand-200 bg-brand-light text-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/25"
-                >
-                  {PERIOD_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-                <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-dark pointer-events-none" />
-              </div>
-            </div>
 
             {/* Grid — only this area scrolls (rows scroll, header stays) */}
             <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-line">
