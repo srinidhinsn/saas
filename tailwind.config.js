@@ -401,7 +401,7 @@
         ui-page, ui-panel, ui-panel-title, ui-metrics, ui-metric(+label/value/note),
         ui-tabs / ui-tab, ui-toggle, ui-filter, ui-btn*, ui-input, ui-table,
         ui-pill, ui-chip, ui-error, ui-hint, ui-modal, ui-backdrop            */
-      plugin(function ({ addComponents, theme }) {
+      plugin(function ({ addComponents, theme, addBase }) {
         const brand = (k) => theme(`colors.brand.${k}`);
         // fontSize entries can be a string or [size, options] depending on version
         const fs = (k) => [].concat(theme(`fontSize.${k}`))[0];
@@ -761,6 +761,43 @@
             boxShadow: theme('boxShadow.modal-lg'),
             padding: theme('spacing.modal'),
             color: theme('colors.ink.DEFAULT'),
+          },
+        });
+                addBase({
+          ':root': {
+            '--chariot-grid-header-bg': brand('light'),
+            '--chariot-grid-header-text': brand('dark'),
+            '--chariot-grid-header-hover': brand('soft'),
+            '--chariot-grid-border': brand('table-line'),
+            '--chariot-grid-row-alt': '#fbfcfd',
+            '--chariot-grid-row-hover': brand('light'),
+            '--chariot-grid-cell-text': theme('colors.ink.soft'),
+            '--chariot-grid-text': theme('colors.ink.DEFAULT'),
+            '--chariot-grid-accent': brand('DEFAULT'),
+            '--chariot-grid-focus': brand('ring'),
+            '--chariot-grid-focus-bg': brand('focus'),
+            '--chariot-grid-muted': theme('colors.ink.muted'),
+            '--chariot-grid-row-border': theme('colors.line.soft'),
+            '--chariot-grid-surface': theme('colors.surface'),
+          },
+        });
+
+        addComponents({
+          '.ag-modern-grid.ag-theme-quartz': {
+            '--chariot-grid-header-bg': brand('light'),
+            '--chariot-grid-header-text': brand('dark'),
+            '--chariot-grid-header-hover': brand('soft'),
+            '--chariot-grid-border': brand('table-line'),
+            '--chariot-grid-row-alt': '#fbfcfd',
+            '--chariot-grid-row-hover': brand('light'),
+            '--chariot-grid-cell-text': theme('colors.ink.soft'),
+            '--chariot-grid-text': theme('colors.ink.DEFAULT'),
+            '--chariot-grid-accent': brand('DEFAULT'),
+            '--chariot-grid-focus': brand('ring'),
+            '--chariot-grid-focus-bg': brand('focus'),
+            '--chariot-grid-muted': theme('colors.ink.muted'),
+            '--chariot-grid-row-border': theme('colors.line.soft'),
+            '--chariot-grid-surface': theme('colors.surface'),
           },
         });
       }),

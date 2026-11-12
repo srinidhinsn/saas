@@ -7,7 +7,7 @@ import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-
 import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw, LayoutGrid, ListChecks, Store } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import { parseISTTimestamp, getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
-import { isPackagingMenuRecord  } from '../../utils/Menu-utils/menuUtils';
+import { isPackagingMenuRecord } from '../../utils/Menu-utils/menuUtils';
 import { returnRentalItems } from '../../utils/Menu-utils/rentalReturn';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -62,6 +62,14 @@ const STATUS_BAR = {
   preparing: 'border-t-status-preparing',
   ready: 'border-t-status-ready',
   served: 'border-t-status-served',
+};
+
+const ORDER_STATUS_BAR = {
+  pending: { bar: 'border-t-status-pending', dot: 'bg-status-pending' },
+  preparing: { bar: 'border-t-status-preparing', dot: 'bg-status-preparing' },
+  ready: { bar: 'border-t-status-ready', dot: 'bg-status-ready' },
+  served: { bar: 'border-t-status-served', dot: 'bg-status-served' },
+  cancelled: { bar: 'border-t-gray-300', dot: 'bg-gray-300' },
 };
 
 const INVENTORY_API = import.meta.env.VITE_API_INVENTORY_SERVICE_URL;
@@ -507,7 +515,7 @@ const KitchenCard = ({
   card,
   tablesMap,
   menuItemsMap,
-  onItemStatusChange,nowTick = Date.now(), isRental = false, 
+  onItemStatusChange, nowTick = Date.now(), isRental = false,
 }) => {
   // Track which item buttons are currently being saved to prevent double-clicks
   const [pendingItemIds, setPendingItemIds] = useState(new Set());
@@ -516,20 +524,20 @@ const KitchenCard = ({
   const rentedDateLabel = isRental ? formatRentedDate(card.created_at) : null;
   const agingDays = isRental ? calculateAgingDays(card.created_at) : null;
   const allReady =
-  card.items?.length > 0 &&
-  card.items.every((i) => i.status === KDS_CONFIG.STATUS.READY || i.status === KDS_CONFIG.STATUS.SERVED) &&
-  !card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED);
+    card.items?.length > 0 &&
+    card.items.every((i) => i.status === KDS_CONFIG.STATUS.READY || i.status === KDS_CONFIG.STATUS.SERVED) &&
+    !card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED);
 
   const statusColorClass =
-  allReady
-    ? 'text-status-ready'
-    : card.status === KDS_CONFIG.STATUS.SERVED
-      ? 'text-status-served'
-      : card.status === KDS_CONFIG.STATUS.PENDING
-        ? 'text-status-pending'
-        : card.status === KDS_CONFIG.STATUS.PREPARING
-          ? 'text-status-preparing'
-          : '';
+    allReady
+      ? 'text-status-ready'
+      : card.status === KDS_CONFIG.STATUS.SERVED
+        ? 'text-status-served'
+        : card.status === KDS_CONFIG.STATUS.PENDING
+          ? 'text-status-pending'
+          : card.status === KDS_CONFIG.STATUS.PREPARING
+            ? 'text-status-preparing'
+            : '';
 
   const cardBar = STATUS_BAR[allReady ? KDS_CONFIG.STATUS.READY : card.status] || 'border-t-line-strong';
 
@@ -577,7 +585,7 @@ const KitchenCard = ({
           const combo = isComboItem(item, menuRecord);
           const isPending = pendingItemIds.has(item.id);
           const isCancelled = isCancelledStatus(item.status);
-          const isReturned = isServedLikeStatus(item.status);    
+          const isReturned = isServedLikeStatus(item.status);
           return (
             <div key={item.id || idx} className="flex flex-col w-full rounded-button-sm">
               {/* Main item row — unchanged */}
@@ -616,26 +624,26 @@ const KitchenCard = ({
                   })()}
                 </div>
                 <div className="flex items-center gap-1 ml-3">
-                {isRental ? (
-                   isReturned ? (
-                    <span
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-button-sm text-ui-sm font-semibold bg-brand-light text-ink-muted border border-brand-line"
-                    >
-                      <FaCheckCircle size={14} className="text-state-vacant" />
-                      Returned
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={isPending || isCancelled}
-                      onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.CANCELLED)}
-                      title="Mark as Returned"
-                      className="ui-btn ui-btn-add !h-8"
-                    >
-                      <RotateCcw size={14} />
-                      Mark as Returned
-                    </button>)
-                  ) :(<>   <button
+                  {isRental ? (
+                    isReturned ? (
+                      <span
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-button-sm text-ui-sm font-semibold bg-brand-light text-ink-muted border border-brand-line"
+                      >
+                        <FaCheckCircle size={14} className="text-state-vacant" />
+                        Returned
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isPending || isCancelled}
+                        onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.CANCELLED)}
+                        title="Mark as Returned"
+                        className="ui-btn ui-btn-add !h-8"
+                      >
+                        <RotateCcw size={14} />
+                        Mark as Returned
+                      </button>)
+                  ) : (<>   <button
                     type="button"
                     disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
@@ -647,47 +655,47 @@ const KitchenCard = ({
                       className={item.status === 'pending' ? 'text-status-pending' : 'text-ink-faint'}
                     />
                   </button>
-                  <button
-                    type="button"
-                    disabled={isPending || isCancelled}
-                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
-                    title="Mark as Preparing"
-                    className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    <FaHourglassHalf
-                      size={20}
-                      className={item.status === 'preparing' ? 'text-status-preparing' : 'text-ink-faint'}
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isPending || isCancelled}
-                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
-                    title="Mark as Ready"
-                    className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    <FaCheckCircle
-                      size={20}
-                      className={item.status === 'ready' ? 'text-status-ready' : 'text-ink-faint'}
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isPending || isCancelled}
-                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.SERVED)}
-                    title="Mark as Served"
-                    className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    <FaConciergeBell
-                      size={20}
-                      className={item.status === 'served' ? 'text-status-served' : 'text-ink-faint'}
-                    />
-                  </button></>)} 
+                    <button
+                      type="button"
+                      disabled={isPending || isCancelled}
+                      onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
+                      title="Mark as Preparing"
+                      className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      <FaHourglassHalf
+                        size={20}
+                        className={item.status === 'preparing' ? 'text-status-preparing' : 'text-ink-faint'}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending || isCancelled}
+                      onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
+                      title="Mark as Ready"
+                      className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      <FaCheckCircle
+                        size={20}
+                        className={item.status === 'ready' ? 'text-status-ready' : 'text-ink-faint'}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending || isCancelled}
+                      onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.SERVED)}
+                      title="Mark as Served"
+                      className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      <FaConciergeBell
+                        size={20}
+                        className={item.status === 'served' ? 'text-status-served' : 'text-ink-faint'}
+                      />
+                    </button></>)}
                 </div>
               </div>
 
               {/* Combo components list — unchanged */}
-              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} parentQuantity={item.quantity ?? 1}  />}
+              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} parentQuantity={item.quantity ?? 1} />}
 
               {/* Addon rows — identified by "addon_" prefix on frontend_unique_key */}
               {/* Addon rows */}
@@ -749,8 +757,8 @@ const KitchenCard = ({
 
 // ─── Main KitchenDisplay component ────────────────────────────────────────────
 
-const KitchenDisplay = ({clientId, token, realm}) => {
-  const isRental = (realm || '').trim().toLowerCase() === 'rental'; 
+const KitchenDisplay = ({ clientId, token, realm }) => {
+  const isRental = (realm || '').trim().toLowerCase() === 'rental';
   const [cards, setCards] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [menuItemsMap, setMenuItemsMap] = useState({});
@@ -762,21 +770,22 @@ const KitchenDisplay = ({clientId, token, realm}) => {
   // Defaults to today (live view). Selecting an earlier date switches the
   // page into a "missed orders" lookup mode: same hide-served filtering,
   // but no polling, since past orders don't change on their own.
-const todayDate = new Date().toISOString().split('T')[0];
-const [datePreset, setDatePreset] = useState('today');
-const [customFrom, setCustomFrom] = useState(todayDate);
-const [customTo, setCustomTo] = useState(todayDate);
-const datePresetRef = useRef('today');
-const customFromValRef = useRef(todayDate);
-const customToValRef = useRef(todayDate);
-useEffect(() => { datePresetRef.current = datePreset; }, [datePreset]);
-useEffect(() => { customFromValRef.current = customFrom; }, [customFrom]);
-useEffect(() => { customToValRef.current = customTo; }, [customTo]);
-useEffect(() => {                                      // ← add
-  if (!isRental) return;
-  const t = setInterval(() => setNowTick(Date.now()), 30000);
-  return () => clearInterval(t);
-}, [isRental]);
+  const todayDate = new Date().toISOString().split('T')[0];
+  const [datePreset, setDatePreset] = useState('today');
+  const [customFrom, setCustomFrom] = useState(todayDate);
+  const [customTo, setCustomTo] = useState(todayDate);
+  const datePresetRef = useRef('today');
+  const customFromValRef = useRef(todayDate);
+  const customToValRef = useRef(todayDate);
+  const [showOrderFilter, setShowOrderFilter] = useState(false);
+  useEffect(() => { datePresetRef.current = datePreset; }, [datePreset]);
+  useEffect(() => { customFromValRef.current = customFrom; }, [customFrom]);
+  useEffect(() => { customToValRef.current = customTo; }, [customTo]);
+  useEffect(() => {                                      // ← add
+    if (!isRental) return;
+    const t = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, [isRental]);
   // Stores the canonical item order (array of item ids) per card_id.
   // Persists across re-renders and poll ticks so item positions never shift.
   const itemOrderRef = useRef({});
@@ -853,7 +862,7 @@ useEffect(() => {                                      // ← add
     // One card per sub-order: sort strictly by created_at ascending
     return subOrders
       .slice()
-      .filter((subOrder) => !isCancelledStatus(subOrder.status)) 
+      .filter((subOrder) => !isCancelledStatus(subOrder.status))
       .sort((a, b) => parseISTTimestamp(a.created_at || 0) - parseISTTimestamp(b.created_at || 0))
       .map((subOrder) => ({
         card_id: subOrder.id,
@@ -999,9 +1008,9 @@ useEffect(() => {                                      // ← add
   }, [fetchOrders]);
 
   useEffect(() => {
-  setLoading(true);
-  fetchOrders();
-}, [datePreset, customFrom, customTo]);
+    setLoading(true);
+    fetchOrders();
+  }, [datePreset, customFrom, customTo]);
 
   // ─── Item status change ───────────────────────────────────────────────────────
 
@@ -1013,21 +1022,21 @@ useEffect(() => {                                      // ← add
     if (!targetItem) return;
 
     const fkey = targetItem.frontend_unique_key || '';
-  const isParentItem = !fkey.startsWith('addon_') && !fkey.startsWith('cchild_');
+    const isParentItem = !fkey.startsWith('addon_') && !fkey.startsWith('cchild_');
 
-  const packagingChildren = isParentItem
-    ? (card.items || []).filter(i =>
+    const packagingChildren = isParentItem
+      ? (card.items || []).filter(i =>
         (i.frontend_unique_key || '').startsWith(`addon_${fkey}_`) &&
         isPackagingMenuRecord(menuItemsMap[String(i.item_id)]) &&
         !isCancelledStatus(i.status)
       )
-    : [];
+      : [];
 
-  const changedIds = new Set([String(itemId), ...packagingChildren.map(c => String(c.id))]);
-  const previousStatusMap = {};
-  (card.items || []).forEach(i => {
-    if (changedIds.has(String(i.id))) previousStatusMap[i.id] = i.status;
-  });
+    const changedIds = new Set([String(itemId), ...packagingChildren.map(c => String(c.id))]);
+    const previousStatusMap = {};
+    (card.items || []).forEach(i => {
+      if (changedIds.has(String(i.id))) previousStatusMap[i.id] = i.status;
+    });
 
     const updatedItems = (card.items || []).map((i) =>
       changedIds.has(String(i.id)) && !isCancelledStatus(i.status)
@@ -1047,32 +1056,32 @@ useEffect(() => {                                      // ← add
     inflightUpdatesRef.current += 1;
 
     try {
-    const buildPayload = (item) => ({
-      id: item.id,
-      item_id: item.item_id,
-      item_name: item.item_name,
-      quantity: item.quantity,
-      status: newStatus,
-      note: item.note || '',
-      slug: item.slug || '',
-      unit_price: item.unit_price || 0,
-      line_total: (item.unit_price || 0) * (item.quantity || 1),
-      client_id: clientIdRef.current,
-      order_id: card.sub_order_id,
-      frontend_unique_key: item.frontend_unique_key || null,
-      is_addon: item.id !== targetItem.id,
-      parent_item_key: item.id !== targetItem.id ? targetItem.frontend_unique_key : null,
-    });
-
-    if (isRental) {
-      const nextMap = await returnRentalItems({
-        items: [targetItem, ...packagingChildren],
-        menuItemsMap,
-        clientId: clientIdRef.current,
-        token: tokenRef.current,
+      const buildPayload = (item) => ({
+        id: item.id,
+        item_id: item.item_id,
+        item_name: item.item_name,
+        quantity: item.quantity,
+        status: newStatus,
+        note: item.note || '',
+        slug: item.slug || '',
+        unit_price: item.unit_price || 0,
+        line_total: (item.unit_price || 0) * (item.quantity || 1),
+        client_id: clientIdRef.current,
+        order_id: card.sub_order_id,
+        frontend_unique_key: item.frontend_unique_key || null,
+        is_addon: item.id !== targetItem.id,
+        parent_item_key: item.id !== targetItem.id ? targetItem.frontend_unique_key : null,
       });
-      if (nextMap) setMenuItemsMap(nextMap);
-    } else {
+
+      if (isRental) {
+        const nextMap = await returnRentalItems({
+          items: [targetItem, ...packagingChildren],
+          menuItemsMap,
+          clientId: clientIdRef.current,
+          token: tokenRef.current,
+        });
+        if (nextMap) setMenuItemsMap(nextMap);
+      } else {
         const itemsPayload = [targetItem, ...packagingChildren].map(buildPayload);
         await axios.post(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/order_items/update?order_id=${card.sub_order_id}`,
@@ -1102,7 +1111,7 @@ useEffect(() => {                                      // ← add
       setCards((prev) =>
         prev.map((c) => {
           if (c.card_id !== cardId) return c;
-          const rolledBackItems  = c.items.map((i) =>
+          const rolledBackItems = c.items.map((i) =>
             changedIds.has(String(i.id)) ? { ...i, status: previousStatusMap[i.id] } : i
           );
           return { ...c, items: rolledBackItems, status: deriveStatus(rolledBackItems) };
@@ -1128,34 +1137,17 @@ useEffect(() => {                                      // ← add
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-  <div className="ui-page">
-    <div className="mx-auto">
+    <div className="ui-page">
+      <div className="mx-auto">
 
-      {/* ── Toolbar: view tabs on the left, filters on the right ── */}
-      <div className="ui-panel flex flex-wrap items-center justify-between gap-3">
-        <div className="ui-tabs">
-          {VIEW_TABS.map(({ key, label, Icon }) => (
-            <button
-              key={key}
-              onClick={() => setActiveView(key)}
-              className={`ui-tab inline-flex items-center gap-2 ${activeView === key
-                ? 'ui-tab-active'
-                : ''
-                }`}
-            >
-              <Icon size={16} />
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap gap-2 items-center">
+        {/* ── Toolbar: view tabs on the left, filters on the right ── */}
+        <div className="ui-panel flex flex-wrap items-center justify-between gap-3">
           <div className="ui-tabs">
-            {ORDER_FILTER_OPTIONS.map(({ key, label, Icon }) => (
+            {VIEW_TABS.map(({ key, label, Icon }) => (
               <button
                 key={key}
-                onClick={() => setOrderFilter(key)}
-                className={`ui-tab inline-flex items-center gap-2 ${orderFilter === key
+                onClick={() => setActiveView(key)}
+                className={`ui-tab inline-flex items-center gap-2 ${activeView === key
                   ? 'ui-tab-active'
                   : ''
                   }`}
@@ -1166,58 +1158,88 @@ useEffect(() => {                                      // ← add
             ))}
           </div>
 
-          <DateRangeFilter
-            datePreset={datePreset}
-            setDatePreset={setDatePreset}
-            customFrom={customFrom}
-            setCustomFrom={setCustomFrom}
-            customTo={customTo}
-            setCustomTo={setCustomTo}
-          />
+          <div className="flex items-center gap-x-3 gap-y-1 text-micro text-ink-muted">
+            {Object.entries(ORDER_STATUS_BAR).map(([status, s]) => (
+              <span key={status} className="inline-flex items-center gap-1 capitalize">
+                <span className={`h-2 w-2 rounded-badge ${s.dot}`} />
+                {status}
+              </span>
+            ))}
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-badge bg-state-reserved" /> Draft
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="ui-filter relative min-w-[160px]">
+              <label className="ui-filter-label">
+                Order Type
+              </label>
+              <select
+                value={orderFilter}
+                onChange={(e) => setOrderFilter(e.target.value)}
+                className="ui-filter-control p-2"
+              >
+                {ORDER_FILTER_OPTIONS.map(({ key, label }) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <DateRangeFilter
+              datePreset={datePreset}
+              setDatePreset={setDatePreset}
+              customFrom={customFrom}
+              setCustomFrom={setCustomFrom}
+              customTo={customTo}
+              setCustomTo={setCustomTo}
+            />
+          </div>
+        </div>
+
+        {/* ── Active view ── */}
+        <div className="w-full">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-ui text-ink-muted">Loading orders...</div>
+            </div>
+          ) : activeView === VIEWS.ORDER ? (
+            filteredCards.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-ui text-ink-muted">No active orders</div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-tiles">
+                {filteredCards.map((card) => (
+                  <KitchenCard
+                    key={card.card_id}
+                    card={card}
+                    tablesMap={tablesMap}
+                    menuItemsMap={menuItemsMap}
+                    onItemStatusChange={handleItemStatusChange}
+                    nowTick={nowTick}
+                    isRental={isRental}
+                  />
+                ))}
+              </div>
+            )
+          ) : activeView === VIEWS.ITEM ? (
+            <ItemView cards={filteredCards} tablesMap={tablesMap} />
+          ) : (
+            <CounterView
+              cards={filteredCards}
+              tablesMap={tablesMap}
+              menuItemsMap={menuItemsMap}
+              clientId={clientId}
+              token={token}
+            />
+          )}
         </div>
       </div>
-
-      {/* ── Active view ── */}
-      <div className="w-full">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-ui text-ink-muted">Loading orders...</div>
-          </div>
-        ) : activeView === VIEWS.ORDER ? (
-          filteredCards.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-ui text-ink-muted">No active orders</div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-tiles">
-              {filteredCards.map((card) => (
-                <KitchenCard
-                  key={card.card_id}
-                  card={card}
-                  tablesMap={tablesMap}
-                  menuItemsMap={menuItemsMap}
-                  onItemStatusChange={handleItemStatusChange}
-                  nowTick={nowTick}
-                  isRental={isRental}
-                />
-              ))}
-            </div>
-          )
-        ) : activeView === VIEWS.ITEM ? (
-          <ItemView cards={filteredCards} tablesMap={tablesMap} />
-        ) : (
-          <CounterView
-            cards={filteredCards}
-            tablesMap={tablesMap}
-            menuItemsMap={menuItemsMap}
-            clientId={clientId}
-            token={token}
-          />
-        )}
-      </div>
     </div>
-  </div>
-);
+  );
 };
 
 export default KitchenDisplay;

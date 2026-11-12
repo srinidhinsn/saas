@@ -2385,7 +2385,7 @@ const handleBillFromCart = async () => {
                             title="Save draft — items will be here even after a page refresh"
                             className={`ui-btn gap-1 transition-colors
                               ${cart.length > 0
-                                ? 'bg-state-reserved-bg border-state-reserved/30 text-state-reserved hover:bg-state-reserved-bg'
+                                ? 'border-state-reserved/30'
                                 : 'opacity-40 cursor-not-allowed'}`}
                           >
                             <Save size={15} /> Save

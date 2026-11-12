@@ -39,6 +39,9 @@ export const DateRangeFilter = ({ datePreset, setDatePreset, customFrom, setCust
   return (
     <div className="flex flex-wrap items-end gap-2">
       <div className="ui-filter min-w-[155px]">
+        {/* <label className="ui-filter-label">
+          Date Range
+        </label> */}
         <select
           value={datePreset}
           onChange={e => {

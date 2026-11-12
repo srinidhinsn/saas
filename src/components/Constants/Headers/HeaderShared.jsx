@@ -1,9 +1,14 @@
+
 import { APP_ROOT } from '../../config/pathConfig';
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { getValidToken } from '../../utils/Interceptors/Api';
 import axios from 'axios';
 import { NAV_TABS } from './Navtabs';
+import logo from '../../../../public/logo.png';
+
+// Replace this with your actual Tekhawk logo PNG path.
+const TEKHAWK_LOGO_PATH = logo;
 
 export const navMap = {
   home: (clientId) => `/${APP_ROOT}/${clientId}/home`,
@@ -79,6 +84,7 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
     const fn = navMap[id];
     if (!fn) return;
     setMobileOpen(false);
+    setProfileOpen(false);
     navigate(fn(clientId));
   };
 
@@ -86,8 +92,13 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
     const isActive = active === id;
     return (
       <button
+        type="button"
         onClick={() => handleNavigate(id)}
-        className={`px-2 py-1 rounded transition-colors ${isActive ? 'text-action-primary font-semibold' : 'text-text-primary dark:text-text-secondary-dark hover:text-action-primary'}`}
+        className={`
+          ui-tab
+          !px-2 !py-[2.5px] !text-base !leading-6
+          ${isActive ? 'ui-tab-active' : ''}
+        `}
         aria-current={isActive ? 'page' : undefined}
       >
         {children}
@@ -99,118 +110,165 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
   const displayLabel = clientData?.name || (clientId || 'APP').toUpperCase();
 
   return (
-    <header className="shadow-md sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-border-default dark:border-border-default-dark transition-colors duration-300">
-      <div className="mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
+    <>
+      <header className="sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-brand-tab-line shadow-tabs transition-colors duration-300">
 
-        <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-text-primary">
-          {visibleTabs
-            .filter(tab => ['home', 'table', 'menu', 'billing', 'inventory'].includes(tab.id))
-            .map(tab => (
-              <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
-            ))}
-        </div>
+        {/* Desktop Header */}
+        <div className="mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
 
-        <button
-          onClick={() => handleNavigate('home')}
-          className="text-2xl lg:text-3xl font-serif italic text-action-primary hover:text-action-primary-hover transition-colors duration-300"
-        >
-          <span className="text-action-primary">{displayLabel}</span>
-        </button>
-
-        <div className="hidden lg:flex items-center space-x-8 text-text-primary">
-          {visibleTabs
-            .filter(tab => ['users', 'order', 'summary', 'kds', 'counter'].includes(tab.id))
-            .map(tab => (
-              <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
-            ))}
-
-          {isVisible('profile') && (
-            <div className="relative group" onClick={() => setProfileOpen(prev => !prev)}>
-              <div className="cursor-pointer px-2 py-1 rounded hover:text-action-primary transition-colors">
-                Profile
-              </div>
-              <div
-                className={`
-                  absolute right-4 mt-2 w-28 bg-bg-primary rounded shadow-lg border
-                  transition-all duration-200
-                  opacity-0 invisible translate-y-2
-                  group-hover:opacity-100 group-hover:visible group-hover:translate-y-0
-                  ${profileOpen ? "opacity-100 visible translate-y-0" : ""}
-                `}
-              >
-                <ul className="py-2">
-                  <li>
-                    <NavLink id="profile">Profile</NavLink>
-                  </li>
-                  <li
-                    onClick={() => onLogout?.()}
-                    className="block px-4 py-2 cursor-pointer hover:bg-bg-tertiary"
-                  >
-                    Logout
-                  </li>
-                </ul>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="lg:hidden flex items-center">
-          <button
-            onClick={() => setMobileOpen(prev => !prev)}
-            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={mobileOpen}
-            className="p-2 rounded-md hover:bg-bg-tertiary dark:hover:bg-bg-tertiary-dark transition-all text-text-secondary dark:text-text-secondary-dark"
-          >
-            <div className="relative w-6 h-6">
-              <span className={`block absolute left-0 right-0 h-0.5 bg-current transform transition-all duration-300 ${mobileOpen ? 'rotate-45 top-2.5' : 'top-1'}`} />
-              <span className={`block absolute left-0 right-0 h-0.5 bg-current transform transition-all duration-300 ${mobileOpen ? 'opacity-0' : 'top-2.5'}`} />
-              <span className={`block absolute left-0 right-0 h-0.5 bg-current transform transition-all duration-300 ${mobileOpen ? '-rotate-45 top-2.5' : 'top-4'}`} />
-            </div>
-          </button>
-        </div>
-      </div>
-
-      <div
-        className={`lg:hidden fixed inset-0 z-40 pointer-events-none transition-opacity duration-300 bg-black ${mobileOpen ? 'opacity-60 pointer-events-auto' : 'opacity-0'}`}
-        onClick={() => setMobileOpen(false)}
-        aria-hidden={!mobileOpen}
-      />
-
-      <nav
-        className={`lg:hidden fixed right-0 top-0 z-50 w-full max-w-xs h-full shadow-lg transform transition-transform duration-300 bg-bg-primary dark:bg-bg-primary-dark ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}`}
-        aria-hidden={!mobileOpen}
-      >
-        <div className="p-4 border-b flex items-center justify-between border-border-default dark:border-border-default-dark">
-          <div className="text-lg font-semibold text-action-primary dark:text-text-primary-dark uppercase">{clientId}</div>
-          <button
-            onClick={() => setMobileOpen(false)}
-            className="p-2 rounded-md hover:bg-bg-tertiary dark:hover:bg-bg-tertiary-dark text-action-danger dark:text-text-secondary-dark"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="p-4 space-y-3 h-full overflow-y-auto">
-          <div className="flex flex-col space-y-1">
-            {visibleTabs.map(tab => (
-              <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
-            ))}
+          {/* Left Navigation Tabs */}
+          <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-ink-tab">
+            {visibleTabs
+              .filter(tab => ['home', 'table', 'menu', 'billing', 'inventory'].includes(tab.id))
+              .map(tab => (
+                <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
+              ))}
           </div>
 
-          <hr className="my-2 border-border-default dark:border-border-default-dark" />
+          {/* Client Name - Centre */}
+          <button
+            type="button"
+            onClick={() => handleNavigate('home')}
+            className="text-2xl lg:text-3xl font-semibold tracking-tight text-brand-dark hover:text-brand transition-colors duration-200 shrink-0"
+          >
+            <span>{displayLabel}</span>
+          </button>
 
-          <div className="flex flex-col space-y-1">
+          {/* Right Navigation Tabs */}
+          <div className="hidden lg:flex items-center space-x-8 text-ink-tab">
+            {visibleTabs
+              .filter(tab => ['users', 'order', 'summary', 'kds', 'counter'].includes(tab.id))
+              .map(tab => (
+                <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
+              ))}
+
+            {isVisible('profile') && (
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen(prev => !prev)}
+                  className={`ui-tab !px-2 !py-[2.5px] !text-base !leading-6 ${active === 'profile' || profileOpen ? 'ui-tab-active' : ''}`}
+                  aria-expanded={profileOpen}
+                >
+                  Profile
+                  <svg
+                    className={`w-3.5 h-3.5 transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`}
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path fillRule="evenodd" d="M5.22 7.22a.75.75 0 011.06 0L10 10.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 8.28a.75.75 0 010-1.06z" clipRule="evenodd" />
+                  </svg>
+                </button>
+
+                {profileOpen && (
+                  <>
+                    <button
+                      type="button"
+                      className="fixed inset-0 z-40 cursor-default"
+                      onClick={() => setProfileOpen(false)}
+                      aria-label="Close profile menu"
+                    />
+
+                    <div className="absolute right-0 top-full mt-2 z-50 w-44 bg-surface border border-brand-line rounded-panel shadow-soft overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => handleNavigate('profile')}
+                        className={`w-full px-4 py-3 text-left text-ui font-semibold transition-colors ${
+                          active === 'profile'
+                            ? 'bg-brand-light text-brand-dark'
+                            : 'text-ink-soft hover:bg-brand-light hover:text-brand-dark'
+                        }`}
+                      >
+                        My Profile
+                      </button>
+
+                      <div className="border-t border-line-soft" />
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          onLogout?.();
+                        }}
+                        className="w-full px-4 py-3 text-left text-ui font-semibold text-action-danger hover:bg-brand-light transition-colors"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="lg:hidden flex items-center">
             <button
-              onClick={() => { onLogout?.(); setMobileOpen(false); }}
-              className="px-2 py-1 rounded text-text-primary dark:text-text-secondary-dark text-left hover:text-action-primary"
+              type="button"
+              onClick={() => setMobileOpen(prev => !prev)}
+              aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileOpen}
+              className="p-2 rounded-button border border-brand-line bg-brand-light text-brand-dark hover:bg-brand-soft transition-all"
             >
-              Logout
+              <div className="relative w-6 h-6">
+                <span className={`block absolute left-0 right-0 h-0.5 bg-current transform transition-all duration-300 ${mobileOpen ? 'rotate-45 top-2.5' : 'top-1'}`} />
+                <span className={`block absolute left-0 right-0 h-0.5 bg-current transform transition-all duration-300 ${mobileOpen ? 'opacity-0' : 'top-2.5'}`} />
+                <span className={`block absolute left-0 right-0 h-0.5 bg-current transform transition-all duration-300 ${mobileOpen ? '-rotate-45 top-2.5' : 'top-4'}`} />
+              </div>
             </button>
           </div>
         </div>
-      </nav>
-    </header>
+
+        {/* Mobile Backdrop */}
+        <div
+          className={`lg:hidden fixed inset-0 z-40 pointer-events-none transition-opacity duration-300 bg-black ${mobileOpen ? 'opacity-60 pointer-events-auto' : 'opacity-0'}`}
+          onClick={() => setMobileOpen(false)}
+          aria-hidden={!mobileOpen}
+        />
+
+        {/* Mobile Navigation Drawer */}
+        <nav
+          className={`lg:hidden fixed right-0 top-0 z-50 w-full max-w-xs h-full shadow-soft transform transition-transform duration-300 bg-bg-primary dark:bg-bg-primary-dark border-l border-brand-line ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}`}
+          aria-hidden={!mobileOpen}
+        >
+          <div className="p-4 border-b border-brand-line flex items-center justify-between">
+            <div className="text-lg font-semibold text-brand-dark dark:text-text-primary-dark uppercase">
+              {displayLabel}
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              className="p-2 rounded-button text-brand-dark hover:bg-brand-light transition-colors"
+              aria-label="Close menu"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="p-4 space-y-3 h-full overflow-y-auto">
+            <div className="flex flex-col space-y-1">
+              {visibleTabs.map(tab => (
+                <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
+              ))}
+            </div>
+
+            <hr className="my-2 border-brand-tab-line" />
+
+            <div className="flex flex-col space-y-1">
+              <button
+                type="button"
+                onClick={() => { onLogout?.(); setMobileOpen(false); }}
+                className="ui-tab !px-2 !py-[2.5px] !text-base !leading-6 w-full justify-start text-left text-action-danger hover:bg-red-50"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </nav>
+      </header>
+    </>
   );
 };
 
-export default HeaderShared
+export default HeaderShared;

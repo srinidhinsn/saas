@@ -681,8 +681,6 @@ const DashBoardPage = () => {
             ]}
           />
         </Card>
-
-        <div className="text-micro tracking-wide text-ink-muted pt-4">TEKHAWK</div>
       </div>
     </div>
   );

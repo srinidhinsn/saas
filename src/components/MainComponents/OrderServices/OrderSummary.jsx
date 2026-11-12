@@ -34,33 +34,6 @@ const normaliseItem = (item) => {
   };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Theme — every colour comes from tailwind.config.js tokens (no hex in this file)
-//   brand / brand-dark / brand-light / brand-tint   ink-soft / ink-muted / ink-faint
-//   line / line-soft   canvas / surface   success / warning / state-occupied
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Colours for the AG Grid internals, applied from the card wrapper with Tailwind
-// arbitrary variants so they use the same tokens as the rest of the page.
-const GRID_THEME = [
-  '[&_.ag-header]:!bg-brand-light',
-  '[&_.ag-header]:!border-b',
-  '[&_.ag-header]:!border-line-soft',
-  '[&_.ag-header-cell]:!text-brand-dark',
-  '[&_.ag-header-cell-text]:!text-brand-dark',
-  '[&_.ag-header-cell-label]:!text-brand-dark',
-  '[&_.ag-header-cell-label]:!font-bold',
-  '[&_.ag-header-cell-label]:!text-[13px]',
-  '[&_.ag-header-cell-label]:!tracking-normal',
-  '[&_.ag-header-cell-label]:!normal-case',
-  '[&_.ag-icon]:!text-brand-dark',
-  '[&_.ag-cell]:!text-ink-soft',
-  '[&_.ag-row]:!border-line-soft',
-  '[&_.ag-row-zebra]:!bg-brand-tint',
-  '[&_.ag-row-hover]:!bg-brand-light',
-].join(' ');
-
-
 
 // Sorts Order # numerically (1, 2, 3, … 10) instead of as text; ties fall back to the DB id
 const orderNoComparator = (a, b, nodeA, nodeB) => {
@@ -949,7 +922,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
             <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <div className={`orders-purple-grid ${GRID_THEME} h-full min-h-0 flex flex-col bg-surface rounded-xl border border-line shadow-panel p-3 sm:p-4`}>
+          <div className={`orders-purple-grid h-full min-h-0 flex flex-col bg-surface rounded-xl border border-line shadow-panel p-3 sm:p-4`}>
 
             {/* Grid — only this area scrolls (rows scroll, header stays) */}
             <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-line">

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 
@@ -19,7 +20,6 @@ import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-quartz.css';
 
 import {
-    Search,
     Download,
     Columns3,
     ChevronLeft,
@@ -308,8 +308,6 @@ const AgGridTable = ({
                     '--ag-row-height': `${rowHeight}px`,
                     '--ag-header-height': `${headerHeight}px`,
                     '--ag-cell-horizontal-padding': '20px',
-                    '--ag-border-color': '#e1d4ee',
-                    '--ag-row-border-color': '#e9eff3',
                     '--ag-header-column-separator-display': 'none',
                     '--ag-wrapper-border-radius': '0px',
                 }}
@@ -382,67 +380,143 @@ const AgGridTable = ({
         .ag-modern-grid.ag-theme-quartz {
           --ag-font-family: Inter, "Segoe UI", Arial, sans-serif;
           --ag-font-size: 13px;
-          --ag-foreground-color: #17283b;
-          --ag-background-color: #ffffff;
-          --ag-header-background-color: #f5f0f9;
-          --ag-header-foreground-color: #695284;
-          --ag-odd-row-background-color: #faf7fd;
-          --ag-row-hover-color: #f5f0f9;
-          --ag-selected-row-background-color: #e9ddf5;
-          --ag-accent-color: #7953a7;
-          --ag-input-focus-border-color: #a47dc9;
-          --ag-checkbox-checked-color: #7953a7;
+
+          --ag-foreground-color: var(--chariot-grid-text, #17283b);
+          --ag-background-color: var(--chariot-grid-surface, #ffffff);
+          --ag-header-background-color: var(--chariot-grid-header-bg, #f5f0f9);
+          --ag-header-foreground-color: var(--chariot-grid-header-text, #69458f);
+          --ag-odd-row-background-color: var(--chariot-grid-row-alt, #fbfcfd);
+          --ag-row-hover-color: var(--chariot-grid-row-hover, #f5f0f9);
+          --ag-selected-row-background-color: var(--chariot-grid-focus-bg, #e8daf5);
+          --ag-accent-color: var(--chariot-grid-accent, #7953a7);
+          --ag-input-focus-border-color: var(--chariot-grid-focus, #a47dc9);
+          --ag-checkbox-checked-color: var(--chariot-grid-accent, #7953a7);
+          --ag-border-color: var(--chariot-grid-border, #e5d9f0);
+          --ag-row-border-color: var(--chariot-grid-row-border, #e9eff3);
         }
+
         .ag-modern-grid .ag-root-wrapper {
-          border: 1px solid #e1d4ee;
+          border: 1px solid var(--chariot-grid-border, #e5d9f0);
           border-radius: 9px;
           overflow: hidden;
         }
+
         .ag-modern-grid .ag-header {
-          border-bottom: 1px solid #e1d4ee;
+          border-bottom: 1px solid var(--chariot-grid-border, #e5d9f0);
         }
+
+        .ag-modern-grid .ag-header-cell,
+        .ag-modern-grid .ag-header-group-cell {
+          background-color: var(--chariot-grid-header-bg, #f5f0f9);
+        }
+
         .ag-modern-grid .ag-header-cell-label {
-          font-weight: 750;
-          font-size: 11px;
-          letter-spacing: .045em;
-          text-transform: uppercase;
+          font-weight: 700;
+          font-size: 13px;
+          letter-spacing: normal;
+          text-transform: none;
         }
+
+        .ag-modern-grid .ag-header-cell-text {
+          color: var(--chariot-grid-header-text, #69458f);
+        }
+
         .ag-modern-grid .ag-header-cell:hover {
-          background-color: #e9ddf5;
+          background-color: var(--chariot-grid-header-hover, #e9ddf5);
         }
+
         .ag-modern-grid .ag-row {
-          border-bottom: 1px solid #e9eff3;
+          border-bottom: 1px solid var(--chariot-grid-row-border, #e9eff3);
           transition: background .15s ease;
         }
+
         .ag-modern-grid .ag-row-zebra {
-          background-color: #faf7fd;
+          background-color: var(--chariot-grid-row-alt, #fbfcfd);
         }
+
         .ag-modern-grid .ag-row-hover {
-          background: #f5f0f9 !important;
+          background: var(--chariot-grid-row-hover, #f5f0f9) !important;
         }
+
         .ag-modern-grid .ag-cell {
           display: flex;
           align-items: center;
           font-size: 13px;
-          color: #354b60;
+          color: var(--chariot-grid-cell-text, #354b60);
         }
+
         .ag-modern-grid .ag-cell-focus,
         .ag-modern-grid .ag-cell:focus {
-          border-color: #a47dc9 !important;
+          border-color: var(--chariot-grid-focus, #a47dc9) !important;
         }
+
         .ag-modern-grid .ag-icon {
-          color: #7953a7;
+          color: var(--chariot-grid-header-text, #69458f);
           opacity: .9;
         }
+
         .ag-modern-grid .ag-header-cell:hover .ag-icon {
           opacity: 1;
         }
+
         .ag-modern-grid .ag-paging-panel {
-          border-top: 1px solid #e1d4ee;
-          color: #6d7f90;
+          border-top: 1px solid var(--chariot-grid-border, #e5d9f0);
+          color: var(--chariot-grid-muted, #6d7f90);
         }
+
         .ag-modern-grid .ag-checkbox-input-wrapper.ag-checked::after {
-          color: #7953a7;
+          color: var(--chariot-grid-accent, #7953a7);
+        }
+
+        .ag-modern-grid .ag-checkbox-input-wrapper {
+          border-color: var(--chariot-grid-border, #e5d9f0);
+        }
+
+        .ag-modern-grid .ag-checkbox-input-wrapper.ag-checked {
+          border-color: var(--chariot-grid-accent, #7953a7);
+        }
+
+        /* Filter popups may be rendered outside the grid element. */
+        .ag-popup,
+        .ag-popup-child,
+        .ag-menu,
+        .ag-filter {
+          color: var(--chariot-grid-text, #17283b);
+          font-family: Inter, "Segoe UI", Arial, sans-serif;
+        }
+
+        .ag-menu {
+          border: 1px solid var(--chariot-grid-border, #e5d9f0);
+          border-radius: 9px;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, .10);
+          background: var(--chariot-grid-surface, #ffffff);
+        }
+
+        .ag-input-field-input,
+        .ag-picker-field-wrapper,
+        .ag-select .ag-picker-field-wrapper {
+          border: 1px solid var(--chariot-grid-border, #e5d9f0);
+          border-radius: 6px;
+          background-color: var(--chariot-grid-surface, #ffffff);
+          color: var(--chariot-grid-text, #17283b);
+        }
+
+        .ag-input-field-input:focus,
+        .ag-picker-field-wrapper:focus-within {
+          border-color: var(--chariot-grid-focus, #a47dc9);
+          box-shadow: 0 0 0 2px var(--chariot-grid-focus-bg, #e8daf5);
+        }
+
+        .ag-checkbox-input-wrapper {
+          border-color: var(--chariot-grid-border, #e5d9f0);
+        }
+
+        .ag-checkbox-input-wrapper.ag-checked {
+          border-color: var(--chariot-grid-accent, #7953a7);
+        }
+
+        .ag-checkbox-input-wrapper.ag-checked::after {
+          color: var(--chariot-grid-accent, #7953a7);
         }
       `}</style>
         </div>

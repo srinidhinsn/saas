@@ -7,6 +7,8 @@ import { Search, Calendar, Eye } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import AgGridTable from '../../utils/AgGridTable';
 import { fmt, formatPriceByMode } from '../../utils/Menu-utils/menuUtils';
+import { DateRangeFilter, getDateRangeFromPreset } from '../../utils/dateRange';
+
 import {
   OrderRowActions,
   CancelOrderConfirmModal,
@@ -32,8 +34,6 @@ export default function BillingPage({ clientId, token }) {
   const [datePreset, setDatePreset] = useState('today');
   const [customFrom, setCustomFrom] = useState(todayDate);
   const [customTo, setCustomTo] = useState(todayDate);
-  const customFromRef = useRef(null);
-  const customToRef = useRef(null);
   const [viewOrder, setViewOrder] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [cancelOrderModal, setCancelOrderModal] = useState({ isOpen: false, orderId: null });
@@ -91,35 +91,18 @@ export default function BillingPage({ clientId, token }) {
   }, [clientId, token]);
 
   // Filter orders based on search and date
-  const getDateRange = () => {
-    const now = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
-    const today = toStr(now);
-    const subtractDays = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return toStr(d); };
-    const subtractMonths = (n) => { const d = new Date(now); d.setMonth(d.getMonth() - n); return toStr(d); };
-    switch (datePreset) {
-      case 'today': return { from: today, to: today };
-      case '1w': return { from: subtractDays(7), to: today };
-      case '15d': return { from: subtractDays(15), to: today };
-      case '1m': return { from: subtractMonths(1), to: today };
-      case '3m': return { from: subtractMonths(3), to: today };
-      case '6m': return { from: subtractMonths(6), to: today };
-      case 'custom': return { from: customFrom, to: customTo };
-      default: return { from: today, to: today };
-    }
-  };
+useEffect(() => {
+  let filtered = orders.filter(o => o.status?.toLowerCase() !== 'cancelled');
 
-  useEffect(() => {
-    let filtered = orders.filter(o => o.status?.toLowerCase() !== 'cancelled');
+  const { from, to } = getDateRangeFromPreset(datePreset, customFrom, customTo);
 
-    const { from, to } = getDateRange();
-    filtered = filtered.filter(order => {
-      const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
-      return orderDate >= from && orderDate <= to;
-    });
+  filtered = filtered.filter(order => {
+    const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
+    return orderDate >= from && orderDate <= to;
+  });
 
-    setFilteredOrders(filtered);
-  }, [datePreset, customFrom, customTo, orders]);
+  setFilteredOrders(filtered);
+}, [datePreset, customFrom, customTo, orders]);
 
   const combineDuplicateItems = (items) => {
     const itemsMap = new Map();
@@ -442,60 +425,21 @@ export default function BillingPage({ clientId, token }) {
   ];
 
   const billingToolbarLeft = (
-    <div className="flex flex-wrap items-center gap-12">
-      <span className="text-sm font-bold text-action-primary whitespace-nowrap">
-        {filteredOrders.length} orders found
-      </span>
+  <div className="flex flex-wrap items-center items-end gap-4">
+    <span className="text-sm font-bold text-action-primary whitespace-nowrap">
+      {filteredOrders.length} orders found
+    </span>
 
-      <div className="relative">
-        <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
-        <select
-          value={datePreset}
-          onChange={e => {
-            const val = e.target.value;
-            setDatePreset(val);
-            if (val === 'custom') setTimeout(() => customFromRef.current?.showPicker?.(), 50);
-          }}
-          className="pl-9 pr-8 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-xs font-bold appearance-none cursor-pointer"
-        >
-          <option value="today">Today</option>
-          <option value="1w">Last 1 Week</option>
-          <option value="15d">Last 15 Days</option>
-          <option value="1m">Last 1 Month</option>
-          <option value="3m">Last 3 Months</option>
-          <option value="6m">Last 6 Months</option>
-          <option value="custom">Custom Range</option>
-        </select>
-      </div>
-
-      {datePreset === 'custom' && (
-        <>
-          <input
-            ref={customFromRef}
-            type="date"
-            value={customFrom}
-            max={customTo}
-            onChange={e => {
-              setCustomFrom(e.target.value);
-              setTimeout(() => customToRef.current?.showPicker?.(), 50);
-            }}
-            className="px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-xs"
-          />
-          <span className="text-text-secondary text-xs">→</span>
-          <input
-            ref={customToRef}
-            type="date"
-            value={customTo}
-            min={customFrom}
-            max={todayDate}
-            onChange={e => setCustomTo(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-xs"
-          />
-        </>
-      )}
-    </div>
-  );
-
+    <DateRangeFilter
+      datePreset={datePreset}
+      setDatePreset={setDatePreset}
+      customFrom={customFrom}
+      setCustomFrom={setCustomFrom}
+      customTo={customTo}
+      setCustomTo={setCustomTo}
+    />
+  </div>
+);
   return (
     <div className="min-h-screen bg-bg-primary p-4 md:p-6">
       <div className="max-w-[1800px] mx-auto">

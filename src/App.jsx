@@ -19,6 +19,7 @@ import { useClient } from './context/ClientContext.jsx';
 import RegisterPage from './components/MainComponents/UserServices/ClientRegister/Register';
 import { useIdleLogout, clearIdleActivity, markIdleActivity } from './components/utils/hooks/useIdleLogout.js';
 import Application from '../src/FrontDesk/Application.jsx'
+import Footer from './components/Constants/Footers/Footer.jsx';
 
 const IDLE_TIMEOUT_MS = Number(import.meta.env.VITE_IDLE_TIMEOUT_MS) || 15 * 60 * 1000;
 const getVisibleNav = (token) => {
@@ -85,18 +86,22 @@ const InnerAuthenticatedApp = ({ token, onLogout }) => {
 
   return (
     <OperationGuardProvider clientId={finalClientId} requesterId={decoded.user_id}>
+      <div className="h-screen flex flex-col overflow-hidden">
       <HeaderSwitcher
         clientId={finalClientId}
         onLogout={onLogout}
         subscription={visibleNav}
       />
 
-      <main>
+      <main className="flex-1 min-h-0 min-w-0 overflow-y-auto">
         <RoutesManager
           token={token}
           clientId={finalClientId}
         />
       </main>
+      
+      <Footer />
+      </div>
     </OperationGuardProvider>
   );
 };
