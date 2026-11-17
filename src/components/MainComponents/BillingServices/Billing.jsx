@@ -3,7 +3,7 @@ import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import InvoiceModal from './InvoiceModal';
-import { Search, Calendar, Eye } from 'lucide-react';
+import { Search, Eye } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import AgGridTable from '../../utils/AgGridTable';
 import { fmt, formatPriceByMode } from '../../utils/Menu-utils/menuUtils';
@@ -330,7 +330,7 @@ useEffect(() => {
       field: 'id',
       minWidth: 120,
       cellRenderer: (params) => (
-        <div className="text-sm font-semibold text-text-primary">#{params.value}</div>
+        <div className="text-body-sm font-bold text-brand-dark">#{params.value}</div>
       ),
     },
     {
@@ -340,8 +340,8 @@ useEffect(() => {
       valueGetter: (params) => tablesMap[params.data?.table_id]?.name || `Table ${params.data?.table_id}`,
       cellRenderer: (params) => (
         <div>
-          <div className="text-sm font-medium text-text-primary">{params.value}</div>
-          <div className="text-xs text-text-secondary">{params.data?.mode || "Dine-In"}</div>
+          <div className="text-body-sm font-semibold text-ink">{params.value}</div>
+          <div className="text-ui-sm text-ink-muted">{params.data?.mode || "Dine-In"}</div>
         </div>
       ),
     },
@@ -360,7 +360,7 @@ useEffect(() => {
         return billingDoc ? Number(billingDoc.total_amount) : null;
       },
       cellRenderer: (params) => (
-        <div className="text-sm font-bold text-action-primary">
+        <div className="text-body-sm font-bold text-brand-dark">
           {params.value != null ? `₹${formatPriceByMode(params.value, clientId)}` : "—"}
         </div>
       ),
@@ -372,7 +372,7 @@ useEffect(() => {
       sortable: false,
       valueGetter: (params) => billingDocMap[params.data?.id?.toString()]?.document_number || '',
       cellRenderer: (params) => (
-        <span className="text-sm font-medium text-text-primary">
+        <span className="text-body-sm font-semibold text-ink">
           {params.value || '—'}
         </span>
       ),
@@ -386,16 +386,16 @@ useEffect(() => {
       cellRenderer: (params) => {
         const billingDoc = billingDocMap[params.data?.id?.toString()];
         return billingDoc ? (
-          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${billingDoc.payment_status === "Paid"
-            ? "bg-green-100 text-green-700"
+          <span className={`inline-flex px-2.5 py-1 rounded-badge text-micro font-bold ${billingDoc.payment_status === "Paid"
+            ? "bg-state-vacant-bg text-state-vacant"
             : billingDoc.status === "partial"
-              ? "bg-yellow-100 text-yellow-700"
-              : "bg-red-100 text-red-700"
+              ? "bg-state-reserved-bg text-state-reserved"
+              : "bg-state-occupied-bg text-state-occupied"
             }`}>
             {billingDoc.payment_status?.toUpperCase() ?? "UNKNOWN"}
           </span>
         ) : (
-          <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+          <span className="inline-flex px-2.5 py-1 rounded-badge text-micro font-bold bg-brand-light text-ink-muted">
             NOT BILLED
           </span>
         );
@@ -425,8 +425,8 @@ useEffect(() => {
   ];
 
   const billingToolbarLeft = (
-  <div className="flex flex-wrap items-center items-end gap-4">
-    <span className="text-sm font-bold text-action-primary whitespace-nowrap">
+  <div className="flex flex-wrap items-end gap-4">
+    <span className="text-panel-title text-brand-dark whitespace-nowrap">
       {filteredOrders.length} orders found
     </span>
 
@@ -441,17 +441,17 @@ useEffect(() => {
   </div>
 );
   return (
-    <div className="min-h-screen bg-bg-primary p-4 md:p-6">
+    <div className="min-h-screen bg-canvas p-4 md:p-6">
       <div className="max-w-[1800px] mx-auto">
 
         {/* Orders Table */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-16 h-16 border-4 border-action-primary/30 border-t-action-primary rounded-full animate-spin"></div>
-            <p className="text-text-secondary text-sm mt-4">Loading orders...</p>
+            <div className="h-11 w-11 border-4 border-brand-soft border-t-brand rounded-full animate-spin-slow"></div>
+            <p className="text-ink-muted text-ui mt-4">Loading orders...</p>
           </div>
         ) : (
-          <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default overflow-hidden">
+          <div className="bg-surface rounded-panel shadow-panel border border-line border-t-panel border-t-line-panel overflow-hidden">
             <AgGridTable
               columnDefs={billingColumnDefs}
               rowData={filteredOrders}

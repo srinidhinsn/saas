@@ -8,6 +8,7 @@ import UniversalBulkDeleteModal from "../../utils/Modals/UniversalBulkDeleteModa
 import AccessGuard from "../../utils/Interceptors/ProtectedRoute";
 import TableConfigModal from "../../utils/Modals/TableConfigModal";
 import { menuCache } from '../../utils/Menu-utils/menuCache';
+import { IoSettingsOutline } from "react-icons/io5";
 
 const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
 
@@ -718,7 +719,7 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
                             className="ui-btn ui-btn-config"
                             onClick={() => setShowConfig(true)}
                         >
-                            <FaEdit /> <span className="hidden md:inline">Config</span>
+                            <IoSettingsOutline /> <span className="hidden md:inline">Config</span>
                         </button>
 
                         <button

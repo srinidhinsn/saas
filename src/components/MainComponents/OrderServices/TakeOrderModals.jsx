@@ -1173,7 +1173,7 @@ export const TableReservation = ({
                           </div>
 
                           {/* Action strip */}
-                          {showConfirmPayment && (
+                          {/* {showConfirmPayment && (
                             <button
                               onClick={e => {
                                 e.stopPropagation();
@@ -1184,7 +1184,7 @@ export const TableReservation = ({
                               <Check size={13} />
                               CONFIRM PAYMENT
                             </button>
-                          )}
+                          )} */}
 
                           {showMarkServed && (
                             <button

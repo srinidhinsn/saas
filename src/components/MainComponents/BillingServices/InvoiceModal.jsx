@@ -696,12 +696,8 @@ export default function InvoiceModal({
           <div className="bg-brand-light border-b border-brand-line px-6 py-4 flex-shrink-0">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-surface rounded-panel flex items-center justify-center text-brand-dark font-bold text-kpi shadow-panel border border-brand-line">
-                  {clientId.charAt(0).toUpperCase()}
-                </div>
                 <div>
-                  <h1 className="text-page-title text-brand-dark">{clientId.toUpperCase()}</h1>
-                  <p className="text-ui text-ink-muted">
+                  <p className="text-xl text-ink-muted">
                     Invoice #{documentNumber || "Draft"}
                     {/* REQ 2: Show payment status badge in header */}
                     {invoiceDraftId && (

@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-icons/fa';
-import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw, LayoutGrid, ListChecks, Store } from 'lucide-react';
+import { Filter, Clock, Users, User, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw, LayoutGrid, ListChecks, Store } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import { parseISTTimestamp, getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
 import { isPackagingMenuRecord } from '../../utils/Menu-utils/menuUtils';
@@ -18,6 +18,7 @@ const KDS_CONFIG = {
   FILTERS: {
     ALL: 'ALL',
     DINEIN: 'DINEIN',
+    WALKIN: 'WALKIN',
     TAKEAWAY: 'TAKEAWAY',
     DELIVERY: 'DELIVERY',
   },
@@ -44,8 +45,17 @@ const KDS_CONFIG = {
 const ORDER_FILTER_OPTIONS = [
   { key: KDS_CONFIG.FILTERS.ALL, label: 'All Orders', Icon: Filter },
   { key: KDS_CONFIG.FILTERS.DINEIN, label: 'Dine-In', Icon: Users },
+  { key: KDS_CONFIG.FILTERS.WALKIN, label: 'Walk-In', Icon: User },
   { key: KDS_CONFIG.FILTERS.TAKEAWAY, label: 'Takeaway', Icon: Package },
   { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery', Icon: Truck },
+];
+
+const STATUS_FILTER_OPTIONS = [
+  { key: 'ALL', label: 'All Status' },
+  { key: KDS_CONFIG.STATUS.PENDING, label: 'Pending' },
+  { key: KDS_CONFIG.STATUS.PREPARING, label: 'Preparing' },
+  { key: KDS_CONFIG.STATUS.READY, label: 'Ready' },
+  { key: KDS_CONFIG.STATUS.SERVED, label: 'Served' },
 ];
 
 const VIEWS = { ORDER: 'order', ITEM: 'item', COUNTER: 'counter' };
@@ -154,6 +164,34 @@ const isCancelledStatus = (status) => {
 const isServedLikeStatus = (status) => {
   const normalized = String(status || '').trim().toLowerCase();
   return normalized === KDS_CONFIG.STATUS.SERVED || normalized.includes('return');
+};
+
+// Order mode of a card: the order's own `mode` when the backend sends it,
+// otherwise inferred from the table name (Walk-in / Takeaway / Delivery tables).
+const getOrderMode = (card, tablesMap) => {
+  const { WALKIN, TAKEAWAY, DELIVERY, DINEIN } = KDS_CONFIG.FILTERS;
+  const clean = (v) => String(v || '').toLowerCase().replace(/[^a-z]/g, '');
+  const mode = clean(card.mode);
+  if (mode.includes('walk')) return WALKIN;
+  if (mode.includes('take')) return TAKEAWAY;
+  if (mode.includes('deliver')) return DELIVERY;
+  if (mode.includes('dine')) return DINEIN;
+  const table = clean(tablesMap[card.table_id]);
+  if (table.includes('walk')) return WALKIN;
+  if (table.includes('takeaway')) return TAKEAWAY;
+  if (table.includes('deliver')) return DELIVERY;
+  return DINEIN;
+};
+
+// Status shown for a card: "ready" once every item is ready/served (same rule as the card's top bar)
+const getCardStatus = (card) => {
+  const { READY, SERVED } = KDS_CONFIG.STATUS;
+  if (card.items?.length > 0 && card.items.every((i) => i.status === SERVED)) return SERVED;
+  const allReady =
+    card.items?.length > 0 &&
+    card.items.every((i) => i.status === READY || i.status === SERVED) &&
+    !card.items.every((i) => i.status === SERVED);
+  return allReady ? READY : card.status;
 };
 
 // ─── Derive card-level status from its items ───────────────────────────────────
@@ -764,6 +802,7 @@ const KitchenDisplay = ({ clientId, token, realm }) => {
   const [menuItemsMap, setMenuItemsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [orderFilter, setOrderFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [activeView, setActiveView] = useState(VIEWS.ORDER);
   const [nowTick, setNowTick] = useState(Date.now());
   // ── Date filter ──────────────────────────────────────────────────────────
@@ -852,6 +891,7 @@ const KitchenDisplay = ({ clientId, token, realm }) => {
           root_dinein_order_id: mergedOrder.dinein_order_id,
           table_id: mergedOrder.table_id,
           status: mergedOrder.status || 'pending',
+          mode: mergedOrder.mode,
           created_at: mergedOrder.created_at,
           items: activeItems,
           is_sub_order: false,
@@ -871,6 +911,7 @@ const KitchenDisplay = ({ clientId, token, realm }) => {
         root_dinein_order_id: mergedOrder.dinein_order_id,
         table_id: mergedOrder.table_id,
         status: subOrder.status || 'pending',
+        mode: subOrder.mode ?? mergedOrder.mode,
         created_at: subOrder.created_at,
         items: itemsBySubOrder[subOrder.id] || [],
         is_sub_order: String(subOrder.dinein_order_id).includes('-'),
@@ -923,16 +964,11 @@ const KitchenDisplay = ({ clientId, token, realm }) => {
           return;
         }
 
-        // Skip fully-served groups
-        if (mergedOrder.status === KDS_CONFIG.STATUS.SERVED) return;
+        // Served groups are kept: the Order Status filter hides them unless "Served" is chosen
 
         parseIntoCards(mergedOrder).forEach((card) => {
           if (!card.items || card.items.length === 0) return;
           if (isCancelledStatus(card.status)) return;
-          if (
-            card.items.length > 0 &&
-            card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED)
-          ) return;
           allCards.push(card);
         });
       });
@@ -1126,12 +1162,10 @@ const KitchenDisplay = ({ clientId, token, realm }) => {
   // ─── Filter cards (sort already applied at fetch time) ───────────────────────
   const filteredCards = cards
     .filter((card) => {
+      if (statusFilter === 'ALL' && getCardStatus(card) === KDS_CONFIG.STATUS.SERVED) return false;
+      if (statusFilter !== 'ALL' && getCardStatus(card) !== statusFilter) return false;
       if (orderFilter === KDS_CONFIG.FILTERS.ALL) return true;
-      const tableName = tablesMap[card.table_id] || '';
-      const isTakeaway = tableName.toLowerCase().includes('takeaway');
-      if (orderFilter === KDS_CONFIG.FILTERS.TAKEAWAY) return isTakeaway;
-      if (orderFilter === KDS_CONFIG.FILTERS.DINEIN) return !isTakeaway;
-      return true;
+      return getOrderMode(card, tablesMap) === orderFilter;
     });
 
   // ─── Render ───────────────────────────────────────────────────────────────────
@@ -1181,6 +1215,23 @@ const KitchenDisplay = ({ clientId, token, realm }) => {
                 className="ui-filter-control p-2"
               >
                 {ORDER_FILTER_OPTIONS.map(({ key, label }) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="ui-filter relative min-w-[160px]">
+              <label className="ui-filter-label">
+                Order Status
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="ui-filter-control p-2"
+              >
+                {STATUS_FILTER_OPTIONS.map(({ key, label }) => (
                   <option key={key} value={key}>
                     {label}
                   </option>

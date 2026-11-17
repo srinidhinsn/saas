@@ -3,7 +3,7 @@ import axios from 'axios';
 import { toast } from "react-toastify";
 import Modal from "react-modal";
 import {
-  Users, Package, Truck,
+  Users, Package, Truck, Store,
   Eye, Printer, Trash2, Check,
   CalendarDays, ChevronDown, Search, X,
 } from 'lucide-react';
@@ -17,7 +17,6 @@ import {
   CancelOrderConfirmModal,
   OldItemDeleteModal,
   OrderItemsViewModal,
-  StatusBadge,
   getInitialOrderMode,
   hasInvoiceBeenGenerated,
   OrderRowActions
@@ -46,6 +45,29 @@ const orderNoComparator = (a, b, nodeA, nodeB) => {
 };
 
 const formatLocalDate = (d) => d.toLocaleDateString('en-CA');
+
+// Order-status colours — same map as the KDS card edge and the Order floor legend
+// (status-* tokens for pending / preparing / ready / served)
+const ORDER_STATUS_BAR = {
+  pending:   { dot: 'bg-status-pending' },
+  preparing: { dot: 'bg-status-preparing' },
+  ready:     { dot: 'bg-status-ready' },
+  served:    { dot: 'bg-status-served' },
+  cancelled: { dot: 'bg-ink-faint' },
+  draft:     { dot: 'bg-line-strong' },
+};
+
+// Resolve the order mode from the order's own fields first (walk-in / delivery /
+// takeaway / dine-in), then fall back to the original table-based detection
+const resolveOrderMode = (order, tablesMap) => {
+  const raw = String(order?.order_type || order?.service_type || order?.type || '')
+    .toLowerCase().replace(/[^a-z]/g, '');
+  if (raw.includes('walk')) return 'walkin';
+  if (raw.includes('deliver')) return 'delivery';
+  if (raw.includes('take') || raw.includes('pick')) return 'takeaway';
+  if (raw.includes('dine')) return 'dinein';
+  return getInitialOrderMode(order, tablesMap);
+};
 
 // Day / week (Mon–today) / month / year ranges, ending today
 const getPeriodRange = (period) => {
@@ -319,7 +341,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       clearNewItemsStorage(order.id);
       return {
         ...order,
-        _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMapRef.current),
+        _fixedOrderMode: order._fixedOrderMode ?? resolveOrderMode(order, tablesMapRef.current),
       };
     }
 
@@ -462,7 +484,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
     return {
       ...order,
-      _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMapRef.current),
+      _fixedOrderMode: order._fixedOrderMode ?? resolveOrderMode(order, tablesMapRef.current),
       items: deduped.map(normaliseItem),
       has_new_items: batchItemsMap.size > 0,
     };
@@ -641,9 +663,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const getOrderModeIcon = (mode) => {
     if (mode === 'takeaway') return <Package size={12} />;
     if (mode === 'delivery') return <Truck size={12} />;
+    if (mode === 'walkin') return <Store size={12} />;
     return <Users size={12} />;
   };
-  const getOrderModeLabel = (mode) => { if (mode === 'takeaway') return 'Takeaway'; if (mode === 'delivery') return 'Delivery'; return 'Dine In'; };
+  const getOrderModeLabel = (mode) => { if (mode === 'takeaway') return 'Takeaway'; if (mode === 'delivery') return 'Delivery'; if (mode === 'walkin') return 'Walk-in'; return 'Dine In'; };
 
   // What the user sees as the order number (dinein_order_id), falling back to id
   const getDisplayOrderId = (order) => order?.dinein_order_id ?? order?.id ?? '';
@@ -748,6 +771,16 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       {getOrderModeIcon(mode)}{getOrderModeLabel(mode)}
     </span>
   );
+
+  // Lavender pill + status dot (same look as the item-status badge on the Order page)
+ const renderStatusPill = (status) => {
+    const cfg = ORDER_STATUS_BAR[String(status || '').toLowerCase()];
+    return (
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-badge text-micro font-bold uppercase tracking-wide ${cfg?.dot || 'bg-line-strong'} text-white border border-transparent whitespace-nowrap`}>
+        {status || '—'}
+      </span>
+    );
+  };
 
   const renderPaymentPill = (order) => {
     const doc = getBillingDoc(order);
@@ -862,7 +895,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       headerName: 'Status',
       field: 'status',
       minWidth: 130,
-      cellRenderer: (params) => <StatusBadge status={params.value} />,
+      cellRenderer: (params) => renderStatusPill(params.value),
     },
     {
       headerName: 'Invoice #',
@@ -933,6 +966,19 @@ const OrderSummaryVisible = ({ clientId, token }) => {
                 height="100%"
                 rowHeight={72}
                 exportFileName="orders"
+                toolbarLeft={
+                  <div className="flex items-center justify-center gap-x-3 gap-y-1 text-micro text-ink-muted">
+            {Object.entries(ORDER_STATUS_BAR).map(([status, s]) => (
+              <span key={status} className="inline-flex items-center gap-1 capitalize">
+                <span className={`h-2 w-2 rounded-badge ${s.dot}`} />
+                {status}
+              </span>
+            ))}
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-badge bg-state-reserved" /> Draft
+            </span>
+          </div>
+                }
                 overlayNoRowsTemplate={`<div class="p-6 text-sm font-medium text-ink-muted">${searchText ? 'No orders match your search' : 'No orders found'}</div>`}
               />
             </div>

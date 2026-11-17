@@ -632,28 +632,29 @@ export const OrderItemsViewModal = ({ isOpen, onClose, order, onRequestDeleteIte
 // OrderRowActions — the ONE shared button group (same props as before)
 // ─────────────────────────────────────────────────────────────────────────────
  
+
 export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed }) => {
   if (!order) return null;
   const status = order.status?.toLowerCase();
- 
+
   return (
-    <div className="flex items-center justify-center gap-4 flex-wrap h-full">
+    <div className="flex items-center justify-center gap-3 flex-wrap h-full">
       <button
         onClick={() => onView(order)}
-        className="p-1.5 rounded-button-sm bg-brand-light text-brand-dark hover:bg-brand-soft transition-colors"
+        className="p-1.5 rounded-button-sm bg-[#edf2f8] text-[#496582] hover:bg-[#dfe8f2] hover:text-[#354f6b] transition-colors"
         title="View items"
       >
         <Eye size={15} />
       </button>
- 
+
       <button
         onClick={() => onPrint(order)}
-        className="p-1.5 rounded-button-sm bg-brand-light text-brand-dark hover:bg-brand-soft transition-colors"
+        className="p-1.5 rounded-button-sm bg-[#e8f4f1] text-[#397b6c] hover:bg-[#d8ebe5] hover:text-[#286556] transition-colors"
         title="Print bill"
       >
         <Printer size={15} />
       </button>
- 
+
       {status === 'ready' && onMarkServed && (
         <button
           onClick={() => onMarkServed(order)}
@@ -662,10 +663,10 @@ export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed
           Mark As Served
         </button>
       )}
- 
+
       <button
         onClick={() => onCancel(order)}
-        className="p-1.5 rounded-button-sm bg-brand-light text-brand-dark hover:bg-brand-soft transition-colors"
+        className="p-1.5 rounded-button-sm bg-[#f8eded] text-[#b65b5b] hover:bg-[#f1dede] hover:text-[#984444] transition-colors"
         title="Cancel order"
       >
         <Trash2 size={15} />
@@ -673,6 +674,7 @@ export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed
     </div>
   );
 };
+
 
 export const hasInvoiceBeenGenerated = (order, billingDocMap = {}) =>
   Boolean(billingDocMap?.[order?.id?.toString()]?.document_number);

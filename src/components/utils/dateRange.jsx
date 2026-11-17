@@ -38,7 +38,7 @@ export const DateRangeFilter = ({ datePreset, setDatePreset, customFrom, setCust
 
   return (
     <div className="flex flex-wrap items-end gap-2">
-      <div className="ui-filter min-w-[155px]">
+      <div className="ui-btn min-w-[125px]">
         {/* <label className="ui-filter-label">
           Date Range
         </label> */}
@@ -62,7 +62,7 @@ export const DateRangeFilter = ({ datePreset, setDatePreset, customFrom, setCust
 
       {datePreset === 'custom' && (
         <>
-          <div className="ui-filter min-w-[145px]">
+          <div className="ui-btn min-w-[145px]">
             <label className="ui-filter-label">From Date</label>
             <input
               ref={customFromRef}
@@ -74,7 +74,7 @@ export const DateRangeFilter = ({ datePreset, setDatePreset, customFrom, setCust
             />
           </div>
 
-          <div className="ui-filter min-w-[145px]">
+          <div className="ui-btn min-w-[145px]">
             <label className="ui-filter-label">To Date</label>
             <input
               ref={customToRef}
