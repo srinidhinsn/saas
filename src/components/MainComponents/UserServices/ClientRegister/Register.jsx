@@ -27,15 +27,14 @@ const slugify = (value) =>
 // ─── Reusable field with inline error support ──────────────────────────────
 const Field = ({ icon: Icon, label, type = 'text', name, value, onChange, placeholder, required = false, error }) => (
   <div>
-    <label className="block text-sm font-medium mb-2" style={{ color: '#111827' }}>
-      {label}{required && <span style={{ color: '#f97316' }}> *</span>}
+    <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">
+      {label}{required && <span className="text-brand"> *</span>}
     </label>
     <div className="relative">
       <div
-        className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
-        style={{ color: error ? '#ef4444' : '#9ca3af' }}
+        className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${error ? 'text-state-occupied' : 'text-ink-faint'}`}
       >
-        <Icon size={20} />
+        <Icon size={16} />
       </div>
       <input
         type={type}
@@ -43,26 +42,11 @@ const Field = ({ icon: Icon, label, type = 'text', name, value, onChange, placeh
         placeholder={placeholder}
         value={value}
         onChange={onChange}
-        className="w-full pl-12 pr-4 py-3 border-2 rounded-lg text-base transition-all outline-none"
-        style={{
-          borderColor: error ? '#ef4444' : '#e5e7eb',
-          backgroundColor: error ? '#fef2f2' : '#ffffff',
-          color: '#111827',
-        }}
-        onFocus={(e) => {
-          e.target.style.borderColor = error ? '#ef4444' : '#f97316';
-          e.target.style.boxShadow = error
-            ? '0 0 0 3px rgba(239, 68, 68, 0.15)'
-            : '0 0 0 3px rgba(249, 115, 22, 0.1)';
-        }}
-        onBlur={(e) => {
-          e.target.style.borderColor = error ? '#ef4444' : '#e5e7eb';
-          e.target.style.boxShadow = 'none';
-        }}
+        className={`ui-input h-11${error ? ' !border-state-occupied !bg-state-occupied-bg' : ''}`}
       />
     </div>
     {error && (
-      <p className="mt-1.5 text-xs flex items-center gap-1" style={{ color: '#ef4444' }}>
+      <p className="mt-1.5 text-micro font-semibold flex items-center gap-1 text-state-occupied">
         <AlertCircle size={12} />
         {error}
       </p>
@@ -71,7 +55,7 @@ const Field = ({ icon: Icon, label, type = 'text', name, value, onChange, placeh
 );
 
 const SectionTitle = ({ children }) => (
-  <h3 className="text-sm font-semibold uppercase tracking-wide mb-4" style={{ color: '#f97316' }}>
+  <h3 className="text-ui font-bold uppercase tracking-wide mb-4 text-brand-dark">
     {children}
   </h3>
 );
@@ -266,13 +250,13 @@ export default function RegisterPage({ onRegisterSuccess }) {
 
   if (success) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white z-[9999]">
+      <div className="fixed inset-0 flex items-center justify-center bg-surface z-[9999]">
         <div className="text-center">
-          <CheckCircle size={72} style={{ color: '#f97316' }} className="mx-auto" />
-          <h1 className="mt-6 text-3xl font-bold" style={{ color: '#111827' }}>
+          <CheckCircle size={72} className="mx-auto text-brand" />
+          <h1 className="mt-6 text-heading-md text-ink">
             You're all set!
           </h1>
-          <p className="mt-2" style={{ color: '#6b7280' }}>
+          <p className="mt-2 text-ui text-ink-muted">
             Redirecting you to login...
           </p>
         </div>
@@ -281,25 +265,24 @@ export default function RegisterPage({ onRegisterSuccess }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: '#f9fafb' }}>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-canvas font-sans">
       <div className="w-full max-w-2xl">
-        <div className="bg-white rounded-xl shadow-md p-8 md:p-10">
+        <div className="bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg p-8 md:p-10">
           <div className="text-center mb-6">
             <div
-              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg"
-              style={{ backgroundColor: '#f97316' }}
+              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-soft bg-brand"
             >
               <UserPlus size={28} className="text-white" />
             </div>
-            <h2 className="text-2xl font-semibold" style={{ color: '#111827' }}>
+            <h2 className="text-page-title text-ink">
               Create an Account
             </h2>
-            <p className="text-sm mt-1" style={{ color: '#6b7280' }}>
+            <p className="text-ui mt-1 text-ink-muted">
               Register a new business, or create a super user account
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mb-8">
+          <div className="ui-toggle flex w-full mb-8">
             <button
               type="button"
               onClick={() => {
@@ -307,12 +290,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
                 setFieldErrors({});
                 setRegType('merchant');
               }}
-              className="flex items-center justify-center gap-2 py-3 rounded-lg font-semibold border-2 transition-all"
-              style={{
-                borderColor: regType === 'merchant' ? '#f97316' : '#e5e7eb',
-                backgroundColor: regType === 'merchant' ? '#fff7ed' : '#ffffff',
-                color: regType === 'merchant' ? '#f97316' : '#6b7280',
-              }}
+              className={`ui-toggle-btn flex-1 flex items-center justify-center gap-2 h-10 ${regType === 'merchant' ? 'ui-toggle-btn-active' : ''}`}
             >
               <Building2 size={18} />
               Merchant
@@ -324,12 +302,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
                 setFieldErrors({});
                 setRegType('user');
               }}
-              className="flex items-center justify-center gap-2 py-3 rounded-lg font-semibold border-2 transition-all"
-              style={{
-                borderColor: regType === 'user' ? '#f97316' : '#e5e7eb',
-                backgroundColor: regType === 'user' ? '#fff7ed' : '#ffffff',
-                color: regType === 'user' ? '#f97316' : '#6b7280',
-              }}
+              className={`ui-toggle-btn flex-1 flex items-center justify-center gap-2 h-10 ${regType === 'user' ? 'ui-toggle-btn-active' : ''}`}
             >
               <User size={18} />
               User
@@ -337,9 +310,9 @@ export default function RegisterPage({ onRegisterSuccess }) {
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6 flex items-center gap-2 text-red-600">
+            <div className="ui-error flex items-center gap-2 mb-6">
               <AlertCircle size={18} />
-              <span className="text-sm">{error}</span>
+              <span className="text-ui">{error}</span>
             </div>
           )}
 
@@ -370,36 +343,20 @@ export default function RegisterPage({ onRegisterSuccess }) {
 
                 {regType === 'merchant' && (
                   <div>
-                    <label className="block text-sm font-medium mb-2" style={{ color: '#111827' }}>
-                      Realm <span style={{ color: '#f97316' }}> *</span>
+                    <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">
+                      Realm <span className="text-brand"> *</span>
                     </label>
                     <div className="relative">
                       <div
-                        className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
-                        style={{ color: fieldErrors.realm ? '#ef4444' : '#9ca3af' }}
+                        className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${fieldErrors.realm ? 'text-state-occupied' : 'text-ink-faint'}`}
                       >
-                        <Globe size={20} />
+                        <Globe size={16} />
                       </div>
                       <select
                         name="realm"
                         value={business.realm}
                         onChange={handleChange(setBusiness)}
-                        className="w-full pl-12 pr-4 py-3 border-2 rounded-lg text-base transition-all outline-none appearance-none"
-                        style={{
-                          borderColor: fieldErrors.realm ? '#ef4444' : '#e5e7eb',
-                          backgroundColor: fieldErrors.realm ? '#fef2f2' : '#ffffff',
-                          color: '#111827',
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.borderColor = fieldErrors.realm ? '#ef4444' : '#f97316';
-                          e.target.style.boxShadow = fieldErrors.realm
-                            ? '0 0 0 3px rgba(239, 68, 68, 0.15)'
-                            : '0 0 0 3px rgba(249, 115, 22, 0.1)';
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.borderColor = fieldErrors.realm ? '#ef4444' : '#e5e7eb';
-                          e.target.style.boxShadow = 'none';
-                        }}
+                        className={`ui-input h-11 appearance-none${fieldErrors.realm ? ' !border-state-occupied !bg-state-occupied-bg' : ''}`}
                       >
                         <option value="">Select a realm</option>
                         {realmOptions.map((r) => (
@@ -408,7 +365,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
                       </select>
                     </div>
                     {fieldErrors.realm && (
-                      <p className="mt-1.5 text-xs flex items-center gap-1" style={{ color: '#ef4444' }}>
+                      <p className="mt-1.5 text-micro font-semibold flex items-center gap-1 text-state-occupied">
                         <AlertCircle size={12} />
                         {fieldErrors.realm}
                       </p>
@@ -569,21 +526,15 @@ export default function RegisterPage({ onRegisterSuccess }) {
             <button
               onClick={handleRegister}
               disabled={submitting}
-              className="w-full py-3.5 rounded-lg text-base font-semibold tracking-wide transition-all shadow-sm"
-              style={{
-                backgroundColor: submitting ? '#d1d5db' : '#f97316',
-                color: '#ffffff',
-                cursor: submitting ? 'not-allowed' : 'pointer',
-              }}
+              className="ui-btn ui-btn-add w-full h-11 tracking-wide"
             >
               {submitting ? 'Creating account...' : regType === 'merchant' ? 'Register Business' : 'Create Super User'}
             </button>
 
-            <p className="text-center text-xs" style={{ color: '#9ca3af' }}>
+            <p className="text-center text-ui-sm text-ink-faint">
               Already have an account?{' '}
               <span
-                className="font-medium cursor-pointer"
-                style={{ color: '#f97316' }}
+                className="font-semibold cursor-pointer text-brand hover:underline"
                 onClick={() => navigate(routeClientId ? `/saas/${routeClientId}/login` : '/saas/easyfood/login')}
               >
                 Log in
@@ -594,13 +545,13 @@ export default function RegisterPage({ onRegisterSuccess }) {
       </div>
 
       {duplicateClientModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-[9999] p-4">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full text-center">
-            <AlertCircle size={40} style={{ color: '#f97316' }} className="mx-auto mb-3" />
-            <h3 className="text-lg font-semibold mb-2" style={{ color: '#111827' }}>
+        <div className="ui-backdrop font-sans">
+          <div className="ui-modal text-center animate-scale-in">
+            <AlertCircle size={40} className="mx-auto mb-3 text-brand" />
+            <h3 className="text-panel-title text-brand-dark mb-2">
               Client already exists
             </h3>
-            <p className="text-sm mb-6" style={{ color: '#6b7280' }}>
+            <p className="text-ui mb-6 text-ink-muted">
               An account with the Client ID "<strong>{business.client_id}</strong>" already exists.
               Please choose a different name or ID and try again.
             </p>
@@ -610,8 +561,7 @@ export default function RegisterPage({ onRegisterSuccess }) {
                 setFieldErrors((prev) => ({ ...prev, client_id: 'This Client ID is already taken.' }));
                 setClientIdTouched(true);
               }}
-              className="w-full py-2.5 rounded-lg font-semibold text-white"
-              style={{ backgroundColor: '#f97316' }}
+              className="ui-btn ui-btn-add w-full h-11"
             >
               Try another Client ID
             </button>

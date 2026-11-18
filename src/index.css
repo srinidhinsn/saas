@@ -1,3 +1,122 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* landing page styles */
+@layer base {
+  html {
+    scroll-padding-top: 5rem;
+  }
+
+  .lp-root {
+    @apply bg-canvas font-sans text-ink antialiased;
+    @apply selection:bg-brand-soft selection:text-brand-darker;
+  }
+
+  :where(.lp-root) :is(h1, h2, h3) {
+    @apply font-sans font-semibold text-ink;
+  }
+}
+
+@layer components {
+  .lp-btn-primary {
+    @apply inline-flex items-center justify-center rounded-button bg-brand px-6 py-3.5 font-medium text-white transition;
+    @apply hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-panel-hover;
+  }
+
+  .lp-btn-secondary {
+    @apply inline-flex items-center justify-center rounded-button border border-line bg-surface px-6 py-3.5 font-medium text-ink transition;
+    @apply hover:-translate-y-0.5 hover:bg-brand-light;
+  }
+
+  .lp-btn-light {
+    @apply inline-flex items-center justify-center rounded-button bg-surface px-6 py-3.5 font-medium text-brand-dark transition;
+    @apply hover:-translate-y-0.5 hover:bg-brand-light;
+  }
+
+  .lp-eyebrow {
+    @apply text-sm font-medium uppercase tracking-[.2em] text-brand-dark;
+  }
+
+  .lp-card {
+    @apply rounded-card-lg border border-line bg-surface;
+  }
+
+  .lp-card-soft {
+    @apply rounded-card-lg border border-line bg-surface transition duration-300;
+    @apply hover:-translate-y-1 hover:border-brand-line hover:shadow-panel-hover;
+  }
+
+  .lp-chip {
+    @apply rounded-button bg-brand-light px-3 py-2;
+  }
+
+  .lp-badge {
+    @apply inline-flex rounded-badge border px-3 py-1 text-xs font-medium;
+  }
+
+  .lp-badge-success {
+    @apply lp-badge;
+    color: #15803d;
+    background-color: #e7f6ee;
+    border-color: #bbf7d0;
+  }
+
+  .lp-badge-warning {
+    @apply lp-badge;
+    color: #a16207;
+    background-color: #fdf3dc;
+    border-color: #fde68a;
+  }
+
+  .lp-section-alt {
+    @apply border-y border-line bg-surface;
+  }
+
+  .lp-label {
+    @apply text-sm font-medium text-ink-soft;
+  }
+
+  .lp-input {
+    @apply mt-2 w-full rounded-input border border-brand-line bg-surface px-4 py-3 outline-none transition;
+    @apply focus:border-brand-ring focus:ring-1 focus:ring-brand-ring;
+  }
+
+  .lp-nav-link {
+    @apply relative transition hover:text-ink;
+    @apply after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:bg-brand after:transition-all after:duration-300;
+    @apply hover:after:w-full;
+  }
+
+  .lp-logo {
+    @apply h-16 w-auto;
+  }
+
+  .lp-tab {
+    @apply rounded-button px-5 py-2.5 text-sm font-medium text-ink-soft transition;
+    @apply hover:bg-brand-light hover:text-ink;
+  }
+
+  .lp-tab-active {
+    @apply bg-brand text-white hover:bg-brand-dark hover:text-white;
+  }
+
+  .lp-reveal {
+    opacity: 0;
+  }
+
+  .lp-reveal.is-visible {
+    @apply animate-slideUp opacity-100;
+    animation-delay: var(--d, 0s);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-reveal {
+    opacity: 1;
+  }
+
+  .lp-reveal.is-visible {
+    animation: none;
+  }
+}

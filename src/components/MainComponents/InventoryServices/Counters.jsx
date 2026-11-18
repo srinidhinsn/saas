@@ -6,6 +6,19 @@ const API = import.meta.env.VITE_API_INVENTORY_SERVICE_URL;
 const defaultRoot = import.meta.env.VITE_MENU_DEFAULT_ROOT;
 const counterCategory = import.meta.env.VITE_MENU_COUNTER;
 
+// Shared theme class strings (standardized purple design)
+const FIELD =
+  "w-full h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink " +
+  "outline-none placeholder:text-ink-faint transition-colors " +
+  "focus:border-brand-ring focus:shadow-focus-ring disabled:opacity-50 disabled:cursor-not-allowed";
+const DIALOG =
+  "flex flex-col w-full max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line " +
+  "border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in";
+const HEAD =
+  "flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0";
+const FOOT =
+  "flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0";
+
 export default function CounterManager({ clientId, token }) {
   const [counters, setCounters] = useState([]);
   const [allCategories, setAllCategories] = useState([]);
@@ -309,27 +322,27 @@ export default function CounterManager({ clientId, token }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-6xl mx-auto bg-white shadow-xl rounded-2xl p-8">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Counter Management</h2>
+    <div className="ui-page">
+      <div className="max-w-6xl mx-auto ui-panel">
+        <div className="flex justify-between items-center mb-item">
+          <h2 className="text-page-title text-brand-dark">Counter Management</h2>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition"
+            className="ui-btn ui-btn-add"
           >
             + Add Counter
           </button>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid md:grid-cols-2 gap-tiles">
           {counters.map((counter) => (
             <div
               key={counter.id}
-              className="border rounded-xl p-4 flex justify-between items-center shadow-sm"
+              className="ui-card p-4 flex justify-between items-center"
             >
               <div>
-                <p className="font-semibold">{counter.name}</p>
-                <p className="text-sm text-gray-500">{counter.id}</p>
+                <p className="text-body-sm font-bold text-ink">{counter.name}</p>
+                <p className="text-ui-sm text-ink-muted">{counter.id}</p>
               </div>
 
               <div className="flex gap-2">
@@ -340,7 +353,7 @@ export default function CounterManager({ clientId, token }) {
                       counter.subCategories?.map((c) => c.id) || []
                     );
                   }}
-                  className="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 transition"
+                  className="ui-btn ui-btn-add !h-7"
                 >
                   Assign
                 </button>
@@ -349,13 +362,13 @@ export default function CounterManager({ clientId, token }) {
                     setEditingCounter(counter);
                     setEditCounterName(counter.name);
                   }}
-                  className="bg-amber-500 text-white px-3 py-1 rounded-lg hover:bg-amber-600 transition"
+                  className="ui-btn ui-btn-update !h-7"
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => setDeletingCounter(counter)}
-                  className="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition"
+                  className="ui-btn ui-btn-delete !h-7"
                 >
                   Delete
                 </button>
@@ -367,37 +380,41 @@ export default function CounterManager({ clientId, token }) {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white rounded-2xl p-6 w-96 shadow-xl">
-            <h3 className="text-lg font-bold mb-4">Create Counter</h3>
+        <div className="ui-backdrop font-sans">
+          <div className={`${DIALOG} max-w-modal`} role="dialog" aria-modal="true" aria-label="Create counter">
+            <div className={HEAD}>
+              <h3 className="text-panel-title text-brand-dark">Create Counter</h3>
+            </div>
 
-            <input
-              type="text"
-              placeholder="Counter ID"
-              value={newCounterId}
-              onChange={(e) => setNewCounterId(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 mb-3"
-            />
+            <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
+              <input
+                type="text"
+                placeholder="Counter ID"
+                value={newCounterId}
+                onChange={(e) => setNewCounterId(e.target.value)}
+                className={FIELD}
+              />
 
-            <input
-              type="text"
-              placeholder="Counter Name"
-              value={newCounterName}
-              onChange={(e) => setNewCounterName(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 mb-4"
-            />
+              <input
+                type="text"
+                placeholder="Counter Name"
+                value={newCounterName}
+                onChange={(e) => setNewCounterName(e.target.value)}
+                className={FIELD}
+              />
+            </div>
 
-            <div className="flex justify-end gap-3">
+            <div className={FOOT}>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 border rounded-lg"
+                className="ui-btn"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateCounter}
                 disabled={loading}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                className="ui-btn ui-btn-add"
               >
                 {loading ? "Creating..." : "Create"}
               </button>
@@ -408,36 +425,40 @@ export default function CounterManager({ clientId, token }) {
 
       {/* Edit Modal */}
       {editingCounter && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white rounded-2xl p-6 w-96 shadow-xl">
-            <h3 className="text-lg font-bold mb-4">Edit Counter</h3>
+        <div className="ui-backdrop font-sans">
+          <div className={`${DIALOG} max-w-modal`} role="dialog" aria-modal="true" aria-label="Edit counter">
+            <div className={HEAD}>
+              <h3 className="text-panel-title text-brand-dark">Edit Counter</h3>
+            </div>
 
-            <p className="text-sm text-gray-500 mb-2">
-              ID: {editingCounter.id}
-            </p>
+            <div className="flex-1 overflow-y-auto px-modal py-card">
+              <p className="text-ui-sm text-ink-muted mb-2">
+                ID: {editingCounter.id}
+              </p>
 
-            <input
-              type="text"
-              placeholder="Counter Name"
-              value={editCounterName}
-              onChange={(e) => setEditCounterName(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 mb-4"
-            />
+              <input
+                type="text"
+                placeholder="Counter Name"
+                value={editCounterName}
+                onChange={(e) => setEditCounterName(e.target.value)}
+                className={FIELD}
+              />
+            </div>
 
-            <div className="flex justify-end gap-3">
+            <div className={FOOT}>
               <button
                 onClick={() => {
                   setEditingCounter(null);
                   setEditCounterName("");
                 }}
-                className="px-4 py-2 border rounded-lg"
+                className="ui-btn"
               >
                 Cancel
               </button>
               <button
                 onClick={handleUpdateCounter}
                 disabled={editLoading || !editCounterName.trim()}
-                className="bg-amber-500 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                className="ui-btn ui-btn-add"
               >
                 {editLoading ? "Saving..." : "Save"}
               </button>
@@ -448,28 +469,32 @@ export default function CounterManager({ clientId, token }) {
 
       {/* Delete Confirmation Modal */}
       {deletingCounter && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white rounded-2xl p-6 w-96 shadow-xl">
-            <h3 className="text-lg font-bold mb-2">Delete Counter</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Are you sure you want to delete{" "}
-              <span className="font-semibold">{deletingCounter.name}</span>?
-              Categories assigned to it will no longer be differentiated in
-              KOT printing until reassigned to another counter. This action
-              cannot be undone.
-            </p>
+        <div className="ui-backdrop font-sans">
+          <div className={`${DIALOG} max-w-modal`} role="dialog" aria-modal="true" aria-label="Delete counter">
+            <div className={HEAD}>
+              <h3 className="text-panel-title text-brand-dark">Delete Counter</h3>
+            </div>
+            <div className="flex-1 overflow-y-auto px-modal py-card">
+              <p className="text-ui text-ink-muted">
+                Are you sure you want to delete{" "}
+                <span className="font-bold text-brand-dark">{deletingCounter.name}</span>?
+                Categories assigned to it will no longer be differentiated in
+                KOT printing until reassigned to another counter. This action
+                cannot be undone.
+              </p>
+            </div>
 
-            <div className="flex justify-end gap-3">
+            <div className={FOOT}>
               <button
                 onClick={() => setDeletingCounter(null)}
-                className="px-4 py-2 border rounded-lg"
+                className="ui-btn"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteCounter}
                 disabled={deleteLoading}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+                className="ui-btn ui-btn-danger"
               >
                 {deleteLoading ? "Deleting..." : "Delete"}
               </button>
@@ -480,22 +505,22 @@ export default function CounterManager({ clientId, token }) {
 
       {/* Assign Modal */}
       {selectedCounter && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white rounded-2xl p-6 w-[500px] max-h-[80vh] overflow-y-auto shadow-xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold">
+        <div className="ui-backdrop font-sans">
+          <div className={`${DIALOG} max-w-lg`} role="dialog" aria-modal="true" aria-label="Assign categories">
+            <div className={HEAD}>
+              <h3 className="text-panel-title text-brand-dark">
                 Assign Categories to {selectedCounter.name}
               </h3>
               <button
                 onClick={() => setSelectedCounter(null)}
-                className="p-1.5 rounded-lg bg-action-primary text-text-white hover:opacity-90 transition-opacity"
+                className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors"
                 aria-label="Close"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="flex-1 overflow-y-auto px-modal py-card space-y-4">
               {allCategories.map((group) => {
                 const parentChecked = isParentChecked(group);
                 const parentIndeterminate = isParentIndeterminate(group);
@@ -504,9 +529,10 @@ export default function CounterManager({ clientId, token }) {
                   <div key={group.id}>
 
                     {/* Level One Heading - now also a checkbox */}
-                    <label className="flex items-center gap-2 font-semibold text-lg mb-2 border-b pb-1 cursor-pointer">
+                    <label className="flex items-center gap-2 font-bold text-ui text-brand-dark mb-2 border-b border-line-divider pb-1 cursor-pointer">
                       <input
                         type="checkbox"
+                        className="h-4 w-4 accent-brand cursor-pointer"
                         checked={parentChecked}
                         ref={(el) => {
                           if (el) el.indeterminate = parentIndeterminate;
@@ -517,7 +543,7 @@ export default function CounterManager({ clientId, token }) {
                       />
                       {group.name}
                       {parentChecked && (
-                        <span className="text-xs font-normal text-green-600">
+                        <span className="text-ui-sm font-normal text-state-vacant">
                           (all items in this category differentiated)
                         </span>
                       )}
@@ -528,10 +554,11 @@ export default function CounterManager({ clientId, token }) {
                       {group.subCategories?.map((cat) => (
                         <label
                           key={cat.id}
-                          className="flex items-center gap-2 border p-2 rounded-lg"
+                          className="flex items-center gap-2 border border-line p-2 rounded-button-sm text-ui text-ink cursor-pointer hover:bg-brand-tint"
                         >
                           <input
                             type="checkbox"
+                            className="h-4 w-4 accent-brand cursor-pointer"
                             checked={
                               parentChecked ||
                               selectedCategories.includes(cat.id)
@@ -550,16 +577,16 @@ export default function CounterManager({ clientId, token }) {
               })}
             </div>
 
-            <div className="flex justify-end gap-3 mt-4">
+            <div className={FOOT}>
               <button
                 onClick={() => setSelectedCounter(null)}
-                className="px-4 py-2 border rounded-lg"
+                className="ui-btn"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAssign}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg"
+                className="ui-btn ui-btn-add"
               >
                 Save
               </button>

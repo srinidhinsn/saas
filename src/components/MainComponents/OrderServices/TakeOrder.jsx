@@ -132,6 +132,48 @@ const TakeOrder = ({ clientId, token, onOrderUpdate, realm }) => {
   const [selectedDietary, setSelectedDietary] = useState(null);
   const [showTakeawayOrdersModal, setShowTakeawayOrdersModal] = useState(false);
   const hasFetchedRef = useRef(false);
+  const [showDineinPicker, setShowDineinPicker] = useState(false);
+  const dineinPickedRef = useRef(false);
+  const dineinOnlyTables = useMemo(
+    () => tables.filter(t =>
+      !takeawayTables.some(x => x.id === t.id) &&
+      !walkinTables.some(x => x.id === t.id) &&
+      !deliveryTables.some(x => x.id === t.id)
+    ),
+    [tables, takeawayTables, walkinTables, deliveryTables]
+  );
+  
+  const switchToDineIn = () => {
+    setOrderMode('dinein');
+    syncPackagingForOrderMode('dinein');
+  
+    if (activeOrderId && dineinTableId) {
+      setSelectedTable(dineinTableId.toString());
+      return;
+    }
+    // No table chosen yet → ask for one
+    setSelectedTable('');
+    dineinPickedRef.current = false;
+    setShowDineinPicker(true);
+  };
+  const switchToTakeaway = () => {
+    setOrderMode('takeaway');
+    setSelectedTable(takeawayTableId?.toString() || '');
+    syncPackagingForOrderMode('takeaway');
+  };
+  
+  const handleDineinPicked = (table) => {
+    dineinPickedRef.current = true;
+    setSelectedTable(table.id.toString());
+    setDineinTableId(table.id.toString());
+    setZoneConfigId(table.config_id || null);
+  };
+  
+  const handleDineinPickerClose = () => {
+    setShowDineinPicker(false);
+    // Closed without picking → go back to takeaway
+    if (!dineinPickedRef.current) switchToTakeaway();
+  };
   const menuConfig = useMemo(
     () => (clientId ? getMenuConfig(clientId) : null),
     [clientId]
@@ -1533,7 +1575,7 @@ const buildOrderPayload = (items) =>
           const r = await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create-sub-order`,
             { items: buildOrderPayload(newOnly), price: subTotal, total_price: subTotal },
-            { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId } }
+            { headers, params: { client_id: clientId, parent_dinein_order_id: activeDineinOrderId, parent_order_id: activeOrderId } }
           );
           placedOrderId = activeOrderId;
           placedDineinOrderId = r?.data?.data?.dinein_order_id || activeDineinOrderId;
@@ -1560,13 +1602,15 @@ const buildOrderPayload = (items) =>
               id: existingDraft.id,
               status: 'pending',
               total_price: total,
-              // tells backend to reset dinein_order_id from "DRAFT-X" → "X"
-              dinein_order_id: String(existingDraft.id),
             },
             { headers }
           );
+          const r = await axios.get(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/order`,
+            { headers, params: { client_id: clientId, order_id: existingDraft.id } }
+          );
           placedOrderId = existingDraft.id;
-          placedDineinOrderId = String(existingDraft.id);
+          placedDineinOrderId = r.data?.data?.dinein_order_id || String(existingDraft.id);
         } else {
           const createRes = await axios.post(
             `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/create`,
@@ -1960,7 +2004,7 @@ const handleBillFromCart = async () => {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-bg-primary p-0 h-[calc(100vh-4rem)] overflow-y-auto">
+    <div className="bg-canvas p-0 h-[calc(100vh-4rem)] overflow-y-auto">
 
       {/* ══════════════ FLOOR VIEW ══════════════ */}
       {currentView === 'floor' && (
@@ -1989,7 +2033,8 @@ const handleBillFromCart = async () => {
           }
           onMarkAsServed={handleMarkAsServed}
           onConfirmPayment={(orderId, tableId) =>
-            setTablePayConfirmModal({ isOpen: true, orderId, tableId })
+            setTablePayConfirmModal({ isOpen: true, orderId, tableId,
+              displayId: tableOrders[tableId]?.dinein_order_id || orderId, })
           }
         />
       )}
@@ -2019,14 +2064,14 @@ const handleBillFromCart = async () => {
             <div className="xl:col-span-3 w-full min-w-0 flex flex-col xl:flex-row overflow-hidden gap-2">
 
               {/* Menu panel */}
-              <div className="transition-all duration-300 border-default border-border-default p-2 sm:p-3 rounded-lg flex-1 w-full min-w-0 overflow-x-hidden overflow-y-auto h-[calc(100dvh-10rem)] xl:h-[calc(98dvh-4rem)]">
+              <div className="transition-all duration-300 border border-line border-t-panel border-t-line-panel bg-surface shadow-panel p-2 sm:p-3 rounded-panel flex-1 w-full min-w-0 overflow-x-hidden overflow-y-auto h-[calc(100dvh-10rem)] xl:h-[calc(98dvh-4rem)]">
 
                 {/* Top controls */}
                 <div className="space-y-2 mb-2">
                   <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full min-w-0">
                     <button
                       onClick={handleBackToTables}
-                      className="p-2 rounded-lg bg-bg-tertiary border border-border-default hover:bg-bg-secondary flex-shrink-0"
+                      className="ui-btn w-9 px-0 flex-shrink-0"
                     >
                       <ArrowLeft size={20} />
                     </button>
@@ -2035,10 +2080,10 @@ const handleBillFromCart = async () => {
                     <div className="flex gap-1.5 overflow-x-auto flex-1 min-w-0 whitespace-nowrap py-1">
                       <button
                         onClick={() => setSelectedDietary(null)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all border
+                        className={`px-3 py-1.5 rounded-badge text-ui font-semibold whitespace-nowrap flex-shrink-0 transition-all border
         ${!selectedDietary
-                            ? 'bg-action-primary text-white border-action-primary'
-                            : 'bg-bg-tertiary text-text-primary border-border-default hover:border-action-primary'}`}
+                            ? 'bg-brand-soft text-brand-darker border-brand-ring shadow-seg-active'
+                            : 'bg-brand-light text-ink-toggle border-brand-line hover:border-brand-ring'}`}
                       >
                         All
                       </button>
@@ -2049,10 +2094,10 @@ const handleBillFromCart = async () => {
                           <button
                             key={key}
                             onClick={() => setSelectedDietary(selectedDietary === key ? null : key)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 transition-all border
+                            className={`px-3 py-1.5 rounded-badge text-ui font-semibold whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 transition-all border
             ${selectedDietary === key
-                                ? 'bg-action-primary text-white border-action-primary'
-                                : 'bg-bg-tertiary text-text-primary border-border-default hover:border-action-primary'}`}
+                                ? 'bg-brand-soft text-brand-darker border-brand-ring shadow-seg-active'
+                                : 'bg-brand-light text-ink-toggle border-brand-line hover:border-brand-ring'}`}
                           >
                             {dietaryColorMap[key] && (
                               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dietaryColorMap[key]}`} />
@@ -2065,20 +2110,20 @@ const handleBillFromCart = async () => {
 
                     {/* Search */}
                     <div className="relative w-full sm:w-64 md:w-72 lg:w-80 xl:w-72 flex-shrink-0">
-                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
                       <input
                         ref={searchInputRef}
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         placeholder="Search items..."
-                        className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                        className="ui-input"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Item grid */}
-                <div className={`grid gap-2 grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${showCart ? 'xl:grid-cols-3' : 'xl:grid-cols-4'} w-full min-w-0`}>
+                <div className="grid grid-cols-tiles gap-tiles w-full min-w-0">
                   {filteredItems.map(item => {
                     const dp = item.discount && Number(item.discount) > 0
                       ? Number(item.discount).toFixed(0) : null;
@@ -2093,10 +2138,10 @@ const handleBillFromCart = async () => {
                       <div
                         key={`${item.id}_${item.zone_config_id ?? 0}`}
                         onClick={() => handleItemClick(item)}
-                        className="flex gap-2 items-center bg-bg-primary border-default border-border-default rounded-xl p-2 min-w-0 w-full overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer"
+                        className="ui-card flex gap-2 items-center p-2 min-w-0 w-full overflow-hidden cursor-pointer"
                       >
-                        <div className={`w-[4px] self-stretch rounded-l-xl flex-shrink-0 ${dietaryColor}`} />
-                        <div className="w-14 h-16 rounded-lg overflow-hidden shrink-0 bg-gray-100">
+                        <div className={`w-[4px] self-stretch rounded-l-panel flex-shrink-0 ${dietaryColor}`} />
+                        <div className="w-14 h-16 rounded-button-sm overflow-hidden shrink-0 bg-brand-light">
                           <ImagePreview
                             clientId={clientId}
                             imageId={item.image_id}
@@ -2109,36 +2154,36 @@ const handleBillFromCart = async () => {
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-semibold text-text-primary line-clamp-2">
+                          <h3 className="text-body-sm font-bold text-ink line-clamp-2">
                             {item.name}
                           </h3>
                           <div className="flex items-center gap-2 mt-1">
                             {dp ? (
                               <>
-                                <span className="text-sm font-bold text-action-primary">
+                                <span className="text-body-sm font-bold text-brand-dark">
                                   ₹{(item.unit_price * (1 - Number(item.discount) / 100)).toFixed(0)}
                                 </span>
-                                <span className="text-xs line-through text-text-secondary">
+                                <span className="text-ui line-through text-ink-muted">
                                   ₹{item.unit_price}
                                 </span>
-                                <span className="text-xs text-action-danger font-semibold">{dp}% OFF</span>
+                                <span className="text-ui text-state-vacant font-semibold">{dp}% OFF</span>
                               </>
                             ) : (
-                              <span className="text-sm font-bold text-action-primary">
+                              <span className="text-body-sm font-bold text-brand-dark">
                                 ₹{item.unit_price}
                               </span>
                             )}
                           </div>
                           {getAvailability(item) != null && (
-  <p className={`text-[10px] font-semibold mt-0.5 ${getAvailability(item) <= 5 ? 'text-red-500' : 'text-text-secondary'}`}>
+  <p className={`text-micro font-semibold mt-0.5 ${getAvailability(item) <= 5 ? 'text-state-occupied' : 'text-ink-muted'}`}>
     Qty: {getAvailability(item)}
   </p>
 )}
                           {ac > 0 && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold
+                            <span className={`text-micro px-2 py-0.5 rounded-badge font-bold
                               ${isComboCategoryId(item.category_id)
-                                ? 'bg-violet-100 text-violet-700'
-                                : 'bg-blue-100 text-blue-700'}`}>
+                                ? 'bg-brand-soft text-brand-darker'
+                                : 'bg-brand-pill text-brand-dark'}`}>
                               {isComboCategoryId(item.category_id) ? `${ac} items` : `+${ac} addon${ac > 1 ? 's' : ''}`}
                             </span>
                           )}
@@ -2147,6 +2192,7 @@ const handleBillFromCart = async () => {
                     );
                   })}
                 </div>
+
               </div>
 
               {/* ── Cart panel (desktop only, slide in) ── */}
@@ -2154,12 +2200,12 @@ const handleBillFromCart = async () => {
                 className={`hidden lg:block transition-all duration-300 ease-in-out
                   ${showCart ? 'w-[22rem] opacity-100' : 'w-0 opacity-0 pointer-events-none'}`}
               >
-                <div className="border border-gray-300 rounded-xl bg-white shadow-xl lg:h-[calc(98dvh-4rem)] flex flex-col">
+                <div className="border border-line border-t-panel border-t-line-panel rounded-panel bg-surface shadow-panel lg:h-[calc(98dvh-4rem)] flex flex-col">
                   <div className="flex flex-col h-full p-4">
 
                     {/* Cart header */}
-                    <div className="pb-3 border-b space-y-2">
-                      <h2 className="text-lg font-semibold text-gray-800">Your Order</h2>
+                    <div className="pb-3 border-b border-line-divider space-y-2">
+                      <h2 className="text-panel-title text-brand-dark">Your Order</h2>
                       {orderMode === 'delivery' && (
     <DeliveryDetailsSummary
     value={customerDetails}
@@ -2172,13 +2218,25 @@ const handleBillFromCart = async () => {
                                    value={customerDetails}
                                    onSave={setCustomerDetails}
                                    customers={customersList} />
-                      <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg">
+                      <div className="flex items-center justify-between text-ui bg-brand-tint border border-brand-line px-3 py-2 rounded-panel">
                         <div className="flex items-center gap-2">
-                          {orderMode === 'dinein' && selectedTable && (
-                            <span className="font-semibold text-lg text-gray-700">
-                              {tables.find(t => t.id.toString() === selectedTable)?.table_number}
-                            </span>
-                          )}
+                        {orderMode === 'dinein' && (
+  selectedTable ? (
+    <button
+      onClick={() => !activeOrderId && setShowDineinPicker(true)}
+      className="font-bold text-body text-brand-dark"
+    >
+      {tables.find(t => t.id.toString() === selectedTable)?.table_number}
+    </button>
+  ) : (
+    <button
+      onClick={() => setShowDineinPicker(true)}
+      className="text-ui font-semibold text-brand underline"
+    >
+      Select Table
+    </button>
+  )
+)}
 
                           {orderMode === 'takeaway' && (
                             <select
@@ -2187,7 +2245,7 @@ const handleBillFromCart = async () => {
                                 setSelectedTable(e.target.value);
                                 setTakeawayTableId(e.target.value);
                               }}
-                              className="border-none outline-none rounded px-2 py-1 text-sm bg-white"
+                              className="border-none outline-none rounded-button-sm px-2 py-1 text-ui font-semibold bg-surface text-ink"
                             >
                               <option value="">Select Table</option>
                               {takeawayTables.map(t => (
@@ -2200,22 +2258,22 @@ const handleBillFromCart = async () => {
                           {activeOrderId && (
                             <button
                               onClick={() => setShowTransferModal(true)}
-                              className="text-sm text-red-600 hover:underline"
+                              className="text-ui font-semibold text-brand hover:underline"
                             >
                               Transfer
                             </button>
                           )}
                           {activeDineinOrderId && (
-                            <span className="text-xs text-gray-500 font-mono">
+                            <span className="text-ui-sm text-ink-muted font-mono">
                               #{activeDineinOrderId}
                             </span>
                           )}
                         </div>
-                        <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
+                        <span className="text-body font-bold text-brand-dark">₹{getTotalPrice()}</span>
                       </div>
 
                       {draftSavedAt && (
-                        <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-lg">
+                        <div className="flex items-center gap-1.5 text-ui-sm text-state-vacant bg-state-vacant-bg px-2 py-1 rounded-button-sm">
                           <Save size={11} />
                           <span>
                             Draft saved ·{' '}
@@ -2231,26 +2289,20 @@ const handleBillFromCart = async () => {
                     {/* Dine-in / Takeaway toggle */}
                   {['dinein', 'takeaway'].includes(orderMode) && (
                       <div className="mt-3">
-                          <div className="flex bg-gray-100 rounded-lg p-1">
-                               <button onClick={() => {
-                                                      setOrderMode('dinein');
-                                                      if (dineinTableId) setSelectedTable(dineinTableId);
-                                                      syncPackagingForOrderMode('dinein'); }}
-                                        className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                          <div className="ui-toggle w-full">
+                               <button onClick={switchToDineIn}
+                                        className={`ui-toggle-btn flex-1 flex items-center justify-center gap-2
                                                     ${orderMode === 'dinein'
-                                                                      ? 'bg-action-primary text-white shadow-sm'
-                                                                      : 'text-gray-600 hover:text-gray-800'}`}>
+                                                                      ? 'ui-toggle-btn-active'
+                                                                      : ''}`}>
                                 <Users size={16} /> Dine In
                                </button>
                                <button
-                                       onClick={() => {
-                                                      setOrderMode('takeaway');
-                                                      setSelectedTable(takeawayTableId?.toString());
-                                                      syncPackagingForOrderMode('takeaway'); }}
-                                        className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
+                                       onClick={switchToTakeaway}
+                                        className={`ui-toggle-btn flex-1 flex items-center justify-center gap-2
                                                     ${orderMode === 'takeaway'
-                                                                     ? 'bg-action-primary text-white shadow-sm'
-                                                                     : 'text-gray-600 hover:text-gray-800'}`}>
+                                                                     ? 'ui-toggle-btn-active'
+                                                                     : ''}`}>
                                 <Package size={16} /> Takeaway
                                </button>
                           </div>
@@ -2258,7 +2310,7 @@ const handleBillFromCart = async () => {
 
                     {/* Cart body */}
                     {cart.length === 0 ? (
-                      <div className="flex-1 flex items-center justify-center text-sm text-gray-400">
+                      <div className="flex-1 flex items-center justify-center text-ui text-ink-muted">
                         No items added
                       </div>
                     ) : (
@@ -2277,9 +2329,9 @@ const handleBillFromCart = async () => {
 
                           {activeOrderId && oldItems.length > 0 && newItems.length > 0 && (
                             <div className="flex items-center gap-2 my-2">
-                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
-                              <span className="text-xs font-semibold text-orange-600 px-2">NEW ITEMS</span>
-                              <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
+                              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-brand-ring to-transparent" />
+                              <span className="text-micro font-bold text-brand px-2">NEW ITEMS</span>
+                              <div className="flex-1 h-px bg-gradient-to-r from-brand-ring via-transparent to-transparent" />
                             </div>
                           )}
 
@@ -2287,11 +2339,11 @@ const handleBillFromCart = async () => {
                             <React.Fragment key={ts}>
                               {bi > 0 && (
                                 <div className="flex items-center gap-2 my-2">
-                                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
-                                  <span className="text-xs font-semibold text-orange-600 px-2">
+                                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-brand-ring to-transparent" />
+                                  <span className="text-micro font-bold text-brand px-2">
                                     NEW ITEMS
                                   </span>
-                                  <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
+                                  <div className="flex-1 h-px bg-gradient-to-r from-brand-ring via-transparent to-transparent" />
                                 </div>
                               )}
                               {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
@@ -2312,17 +2364,17 @@ const handleBillFromCart = async () => {
                           <button
                             onClick={handlePlaceOrder}
                             disabled={!canPlaceOrder || isPlacingOrder}
-                            className={`py-2 rounded-lg text-sm font-semibold
+                            className={`ui-btn ui-btn-add
                               ${canPlaceOrder && !isPlacingOrder
-                                ? 'bg-action-primary text-white hover:bg-action-danger'
-                                : 'bg-gray-300 cursor-not-allowed'}`}
+                                ? 'shadow-button'
+                                : 'cursor-not-allowed'}`}
                           >
                             {isPlacingOrder ? 'Placing...' : 'Place Order'}
                           </button>
 
                           <button
                             onClick={handleBillFromCart}
-                            className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"
+                            className="ui-btn gap-1"
                           >
                             <FileText size={16} /> Bill
                           </button>
@@ -2331,17 +2383,17 @@ const handleBillFromCart = async () => {
                             onClick={handleSaveDraft}
                             disabled={cart.length === 0}
                             title="Save draft — items will be here even after a page refresh"
-                            className={`py-2 border rounded-lg text-sm flex items-center justify-center gap-1 font-semibold transition-colors
+                            className={`ui-btn gap-1 transition-colors
                               ${cart.length > 0
-                                ? 'bg-yellow-50 border-yellow-400 text-yellow-700 hover:bg-yellow-100'
-                                : 'opacity-40 cursor-not-allowed text-gray-400 border-gray-200'}`}
+                                ? 'border-state-reserved/30'
+                                : 'opacity-40 cursor-not-allowed'}`}
                           >
                             <Save size={15} /> Save
                           </button>
 
                           <button
                             onClick={handleClearCart}
-                            className="py-2 border rounded-lg text-sm hover:bg-gray-100"
+                            className="ui-btn"
                           >
                             Clear
                           </button>
@@ -2360,10 +2412,10 @@ const handleBillFromCart = async () => {
       {currentView === 'order' && cart.length > 0 && (
         <button
           onClick={() => setShowCart(true)}
-          className="fixed bottom-6 right-6 bg-action-primary text-white p-4 rounded-full shadow-lg z-40 lg:hidden flex items-center gap-2"
+          className="fixed bottom-6 right-6 bg-brand text-white p-4 rounded-full shadow-soft z-40 lg:hidden flex items-center gap-2"
         >
           <ShoppingCart size={24} />
-          <span className="text-sm font-bold">{cart.length}</span>
+          <span className="text-body-sm font-bold">{cart.length}</span>
         </button>
       )}
 
@@ -2371,16 +2423,16 @@ const handleBillFromCart = async () => {
       {currentView === 'order' && showCart && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-backdrop"
             onClick={() => setShowCart(false)}
           />
-          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-2xl flex flex-col max-h-[90dvh]">
+          <div className="absolute bottom-0 left-0 right-0 bg-surface rounded-t-modal-lg shadow-modal-lg flex flex-col max-h-[90dvh]">
             {/* Sheet handle + close */}
-            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b flex-shrink-0">
-              <h2 className="text-lg font-semibold text-gray-800">Your Order</h2>
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-line-divider flex-shrink-0">
+              <h2 className="text-panel-title text-brand-dark">Your Order</h2>
               <button
                 onClick={() => setShowCart(false)}
-                className="p-1 rounded-lg hover:bg-gray-100 text-gray-500"
+                className="p-1 rounded-button-sm hover:bg-brand-light text-ink-muted"
               >
                 ✕
               </button>
@@ -2388,13 +2440,25 @@ const handleBillFromCart = async () => {
 
             <div className="flex flex-col flex-1 overflow-hidden p-4">
               {/* Table info + total */}
-              <div className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded-lg mb-3">
+              <div className="flex items-center justify-between text-ui bg-brand-tint border border-brand-line px-3 py-2 rounded-panel mb-3">
                 <div className="flex items-center gap-2">
-                  {orderMode === 'dinein' && selectedTable && (
-                    <span className="font-semibold text-lg text-gray-700">
-                      {tables.find(t => t.id.toString() === selectedTable)?.table_number}
-                    </span>
-                  )}
+                {orderMode === 'dinein' && (
+  selectedTable ? (
+    <button
+      onClick={() => !activeOrderId && setShowDineinPicker(true)}
+      className="font-bold text-body text-brand-dark"
+    >
+      {tables.find(t => t.id.toString() === selectedTable)?.table_number}
+    </button>
+  ) : (
+    <button
+      onClick={() => setShowDineinPicker(true)}
+      className="text-ui font-semibold text-brand underline"
+    >
+      Select Table
+    </button>
+  )
+)}
                   {orderMode === 'takeaway' && (
                     <select
                       value={selectedTable}
@@ -2402,7 +2466,7 @@ const handleBillFromCart = async () => {
                         setSelectedTable(e.target.value);
                         setTakeawayTableId(e.target.value);
                       }}
-                      className="border-none outline-none rounded px-2 py-1 text-sm bg-white"
+                      className="border-none outline-none rounded-button-sm px-2 py-1 text-ui font-semibold bg-surface text-ink"
                     >
                       <option value="">Select Table</option>
                       {takeawayTables.map(t => (
@@ -2415,22 +2479,22 @@ const handleBillFromCart = async () => {
                   {activeOrderId && (
                     <button
                       onClick={() => setShowTransferModal(true)}
-                      className="text-sm text-red-600 hover:underline"
+                      className="text-ui font-semibold text-brand hover:underline"
                     >
                       Transfer
                     </button>
                   )}
                   {activeDineinOrderId && (
-                    <span className="text-xs text-gray-500 font-mono">
+                    <span className="text-ui-sm text-ink-muted font-mono">
                       #{activeDineinOrderId}
                     </span>
                   )}
                 </div>
-                <span className="text-base font-bold text-red-600">₹{getTotalPrice()}</span>
+                <span className="text-body font-bold text-brand-dark">₹{getTotalPrice()}</span>
               </div>
 
               {draftSavedAt && (
-                <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-lg mb-3">
+                <div className="flex items-center gap-1.5 text-ui-sm text-state-vacant bg-state-vacant-bg px-2 py-1 rounded-button-sm mb-3">
                   <Save size={11} />
                   <span>
                     Draft saved ·{' '}
@@ -2440,18 +2504,18 @@ const handleBillFromCart = async () => {
               )}
 
               {/* Dine-in / Takeaway toggle */}
-              <div className="flex bg-gray-100 rounded-lg p-1 mb-3 flex-shrink-0">
+              <div className="ui-toggle w-full mb-3 flex-shrink-0">
                 <button
-                  onClick={() => { setOrderMode('dinein'); if (dineinTableId) setSelectedTable(dineinTableId); syncPackagingForOrderMode('dinein'); }}
-                  className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                    ${orderMode === 'dinein' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600'}`}
+                  onClick={switchToDineIn}
+                  className={`ui-toggle-btn flex-1 flex items-center justify-center gap-2
+                    ${orderMode === 'dinein' ? 'ui-toggle-btn-active' : ''}`}
                 >
                   <Users size={16} /> Dine In
                 </button>
                 <button
-                  onClick={() => { setOrderMode('takeaway'); setSelectedTable(takeawayTableId?.toString()); syncPackagingForOrderMode('takeaway'); }}
-                  className={`flex-1 py-2 rounded-md text-sm font-medium flex items-center justify-center gap-2
-                    ${orderMode === 'takeaway' ? 'bg-action-primary text-white shadow-sm' : 'text-gray-600'}`}
+                  onClick={switchToTakeaway}
+                  className={`ui-toggle-btn flex-1 flex items-center justify-center gap-2
+                    ${orderMode === 'takeaway' ? 'ui-toggle-btn-active' : ''}`}
                 >
                   <Package size={16} /> Takeaway
                 </button>
@@ -2472,9 +2536,9 @@ const handleBillFromCart = async () => {
 
                 {activeOrderId && oldItems.length > 0 && newItems.length > 0 && (
                   <div className="flex items-center gap-2 my-2">
-                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
-                    <span className="text-xs font-semibold text-orange-600 px-2">NEW ITEMS</span>
-                    <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-brand-ring to-transparent" />
+                    <span className="text-micro font-bold text-brand px-2">NEW ITEMS</span>
+                    <div className="flex-1 h-px bg-gradient-to-r from-brand-ring via-transparent to-transparent" />
                   </div>
                 )}
 
@@ -2482,9 +2546,9 @@ const handleBillFromCart = async () => {
                   <React.Fragment key={ts}>
                     {bi > 0 && (
                       <div className="flex items-center gap-2 my-2">
-                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-400 to-transparent" />
-                        <span className="text-xs font-semibold text-orange-600 px-2">NEW ITEMS</span>
-                        <div className="flex-1 h-px bg-gradient-to-r from-orange-400 via-transparent to-transparent" />
+                        <div className="flex-1 h-px bg-gradient-to-r from-transparent via-brand-ring to-transparent" />
+                        <span className="text-micro font-bold text-brand px-2">NEW ITEMS</span>
+                        <div className="flex-1 h-px bg-gradient-to-r from-brand-ring via-transparent to-transparent" />
                       </div>
                     )}
                     {getGroupedCartItems(groupedNewItems[ts]).map((group, idx) => (
@@ -2506,17 +2570,17 @@ const handleBillFromCart = async () => {
                 <button
                   onClick={handlePlaceOrder}
                   disabled={!canPlaceOrder || isPlacingOrder}
-                  className={`py-2 rounded-lg text-sm font-semibold
+                  className={`ui-btn ui-btn-add
                     ${canPlaceOrder && !isPlacingOrder
-                      ? 'bg-action-primary text-white hover:bg-action-danger'
-                      : 'bg-gray-300 cursor-not-allowed'}`}
+                      ? 'shadow-button'
+                      : 'cursor-not-allowed'}`}
                 >
                   {isPlacingOrder ? 'Placing...' : 'Place Order'}
                 </button>
 
                 <button
                   onClick={handleBillFromCart}
-                  className="py-2 rounded-lg text-sm font-semibold bg-green-600 text-white hover:bg-green-700 flex items-center justify-center gap-1"
+                  className="ui-btn gap-1"
                 >
                   <FileText size={16} /> Bill
                 </button>
@@ -2524,17 +2588,17 @@ const handleBillFromCart = async () => {
                 <button
                   onClick={handleSaveDraft}
                   disabled={cart.length === 0}
-                  className={`py-2 border rounded-lg text-sm flex items-center justify-center gap-1 font-semibold transition-colors
+                  className={`ui-btn gap-1 transition-colors
                     ${cart.length > 0
-                      ? 'bg-yellow-50 border-yellow-400 text-yellow-700 hover:bg-yellow-100'
-                      : 'opacity-40 cursor-not-allowed text-gray-400 border-gray-200'}`}
+                      ? 'bg-state-reserved-bg border-state-reserved/30 text-state-reserved hover:bg-state-reserved-bg'
+                      : 'opacity-40 cursor-not-allowed'}`}
                 >
                   <Save size={15} /> Save
                 </button>
 
                 <button
                   onClick={handleClearCart}
-                  className="py-2 border rounded-lg text-sm hover:bg-gray-100"
+                  className="ui-btn"
                 >
                   Clear
                 </button>
@@ -2546,22 +2610,22 @@ const handleBillFromCart = async () => {
 
       {/* ── Clear confirm dialog ── */}
       {showClearConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg p-6 w-80 shadow-xl">
-            <h3 className="text-lg font-semibold mb-2 text-gray-800">Clear all items?</h3>
-            <p className="text-sm text-gray-500 mb-4">
+        <div className="ui-backdrop">
+          <div className="ui-modal w-80 animate-scale-in">
+            <h3 className="text-panel-title text-brand-dark mb-2">Clear all items?</h3>
+            <p className="text-ui text-ink-muted mb-4">
               This will also discard the saved draft for this table.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowClearConfirm(false)}
-                className="flex-1 py-2 border rounded-lg hover:bg-gray-100"
+                className="ui-btn flex-1"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmClearCart}
-                className="flex-1 py-2 bg-action-primary text-white rounded-lg hover:bg-action-danger"
+                className="ui-btn ui-btn-primary flex-1"
               >
                 Clear
               </button>
@@ -2663,6 +2727,7 @@ const handleBillFromCart = async () => {
       <TablePaymentConfirmModal
         isOpen={tablePayConfirmModal.isOpen}
         orderId={tablePayConfirmModal.orderId}
+        displayId={tablePayConfirmModal.displayId}
         onClose={() => setTablePayConfirmModal({ isOpen: false, orderId: null, tableId: null })}
         onConfirm={(orderId) => {
           handleConfirmPaymentFromGrid(orderId, tablePayConfirmModal.tableId);
@@ -2684,6 +2749,8 @@ const handleBillFromCart = async () => {
         currentTableId={selectedTable}
         onConfirm={handleTransferTable}
       />
+      <TransferTableModal isOpen={showDineinPicker} onClose={handleDineinPickerClose} tables={dineinOnlyTables}
+                          currentTableId={selectedTable} onConfirm={handleDineinPicked} />
       <TakeawayOrdersModal
         isOpen={showTakeawayOrdersModal}
         onClose={() => setShowTakeawayOrdersModal(false)}

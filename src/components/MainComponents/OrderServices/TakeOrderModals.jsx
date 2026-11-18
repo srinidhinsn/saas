@@ -61,27 +61,27 @@ export const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, on
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-800">Transfer Table</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Transfer table">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h2 className="text-panel-title text-brand-dark">Transfer Table</h2>
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
+            <X size={16} />
           </button>
         </div>
-        <div className="px-6 py-4 max-h-72 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
           {vacantTables.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-4">No vacant tables available.</p>
+            <p className="text-ui text-ink-muted text-center py-4">No vacant tables available.</p>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-item-sm">
               {vacantTables.map(t => (
                 <button
                   key={t.id}
                   onClick={() => setSelectedNewTable(t)}
-                  className={`py-3 rounded-lg border-2 text-sm font-bold transition
+                  className={`py-3 rounded-panel border text-ui font-bold transition-colors
                     ${selectedNewTable?.id === t.id
-                      ? 'border-action-primary bg-action-primary/10 text-action-primary'
-                      : 'border-gray-200 hover:border-action-primary text-gray-700'}`}
+                      ? 'border-brand-ring bg-brand-tint text-brand-dark shadow-focus-ring'
+                      : 'border-line bg-surface text-ink-soft hover:border-brand-line hover:bg-brand-tint'}`}
                 >
                   {t.table_number}
                 </button>
@@ -89,18 +89,17 @@ export const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, on
             </div>
           )}
         </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={() => { if (selectedNewTable) { onConfirm(selectedNewTable); onClose(); } }}
             disabled={!selectedNewTable}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${selectedNewTable ? 'bg-action-primary hover:bg-action-danger' : 'bg-gray-300 cursor-not-allowed'}`}
+            className="ui-btn ui-btn-add"
           >
             Transfer
           </button>
@@ -116,15 +115,16 @@ export const TransferTableModal = ({ isOpen, onClose, tables, currentTableId, on
 
 export const ItemStatusBadge = ({ status }) => {
   const cfg = {
-    pending: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Pending' },
-    preparing: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Preparing' },
-    ready: { bg: 'bg-green-100', text: 'text-green-700', label: 'Ready' },
-    served: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Served' },
-    cancelled: { bg: 'bg-red-50', text: 'text-red-400', label: 'Cancelled' },
-  }[status] || { bg: 'bg-gray-100', text: 'text-gray-500', label: status || '—' };
+    pending: { dot: 'bg-status-pending', label: 'Pending' },
+    preparing: { dot: 'bg-status-preparing', label: 'Preparing' },
+    ready: { dot: 'bg-status-ready', label: 'Ready' },
+    served: { dot: 'bg-status-served', label: 'Served' },
+    cancelled: { dot: 'bg-gray-300', label: 'Cancelled' },
+  }[status] || { dot: 'bg-gray-300', label: status || '—' };
 
   return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.text}`}>
+    <span className="inline-flex items-center gap-1 text-micro font-bold px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line">
+      <span className={`h-1.5 w-1.5 rounded-badge ${cfg.dot}`} />
       {cfg.label}
     </span>
   );
@@ -157,27 +157,27 @@ export const CancelOrderConfirmModal = ({ isOpen, onClose, onConfirm }) => {
   const effectiveReason = reason === 'Other' ? customReason : reason;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-red-600">Cancel Order</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Cancel order">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h2 className="text-panel-title text-brand-dark">Cancel Order</h2>
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
+            <X size={16} />
           </button>
         </div>
-        <div className="px-6 py-5 space-y-4">
-          <p className="text-sm text-gray-600">
-            The order will be marked as <span className="font-semibold text-red-600">cancelled</span> and kept for records. Select a reason:
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
+          <p className="text-ui text-ink-muted">
+            The order will be marked as <span className="font-semibold text-brand-dark">cancelled</span> and kept for records. Select a reason:
           </p>
-          <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1">
+          <div className="grid grid-cols-2 gap-item-sm max-h-52 overflow-y-auto pr-1">
             {ORDER_CANCEL_REASONS.map(r => (
               <button
                 key={r}
                 onClick={() => setReason(r)}
-                className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
+                className={`px-2 py-2 rounded-button-sm text-ui-sm font-semibold border text-left transition-colors
                   ${reason === r
-                    ? 'bg-red-600 text-white border-red-600'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+                    ? 'bg-brand text-text-white border-brand'
+                    : 'bg-surface text-ink-soft border-line hover:border-brand-line hover:bg-brand-tint'}`}
               >
                 {r}
               </button>
@@ -188,24 +188,21 @@ export const CancelOrderConfirmModal = ({ isOpen, onClose, onConfirm }) => {
               value={customReason}
               onChange={e => setCustomReason(e.target.value)}
               placeholder="Describe the reason…"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
+              className="w-full h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink outline-none placeholder:text-ink-faint transition-colors focus:border-brand-ring focus:shadow-focus-ring"
             />
           )}
         </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            className="ui-btn"
           >
             Go Back
           </button>
           <button
             disabled={!reason || (reason === 'Other' && !customReason.trim())}
             onClick={() => { onConfirm(effectiveReason); onClose(); }}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${reason && !(reason === 'Other' && !customReason.trim())
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-gray-300 cursor-not-allowed'}`}
+            className="ui-btn ui-btn-danger"
           >
             Cancel Order
           </button>
@@ -228,9 +225,10 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
   const transactionType = isServed ? 'WASTAGE' : 'ITEM_CANCELLED';
   const reasonList = isServed ? WASTAGE_REASONS : CANCELLATION_REASONS;
   const typeLabel = isServed ? 'Wastage' : 'Cancellation';
-  const typeColor = isServed ? 'text-red-600' : 'text-orange-600';
-  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200';
-  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600';
+  const typeColor = isServed ? 'text-brand-dark' : 'text-brand-dark';
+  const typeBg = isServed ? 'bg-brand-light border-brand-line' : 'bg-brand-light border-brand-line';
+  const buttonColor = isServed ? 'ui-btn-danger' : 'ui-btn-danger';
+
 
   useEffect(() => {
     if (isOpen) {
@@ -247,24 +245,24 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
   const effectiveReason = reason === 'Other' ? customReason : reason;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className={`text-lg font-bold ${typeColor}`}>Remove Item</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Remove item">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h2 className={`text-panel-title ${typeColor}`}>Remove Item</h2>
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
+            <X size={16} />
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
           <div>
-            <p className="text-sm text-gray-700 font-semibold">{item.name}</p>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Ordered quantity: <span className="font-semibold">{maxQty}</span>
+            <p className="text-ui text-brand-dark font-bold">{item.name}</p>
+            <p className="text-ui-sm text-ink-muted mt-0.5">
+              Ordered quantity: <span className="font-semibold text-ink-soft">{maxQty}</span>
             </p>
           </div>
 
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-semibold ${typeBg} ${typeColor}`}>
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-button-sm border text-ui-sm font-semibold ${typeBg} ${typeColor}`}>
             <span className="w-2 h-2 rounded-full bg-current inline-block" />
             {typeLabel} — {isServed
               ? 'Item was already served. Stock will be reversed.'
@@ -273,26 +271,26 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
 
           {maxQty > 1 && (
             <div>
-              <p className="text-xs font-semibold text-gray-600 mb-2">How many to remove?</p>
+              <p className="mb-2 text-micro font-bold uppercase tracking-wide text-ink-muted">How many to remove?</p>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setRemoveQty(q => Math.max(1, q - 1))}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold"
+                  className="grid place-items-center h-8 w-8 rounded-button-sm border border-brand-line bg-surface text-brand-dark text-lg font-bold hover:bg-brand-light transition-colors"
                 >−</button>
-                <span className="w-10 text-center text-lg font-bold text-gray-800">{removeQty}</span>
+                <span className="w-10 text-center text-kpi text-brand-dark">{removeQty}</span>
                 <button
                   onClick={() => setRemoveQty(q => Math.min(maxQty, q + 1))}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold"
+                  className="grid place-items-center h-8 w-8 rounded-button-sm border border-brand-line bg-surface text-brand-dark text-lg font-bold hover:bg-brand-light transition-colors"
                 >+</button>
-                <span className="text-xs text-gray-400 ml-1">of {maxQty}</span>
+                <span className="text-ui-sm text-ink-muted ml-1">of {maxQty}</span>
                 <button
                   onClick={() => setRemoveQty(maxQty)}
-                  className="ml-auto text-xs text-red-500 underline font-semibold"
+                  className="ml-auto text-ui-sm text-brand-dark underline font-semibold"
                 >Remove all</button>
               </div>
-              <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="mt-2 h-1.5 bg-brand-light rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-red-400 rounded-full transition-all"
+                  className="h-full bg-brand rounded-full transition-all"
                   style={{ width: `${(removeQty / maxQty) * 100}%` }}
                 />
               </div>
@@ -300,18 +298,18 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
           )}
 
           <div>
-            <p className="text-xs font-semibold text-gray-600 mb-2">Reason</p>
-            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
+            <p className="mb-2 text-micro font-bold uppercase tracking-wide text-ink-muted">Reason</p>
+            <div className="grid grid-cols-2 gap-item-sm max-h-48 overflow-y-auto pr-1">
               {reasonList.map(r => (
                 <button
                   key={r}
                   onClick={() => setReason(r)}
-                  className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
+                  className={`px-2 py-2 rounded-button-sm text-ui-sm font-semibold border text-left transition-colors
                     ${reason === r
                       ? isServed
-                        ? 'bg-red-600 text-white border-red-600'
-                        : 'bg-orange-500 text-white border-orange-500'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+                        ? 'bg-brand text-text-white border-brand'
+                        : 'bg-brand text-text-white border-brand'
+                      : 'bg-surface text-ink-soft border-line hover:border-brand-line hover:bg-brand-tint'}`}
                 >
                   {r}
                 </button>
@@ -322,16 +320,16 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
                 value={customReason}
                 onChange={e => setCustomReason(e.target.value)}
                 placeholder="Describe the reason…"
-                className="mt-2 w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
+                className="mt-2 w-full h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink outline-none placeholder:text-ink-faint transition-colors focus:border-brand-ring focus:shadow-focus-ring"
               />
             )}
           </div>
         </div>
 
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            className="ui-btn"
           >
             Cancel
           </button>
@@ -344,10 +342,7 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
                 onRemoveOne(transactionType, effectiveReason, removeQty);
               }
             }}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${reason && !(reason === 'Other' && !customReason.trim())
-                ? buttonColor
-                : 'bg-gray-300 cursor-not-allowed'}`}
+            className={`ui-btn ${buttonColor}`}
           >
             {isRemoveAll
               ? `Remove All (${maxQty})`
@@ -365,21 +360,21 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
 
 export const CustomerCapturePanel = ({ value, onChange }) => {
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border-default bg-bg-tertiary shadow-sm">
-      <User size={15} className="text-text-secondary shrink-0" />
+    <div className="flex items-center gap-2 px-3 py-2 rounded-panel border border-brand-line bg-brand-tint shadow-panel">
+      <User size={15} className="text-ink-muted shrink-0" />
       <input
         value={value.customer_id}
         onChange={e => onChange({ ...value, customer_id: e.target.value })}
         placeholder="Customer name / ID (optional)"
-        className="flex-1 min-w-0 text-sm bg-transparent outline-none placeholder-text-secondary text-text-primary"
+        className="flex-1 min-w-0 text-ui bg-transparent outline-none placeholder:text-ink-faint text-ink"
       />
-      <div className="w-px h-5 bg-border-default shrink-0" />
-      <Phone size={15} className="text-text-secondary shrink-0" />
+      <div className="w-px h-5 bg-brand-line shrink-0" />
+      <Phone size={15} className="text-ink-muted shrink-0" />
       <input
         value={value.contact_phone}
         onChange={e => onChange({ ...value, contact_phone: e.target.value })}
         placeholder="Phone (optional)"
-        className="w-32 text-sm bg-transparent outline-none placeholder-text-secondary text-text-primary"
+        className="w-32 text-ui bg-transparent outline-none placeholder:text-ink-faint text-ink"
         inputMode="tel"
       />
     </div>
@@ -388,17 +383,17 @@ export const CustomerCapturePanel = ({ value, onChange }) => {
 export const AddressSelectPanel = ({ addresses, selectedAddressId, setSelectedAddressId }) => {
   if (!addresses || addresses.length === 0) {
     return (
-      <div className="px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs text-red-600">
+      <div className="px-3 py-2 rounded-panel border border-state-occupied/30 bg-state-occupied-bg text-ui-sm text-state-occupied">
         No saved address found for this customer.
       </div>
     );
   }
   return (
-    <div className="px-3 py-2 rounded-xl border border-border-default bg-bg-tertiary shadow-sm">
+    <div className="px-3 py-2 rounded-panel border border-brand-line bg-brand-tint shadow-panel">
       <select
         value={selectedAddressId}
         onChange={e => setSelectedAddressId(e.target.value)}
-        className="w-full text-sm px-2 py-1.5 rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+        className="w-full text-ui px-2 py-1.5 rounded-button-sm border border-brand-line bg-surface text-ink focus:outline-none focus:border-brand-ring focus:shadow-focus-ring"
       >
         <option value="">Select delivery address</option>
         {addresses.map(addr => (
@@ -417,23 +412,23 @@ export const DeliveryDetailsSummary = ({ value, onClick }) => {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-left shadow-sm transition
-        ${isComplete ? 'border-purple-200 bg-purple-50 hover:bg-purple-100' : 'border-red-300 bg-red-50 hover:bg-red-100'}`}
+      className={`w-full flex items-center gap-2 px-3 py-2 rounded-panel border text-left shadow-panel transition-colors
+        ${isComplete ? 'border-brand-line bg-brand-tint hover:bg-brand-light' : 'border-state-occupied/40 bg-state-occupied-bg hover:border-state-occupied'}`}
     >
-      <MapPin size={16} className={isComplete ? 'text-purple-600 shrink-0' : 'text-red-500 shrink-0'} />
+      <MapPin size={16} className={isComplete ? 'text-brand shrink-0' : 'text-state-occupied shrink-0'} />
       <div className="flex-1 min-w-0">
         {isComplete ? (
           <>
-            <div className="text-xs font-semibold text-purple-700 truncate">
+            <div className="text-ui-sm font-semibold text-brand-dark truncate">
                {value.contact_phone}
             </div>
-            <div className="text-xs text-purple-600 truncate">{value.shipping_address}</div>
+            <div className="text-ui-sm text-ink-muted truncate">{value.shipping_address}</div>
           </>
         ) : (
-          <div className="text-xs font-semibold text-red-600">Tap to add delivery details</div>
+          <div className="text-ui-sm font-semibold text-state-occupied">Tap to add delivery details</div>
         )}
       </div>
-      <span className="text-xs font-semibold text-purple-500 shrink-0">Edit</span>
+      <span className="text-ui-sm font-semibold text-brand shrink-0">Edit</span>
     </button>
   );
 };
@@ -461,19 +456,19 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <Truck size={18} className="text-purple-600" />
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Delivery details">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h2 className="text-panel-title text-brand-dark flex items-center gap-2">
+            <Truck size={16} className="text-brand" />
             Delivery Details
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
+            <X size={16} />
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-3 max-h-[65vh] overflow-y-auto">
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
           {/* <div>
             <label className="text-xs font-semibold text-gray-600 mb-1 block">Customer Name</label>
             <CustomerAutocomplete
@@ -487,8 +482,8 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
           </div> */}
 
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">
-              Phone <span className="text-red-500">*</span>
+            <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">
+              Phone <span className="text-state-occupied">*</span>
             </label>
             <CustomerAutocomplete
               value={draft.contact_phone}
@@ -501,7 +496,7 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">Email</label>
+            <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">Email</label>
             <CustomerAutocomplete
               value={draft.contact_email}
               onChange={(val) => setDraft(d => ({ ...d, contact_email: val }))}
@@ -513,8 +508,8 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-600 mb-1 block">
-              Delivery Address <span className="text-red-500">*</span>
+            <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">
+              Delivery Address <span className="text-state-occupied">*</span>
             </label>
             <CustomerAutocomplete
               value={draft.shipping_address}
@@ -527,18 +522,17 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
           </div>
         </div>
 
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={() => { onSave(draft); onClose(); }}
             disabled={!canSave}
-            className={`flex-1 py-2.5 rounded-lg font-bold text-sm text-white transition
-              ${canSave ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-300 cursor-not-allowed'}`}
+            className="ui-btn ui-btn-add"
           >
             Save Details
           </button>
@@ -551,30 +545,30 @@ export const DeliveryDetailsModal = ({ isOpen, onClose, value, onSave, customers
 // TablePaymentConfirmModal
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const TablePaymentConfirmModal = ({ isOpen, orderId, onClose, onConfirm }) => {
+export const TablePaymentConfirmModal = ({ isOpen, orderId,displayId, onClose, onConfirm }) => {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-green-700">Confirm Payment</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Confirm payment">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h2 className="text-panel-title text-brand-dark">Confirm Payment</h2>
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors"><X size={16} /></button>
         </div>
-        <div className="px-6 py-5">
-          <p className="text-sm text-gray-600">
-            Mark order <span className="font-semibold">#{orderId}</span> as paid and free the table?
+        <div className="flex-1 overflow-y-auto px-modal py-card">
+          <p className="text-ui text-ink-muted">
+            Mark order <span className="font-semibold text-brand-dark">#{displayId ?? orderId}</span> as paid and free the table?
           </p>
         </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={() => { onConfirm(orderId); onClose(); }}
-            className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-green-600 hover:bg-green-700 text-white"
+            className="ui-btn ui-btn-add"
           >
             Confirm Paid
           </button>
@@ -609,72 +603,71 @@ export const LineItemsModal = ({ isOpen, onClose, mainItem, lineItems, onAddWith
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg max-w-lg w-full bg-bg-primary max-h-[80vh] flex flex-col overflow-hidden">
-        <div className="px-6 pt-6 pb-2 shrink-0">
-        <h3 className="text-xl font-semibold mb-2 text-text-primary">{mainItem?.name}</h3>
-        <p className="mb-4 text-text-secondary">Select add-ons:</p>
-        <div className="relative mt-3">
-    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" />
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-lg max-h-[80vh] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Select add-ons">
+        <div className="px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+        <h3 className="text-panel-title text-brand-dark">{mainItem?.name}</h3>
+        <p className="text-micro text-ink-muted">Select add-ons:</p>
+        </div>
+        <div className="px-modal py-item border-b border-line-soft shrink-0">
+        <div className="relative">
+    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
     <input
       value={addonSearch}
       onChange={e => setAddonSearch(e.target.value)}
       placeholder="Search add-ons..."
-      className="w-full pl-8 pr-3 py-2 text-sm rounded-lg border border-border-default bg-bg-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+      className="ui-input"
     />
   </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-2 space-y-2">
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-item-sm">
   {filteredLineItems.length === 0 ? (
-    <p className="text-sm text-text-secondary text-center py-6">No add-ons match "{addonSearch}"</p>
+    <p className="text-ui text-ink-muted text-center py-6">No add-ons match "{addonSearch}"</p>
   ) : (
     filteredLineItems.map(item => (
       <div
         key={item.id}
         onClick={() => toggleAddon(item.id)}
-        className={`flex justify-between items-center p-3 rounded-lg cursor-pointer transition-all
+        className={`flex justify-between items-center p-item rounded-panel border cursor-pointer transition-colors
           ${selectedAddons.includes(item.id)
-            ? 'bg-action-primary/10 border-2 border-action-primary'
-            : 'bg-bg-tertiary border border-border-default hover:border-action-primary/50'}`}
+            ? 'border-brand-ring bg-brand-tint'
+            : 'border-line bg-surface hover:border-brand-line hover:bg-brand-tint'}`}
       >
         <div className="flex items-center gap-3 flex-1">
           <div
-            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all
+            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors
               ${selectedAddons.includes(item.id)
-                ? 'bg-action-primary border-action-primary'
-                : 'border-gray-300'}`}
+                ? 'bg-brand border-brand'
+                : 'border-line-strong bg-surface'}`}
           >
             {selectedAddons.includes(item.id) && <Check size={14} className="text-white" />}
           </div>
-          <span className="text-text-primary font-medium">{item.name}</span>
+          <span className="text-ui font-semibold text-ink">{item.name}</span>
         </div>
-        <span className="font-semibold text-action-primary">₹{item.unit_price}</span>
+        <span className="text-ui font-bold text-brand-dark">₹{item.unit_price}</span>
       </div>
     ))
   )}
 </div>
 
-        <div className="flex gap-3 px-6 py-4 border-t border-border-default shrink-0 bg-bg-primary">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg border border-border-default bg-bg-tertiary text-text-primary hover:bg-gray-100"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={onAddMainOnly}
-            className="flex-1 px-4 py-2 rounded-lg bg-gray-600 text-white hover:bg-gray-700"
+            className="ui-btn"
           >
             Main Only
           </button>
           <button
             onClick={() => onAddWithSelectedAddons(selectedAddons)}
             disabled={selectedAddons.length === 0}
-            className={`flex-1 px-4 py-2 rounded-lg transition-colors
-              ${selectedAddons.length > 0
-                ? 'bg-action-primary text-white hover:bg-action-danger'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+            className="ui-btn ui-btn-add"
           >
             Add ({selectedAddons.length})
           </button>
@@ -697,70 +690,70 @@ export const ComboDetailModal = ({ isOpen, onClose, comboItem, comboComponents, 
   const savings = aLaCarteTotal - Number(comboItem.unit_price);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="rounded-2xl w-full max-w-md bg-white shadow-2xl overflow-hidden">
-        <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-4 flex items-start justify-between">
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Combo details">
+        <div className="flex items-start justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
           <div>
-            <h3 className="text-lg font-bold text-white">{comboItem.name}</h3>
+            <h3 className="text-panel-title text-brand-dark">{comboItem.name}</h3>
             {comboItem.description && (
-              <p className="text-xs text-violet-200 mt-0.5">{comboItem.description}</p>
+              <p className="text-ui-sm text-ink-muted mt-0.5">{comboItem.description}</p>
             )}
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center text-white">
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
             <X size={16} />
           </button>
         </div>
 
-        <div className="px-6 py-3 bg-violet-50 border-b border-violet-100 flex items-center justify-between">
+        <div className="px-modal py-item bg-brand-tint border-b border-brand-line flex items-center justify-between shrink-0">
           <div>
-            <span className="text-2xl font-bold text-violet-700">₹{Number(comboItem.unit_price).toFixed(0)}</span>
+            <span className="text-kpi text-brand-dark">₹{Number(comboItem.unit_price).toFixed(0)}</span>
             {savings > 0 && (
-              <span className="ml-2 text-xs text-gray-400 line-through">₹{aLaCarteTotal.toFixed(0)}</span>
+              <span className="ml-2 text-ui-sm text-ink-muted line-through">₹{aLaCarteTotal.toFixed(0)}</span>
             )}
           </div>
           {savings > 0 && (
-            <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded-full">
+            <span className="text-micro font-bold bg-state-vacant-bg text-state-vacant px-2 py-1 rounded-badge">
               Save ₹{savings.toFixed(0)}
             </span>
           )}
         </div>
 
-        <div className="px-6 py-4">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+        <div className="flex-1 overflow-y-auto px-modal py-card">
+          <p className="text-micro font-bold text-ink-muted uppercase tracking-wide mb-item-sm">
             What's included ({comboComponents.length} items)
           </p>
-          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+          <div className="space-y-item-sm">
             {comboComponents.length === 0 ? (
-              <p className="text-sm text-gray-400 italic text-center py-4">No component details available</p>
+              <p className="text-ui text-ink-muted italic text-center py-4">No component details available</p>
             ) : (
               comboComponents.map((c, idx) => (
                 <div
                   key={c.id || idx}
-                  className="flex items-center justify-between px-3 py-2 rounded-xl bg-violet-50 border border-violet-100"
+                  className="flex items-center justify-between px-3 py-2 rounded-panel bg-brand-tint border border-brand-line"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-violet-200 text-violet-700 text-xs font-bold flex items-center justify-center shrink-0">
+                    <span className="w-5 h-5 rounded-full bg-brand-soft text-brand-dark text-micro font-bold flex items-center justify-center shrink-0">
                       {idx + 1}
                     </span>
-                    <span className="text-sm font-medium text-gray-800">{c.name}</span>
+                    <span className="text-ui font-semibold text-ink">{c.name}</span>
                   </div>
-                  <span className="text-xs text-violet-600 font-semibold">₹{Number(c.unit_price).toFixed(0)}</span>
+                  <span className="text-ui-sm text-brand-dark font-semibold">₹{Number(c.unit_price).toFixed(0)}</span>
                 </div>
               ))
             )}
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3">
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={() => { onAddCombo(); onClose(); }}
-            className="flex-1 py-2.5 rounded-xl font-bold text-sm bg-violet-600 hover:bg-violet-700 text-white transition-colors"
+            className="ui-btn ui-btn-add"
           >
             Add Combo · ₹{Number(comboItem.unit_price).toFixed(0)}
           </button>
@@ -779,9 +772,9 @@ export const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequ
   const { main, addons } = group;
   return (
     <div className="space-y-1">
-      <div className="flex items-start gap-2 p-3 rounded-xl border bg-white shadow-sm">
+      <div className="flex items-start gap-2 p-3 rounded-panel border border-line bg-surface shadow-panel">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-11 h-11 rounded-lg overflow-hidden border bg-white shrink-0">
+          <div className="w-11 h-11 rounded-button-sm overflow-hidden border border-line bg-surface shrink-0">
             <ImagePreview
               clientId={clientId}
               imageId={main.image_id}
@@ -794,13 +787,13 @@ export const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequ
             />
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
-            <p className="text-xs font-bold text-action-primary">
+            <h4 className="text-ui font-bold truncate text-ink">{main.name}</h4>
+            <p className="text-ui-sm font-bold text-brand-dark">
             ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {main.batch_label && main.batch_label !== activeDineinOrderId && (
-                <span className="text-xs text-orange-500 font-mono font-semibold">
+                <span className="text-micro text-ink-muted font-mono font-semibold">
                   #{main.batch_label}
                 </span>
               )}
@@ -809,10 +802,10 @@ export const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequ
           </div>
         </div>
         <div className="flex items-center gap-2 self-center">
-          <span className="text-sm font-semibold text-gray-500">×{main.quantity}</span>
+          <span className="text-ui font-semibold text-ink-muted">×{main.quantity}</span>
           <button
             onClick={() => onRequestDelete && onRequestDelete(main)}
-            className="text-red-400 hover:text-red-600 transition-colors"
+            className="text-ink-muted hover:text-brand-dark transition-colors"
             title="Remove item"
           >
             <Trash2 size={15} />
@@ -823,14 +816,14 @@ export const OldItemRow = ({ group, clientId, token, activeDineinOrderId, onRequ
       {addons.map(addon => (
         <div
           key={addon.frontend_unique_key || addon.id}
-          className="flex items-center gap-2 p-2 pl-8 rounded-lg border border-dashed bg-blue-50/50"
+          className="flex items-center gap-2 p-2 pl-8 rounded-button-sm border border-dashed border-brand-line bg-brand-tint"
         >
-          <span className="text-xs text-blue-600">↳</span>
-          <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
-          <span className="text-xs font-semibold text-blue-600">
+          <span className="text-ui-sm text-brand">↳</span>
+          <span className="text-ui text-ink-soft truncate flex-1">{addon.name}</span>
+          <span className="text-ui-sm font-semibold text-brand-dark">
           ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
-          <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
+          <span className="text-ui-sm text-ink-muted w-6 text-center">×{addon.quantity}</span>
         </div>
       ))}
     </div>
@@ -845,9 +838,9 @@ export const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove 
   const { main, addons } = group;
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-2 p-3 rounded-xl border bg-orange-50 shadow-sm">
+      <div className="flex items-center gap-2 p-3 rounded-panel border border-brand-line bg-brand-tint shadow-panel">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-11 h-11 rounded-lg overflow-hidden border bg-white shrink-0">
+          <div className="w-11 h-11 rounded-button-sm overflow-hidden border border-line bg-surface shrink-0">
             <ImagePreview
               clientId={clientId}
               imageId={main.image_id}
@@ -860,8 +853,8 @@ export const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove 
             />
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-semibold truncate text-gray-800">{main.name}</h4>
-            <p className="text-xs font-bold text-action-primary">
+            <h4 className="text-ui font-bold truncate text-ink">{main.name}</h4>
+            <p className="text-ui-sm font-bold text-brand-dark">
             ₹{(main.unit_price * (1 - (Number(main.discount) || 0) / 100)).toFixed(2)}
             </p>
           </div>
@@ -870,14 +863,14 @@ export const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove 
         <div className="flex items-center gap-1">
           <button
             onClick={() => onUpdateQuantity(main.id, -1, main.frontend_unique_key)}
-            className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+            className="grid place-items-center w-7 h-7 border border-brand-line rounded-button-sm bg-surface text-brand-dark hover:bg-brand-light transition-colors"
           >
             <Minus size={14} />
           </button>
-          <span className="w-6 text-center text-sm font-semibold">{main.quantity}</span>
+          <span className="w-6 text-center text-ui font-semibold text-ink">{main.quantity}</span>
           <button
             onClick={() => onUpdateQuantity(main.id, 1, main.frontend_unique_key)}
-            className="w-7 h-7 flex items-center justify-center border rounded hover:bg-gray-100"
+            className="grid place-items-center w-7 h-7 border border-brand-line rounded-button-sm bg-surface text-brand-dark hover:bg-brand-light transition-colors"
           >
             <Plus size={14} />
           </button>
@@ -885,7 +878,7 @@ export const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove 
 
         <button
           onClick={() => onRemove(main.id, main.frontend_unique_key)}
-          className="text-action-primary hover:text-red-700"
+          className="text-ink-muted hover:text-brand-dark transition-colors"
         >
           <X size={16} />
         </button>
@@ -894,14 +887,14 @@ export const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove 
       {addons.map(addon => (
         <div
           key={addon.frontend_unique_key}
-          className="flex items-center gap-2 p-2 pl-8 rounded-lg border border-dashed bg-orange-100/50"
+          className="flex items-center gap-2 p-2 pl-8 rounded-button-sm border border-dashed border-brand-line bg-brand-light"
         >
-          <span className="text-xs text-orange-600">↳</span>
-          <span className="text-sm text-gray-700 truncate flex-1">{addon.name}</span>
-          <span className="text-xs font-semibold text-orange-600">
+          <span className="text-ui-sm text-brand">↳</span>
+          <span className="text-ui text-ink-soft truncate flex-1">{addon.name}</span>
+          <span className="text-ui-sm font-semibold text-brand-dark">
           ₹{(addon.unit_price * (1 - (Number(addon.discount) || 0) / 100)).toFixed(2)}
           </span>
-          <span className="text-xs text-gray-500 w-6 text-center">×{addon.quantity}</span>
+          <span className="text-ui-sm text-ink-muted w-6 text-center">×{addon.quantity}</span>
         </div>
       ))}
     </div>
@@ -911,6 +904,15 @@ export const NewItemRow = ({ group, clientId, token, onUpdateQuantity, onRemove 
 // ─────────────────────────────────────────────────────────────────────────────
 // TableReservation — floor view
 // ─────────────────────────────────────────────────────────────────────────────
+
+
+const ORDER_STATUS_BAR = {
+  pending: { bar: 'border-t-status-pending', dot: 'bg-status-pending' },
+  preparing: { bar: 'border-t-status-preparing', dot: 'bg-status-preparing' },
+  ready: { bar: 'border-t-status-ready', dot: 'bg-status-ready' },
+  served: { bar: 'border-t-status-served', dot: 'bg-status-served' },
+  cancelled: { bar: 'border-t-gray-300', dot: 'bg-gray-300' },
+};
 
 export const TableReservation = ({
   tables = [],
@@ -967,139 +969,134 @@ export const TableReservation = ({
     const h = Math.floor(m / 60);
     const d = Math.floor(h / 24);
     if (s < 60) return 'Just now';
-    if (m === 1) return '1 min ago';
-    if (m < 60) return `${m} mins ago`;
-    if (h === 1) return '1 hr ago';
-    if (h < 24) return `${h} hrs ago`;
-    if (d === 1) return '1 day ago';
-    return `${d} days ago`;
+    if (m === 1) return '1 min ';
+    if (m < 60) return `${m} mins `;
+    if (h === 1) return '1 hr ';
+    if (h < 24) return `${h} hrs `;
+    if (d === 1) return '1 day ';
+    return `${d} days `;
   };
 
-  const getOrderStatusStyle = (status) => {
-    const map = {
-      pending: 'bg-orange-100 text-orange-700',
-      preparing: 'bg-blue-100 text-blue-700',
-      ready: 'bg-green-100 text-green-700',
-      served: 'bg-purple-100 text-purple-700',
-      cancelled: 'bg-gray-100 text-gray-500',
-    };
-    return map[status] || 'bg-gray-100 text-gray-700';
-  };
+
+  const modeBtn = (active) => `ui-tab inline-flex items-center gap-1 ${active ? 'ui-tab-active' : ''}`;
 
   return (
-    <div className="p-4 bg-bg-primary overflow-y-auto h-[calc(100vh-4rem)]">
+    <div className="ui-page !min-h-0 h-[calc(100vh-4rem)] overflow-y-auto">
 
       {/* ── Filter bar ── */}
-      <div className="mb-3 sticky top-0 z-10 bg-bg-primary">
-        <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-border-default bg-bg-tertiary">
-          <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl">
+      <section className="ui-panel sticky top-0 z-10">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="ui-tabs" role="group" aria-label="Filter by section">
             <button
+              type="button"
+              aria-pressed={selectedSections.length === 0 && selectedZones.length === 0}
               onClick={() => { setSelectedSections([]); setSelectedZones([]); }}
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                ${selectedSections.length === 0 && selectedZones.length === 0
-                  ? 'bg-action-primary text-white'
-                  : 'bg-white text-text-secondary hover:bg-gray-100'}`}
+              className={`ui-tab ${selectedSections.length === 0 && selectedZones.length === 0 ? 'ui-tab-active' : ''}`}
             >
               All
             </button>
-            <div className="w-px bg-border-default mx-1" />
             {sectionsFromDB.map(sec => (
               <button
                 key={sec}
+                type="button"
+                aria-pressed={selectedSections.includes(sec)}
                 onClick={() => toggleFilter(sec, setSelectedSections)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                  ${selectedSections.includes(sec)
-                    ? 'bg-action-primary text-white'
-                    : 'bg-white text-text-secondary hover:bg-gray-100'}`}
+                className={`ui-tab ${selectedSections.includes(sec) ? 'ui-tab-active' : ''}`}
               >
                 {sec}
               </button>
             ))}
-            <div className="w-px bg-border-default mx-1" />
             {/* {zonesFromDB.map(zone => (
               <button
                 key={zone}
+                type="button"
+                aria-pressed={selectedZones.includes(zone)}
                 onClick={() => toggleFilter(zone, setSelectedZones)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                  ${selectedZones.includes(zone)
-                    ? 'bg-action-primary text-white'
-                    : 'bg-white text-text-secondary hover:bg-gray-100'}`}
+                className={`ui-toggle-btn ${selectedZones.includes(zone) ? 'ui-toggle-btn-active' : ''}`}
               >
                 {zone}
               </button>
             ))} */}
           </div>
 
-          {/* Dine-in / Takeaway toggle */}
-          <div className="ml-auto flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
+          <div className="flex items-center gap-x-3 gap-y-1 text-micro text-ink-muted">
+          {Object.entries(ORDER_STATUS_BAR).map(([status, s]) => (
+            <span key={status} className="inline-flex items-center gap-1 capitalize">
+              <span className={`h-2 w-2 rounded-badge ${s.dot}`} />
+              {status}
+            </span>
+          ))}
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-badge bg-state-reserved" /> Draft
+          </span>
+        </div>
+
+          {/* Order-mode toggle */}
+          <div className="ui-tabs" role="group" aria-label="Order type">
             {hasDinein && (
-            <button
-              onClick={onSelectDineIn}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all
-                ${orderMode === 'dinein'
-                  ? 'bg-action-primary text-text-white shadow'
-                  : 'text-text-secondary hover:bg-gray-100'}`}
-            >
-              Dine In
-            </button>
+              <button type="button" aria-pressed={orderMode === 'dinein'} onClick={onSelectDineIn} className={modeBtn(orderMode === 'dinein')}>
+                Dine In
+              </button>
             )}
             {hasWalkin && (
-            <button
-    onClick={onSelectWalkIn}
-    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
-      ${orderMode === 'walkin'
-        ? 'bg-teal-500 text-white shadow'
-        : 'text-gray-600 hover:bg-gray-100'}`}
-  >
-    <User size={12} /> Walk In
-  </button>
+              <button type="button" aria-pressed={orderMode === 'walkin'} onClick={onSelectWalkIn} className={modeBtn(orderMode === 'walkin')}>
+                <User size={12} /> Walk In
+              </button>
             )}
             {hasTakeaway && (
-            <button
-              onClick={onSelectTakeaway}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
-                ${orderMode === 'takeaway'
-                  ? 'bg-orange-500 text-white shadow'
-                  : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              <Package size={12} /> Takeaway
-            </button>
+              <button type="button" aria-pressed={orderMode === 'takeaway'} onClick={onSelectTakeaway} className={modeBtn(orderMode === 'takeaway')}>
+                <Package size={12} /> Takeaway
+              </button>
             )}
             {hasDelivery && (
-   
-            <button
-    onClick={onSelectDelivery}
-    className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
-      ${orderMode === 'delivery'
-        ? 'bg-purple-500 text-white shadow'
-        : 'text-gray-600 hover:bg-gray-100'}`}
-  >
-    <Truck size={12} /> Delivery
-  </button>
+              <button type="button" aria-pressed={orderMode === 'delivery'} onClick={onSelectDelivery} className={modeBtn(orderMode === 'delivery')}>
+                <Truck size={12} /> Delivery
+              </button>
             )}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* ── Table grid ── */}
+      {/* ── Zones → sections → table cards ── */}
       {orderMode === 'dinein' && visibleZones.map(zone => {
         const sections = getSectionsByZone(zone);
+        const zoneTables = filteredTables.filter(t => getZone(t) === zone);
+        const isVac = t => ['vacant', 'available'].includes(t.status?.toLowerCase().trim());
+        const vac = zoneTables.filter(isVac).length;
+        const occ = zoneTables.filter(t => t.status?.toLowerCase() === 'occupied').length;
+
         return (
-          <div key={zone} className="mb-10">
-            <h3 className="text-xl font-bold mb-4 text-gray-800">{zone}</h3>
-            {sections.map(section => (
-              <div key={section} className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm font-semibold px-3 py-1 rounded-full bg-gray-200">
-                    {section}
-                  </span>
-                </div>
-                <div className="grid gap-4 grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-5">
-                  {filteredTables
-                    .filter(t => getZone(t) === zone && getSection(t) === section)
-                    .map(table => {
-                      const statusKey = table.status?.toLowerCase();
+          <section key={zone} className="ui-panel">
+            {/* Zone header */}
+            <div className="flex items-center gap-2.5 pb-2.5 mb-3 border-b border-line-divider">
+              <h3 className="text-panel-title text-brand-dark">{zone}</h3>
+              <span className="text-micro font-bold px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line">
+                {zoneTables.length} table{zoneTables.length !== 1 ? 's' : ''}
+              </span>
+              <div className="ml-auto hidden sm:flex gap-2.5 text-ui-sm text-ink-muted">
+                <span><b className="text-ink-soft">{vac}</b> vacant</span>
+                <span><b className="text-ink-soft">{occ}</b> occupied</span>
+              </div>
+            </div>
+
+            {sections.map(section => {
+              const sectionTables = zoneTables.filter(t => getSection(t) === section);
+              return (
+                <div key={section} className="mb-3.5 last:mb-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h4 className="text-ui font-bold text-ink-soft">{section}</h4>
+                    <span className="text-micro text-ink-muted">
+                      {sectionTables.length} table{sectionTables.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-tiles gap-tiles">
+                    {sectionTables.map(table => {
+                      const rawStatus = table.status?.toLowerCase().trim();
+                      const statusKey = rawStatus === 'available' ? 'vacant' : rawStatus;
+                      const isVacant = statusKey === 'vacant';
                       const config = TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
+                      const canSelect = isVacant || config.clickable;
                       const orderInfo = tableOrders[table.id];
                       const hasViewableOrder = (statusKey === 'occupied' || statusKey === 'served') && orderInfo;
                       const tableHasDraft = draftTableIds.includes(table.id.toString());
@@ -1110,135 +1107,134 @@ export const TableReservation = ({
                         : null;
 
                       const invoiceStatus = orderInfo?.invoice_status?.toLowerCase();
+                      const orderStatus = orderInfo?.status?.toLowerCase();
                       const showConfirmPayment = hasViewableOrder && invoiceStatus === 'pending';
+                      const showMarkServed = hasViewableOrder && orderStatus === 'ready' && !showConfirmPayment;
+
+                      const bar = hasViewableOrder
+                      ? (ORDER_STATUS_BAR[orderStatus]?.bar || 'border-t-line-strong')
+                      : 'border-t-line-strong';
 
                       const handleCardClick = () => {
-                        if (config.clickable) onSelectTable(table);
+                        if (canSelect) onSelectTable(table);
                         else if (hasViewableOrder && onViewOrder) onViewOrder(table);
                       };
 
                       return (
                         <div
                           key={table.id}
-                          className="rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition bg-white"
+                          className={`flex flex-col overflow-hidden ui-card ${bar}`}
                         >
+                          {/* Clickable area: header + body */}
                           <div
                             onClick={handleCardClick}
-                            className={config.clickable || hasViewableOrder ? 'cursor-pointer' : ''}
+                            className={canSelect || hasViewableOrder ? 'cursor-pointer' : ''}
                           >
-                            {/* Card header */}
-                            <div className="flex justify-between items-center px-3 py-2 bg-action-primary text-white">
-                              <span className="font-bold text-lg tracking-wide">{table.table_number}</span>
+                            {/* Header: table name + timer */}
+                            <div className="flex items-center justify-between gap-4 p-2">
+                              <span className="text-body-sm font-bold text-brand-dark break-words">{table.table_number}</span>
+
+                              
+                              {hasViewableOrder && (
+                                <span className="text-body-sm font-bold text-brand-dark">#{orderInfo.dinein_order_id || orderInfo.id}</span>
+                              )}
                               {tableHasDraft && !hasViewableOrder && (
-                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-yellow-300 text-yellow-900">
-                                  DRAFT
+                                <span className="ui-chip bg-state-reserved-bg text-state-reserved">Draft</span>
+                              )}
+                            </div>
+
+                            {/* Body */}
+                            <div className={`grid gap-0.5 px-3 pb-2.5 text-ui-sm text-ink-muted min-h-[1.75rem] ${isVacant ? '' : ''}`}>
+                              {hasViewableOrder ? (
+                                <div className="flex items-center justify-between gap-2">
+                                  <span><b className="text-ink-soft">Ordered -{orderCount}</b></span>
+                                  {hasViewableOrder && elapsedTime && (
+                                <span className="inline-flex items-center gap-1 text-micro font-bold text-ink-muted whitespace-nowrap">
+                                  <Clock size={12} className="text-brand" />
+                                  {elapsedTime}
                                 </span>
                               )}
-                              {hasViewableOrder && (
+                                  
+                                </div>
+                              ) : statusKey === 'reserved' ? (
+                                <span className="inline-flex items-center gap-1.5 text-ui-sm font-semibold text-state-reserved">
+                                  <Lock size={14} /> Reserved
+                                </span>
+                              ) : isVacant ? (
                                 <>
-                                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${getOrderStatusStyle(orderInfo.status)}`}>
-                                    {orderInfo.status?.toUpperCase()}
-                                  </span>
-                                  <span className="text-xl opacity-80 font-bold">
-                                    #{orderInfo.dinein_order_id || orderInfo.id}
-                                  </span>
+                                 
                                 </>
+                              ) : statusKey === 'occupied' || statusKey === 'served' ? (
+                                <Eye size={18} className="text-brand" />
+                              ) : (
+                                <span className="text-heading-sm leading-none text-brand-soft">—</span>
                               )}
                             </div>
-
-                            {/* Card body */}
-                            <div
-                              className={`p-3 flex items-center justify-between gap-2
-                                ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50'
-                                  : statusKey === 'served' ? 'text-purple-600 bg-purple-50'
-                                    : statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50'
-                                      : 'text-green-600 bg-green-50'}`}
-                            >
-                              {statusKey === 'vacant' && <span className="text-2xl text-green-400">—</span>}
-                              {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={22} />}
-                              {statusKey === 'reserved' && <Lock size={22} />}
-
-                              {hasViewableOrder && (
-                                <div className="flex flex-col items-center flex-1">
-                                  <span className="text-xs font-bold text-gray-700">
-                                    {orderCount} time ordered
-                                  </span>
-                                  {totalPrice && (
-                                    <span className="text-sm font-bold text-action-primary">{totalPrice}</span>
-                                  )}
-                                </div>
-                              )}
-
-                              {hasViewableOrder && (
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={e => { e.stopPropagation(); onPrintBill?.(orderInfo.id, table.id); }}
-                                    className="text-yellow-600 hover:scale-110 transition-transform"
-                                    title="Print Bill"
-                                  >
-                                    <Printer size={22} />
-                                  </button>
-                                  <button
-                                    onClick={e => { e.stopPropagation(); onCancelOrder?.(orderInfo.id, table.id); }}
-                                    className="text-red-600 hover:scale-110 transition-transform"
-                                    title="Cancel Order"
-                                  >
-                                    <Trash2 size={22} />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Elapsed time */}
-                            {hasViewableOrder && elapsedTime && (
-                              <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100">
-                                <div className="flex items-center justify-center gap-1 text-xs font-semibold text-gray-600">
-                                  <Clock size={13} className="text-orange-500" />
-                                  <span>{elapsedTime}</span>
-                                </div>
-                              </div>
-                            )}
                           </div>
 
-                          {showConfirmPayment && (
+                          {/* Action strip */}
+                          {/* {showConfirmPayment && (
                             <button
                               onClick={e => {
                                 e.stopPropagation();
                                 onConfirmPayment?.(orderInfo.id, table.id);
                               }}
-                              className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                              className="flex items-center justify-center gap-1 w-full py-2 bg-brand text-text-white text-micro font-bold tracking-wide hover:bg-brand-dark transition-colors"
                             >
-                              <Check size={14} />
-                              Confirm Payment
+                              <Check size={13} />
+                              CONFIRM PAYMENT
+                            </button>
+                          )} */}
+
+                          {showMarkServed && (
+                            <button
+                              onClick={e => { e.stopPropagation(); onMarkAsServed?.(orderInfo.id, table.id); }}
+                              className="w-full py-2 bg-brand text-text-white text-micro font-bold tracking-wide hover:bg-brand-dark transition-colors"
+                            >
+                              MARK AS SERVED
                             </button>
                           )}
 
-                          {hasViewableOrder && orderInfo.status === 'ready' && !showConfirmPayment && (
-                            <button
-                              onClick={e => { e.stopPropagation(); onMarkAsServed?.(orderInfo.id, table.id); }}
-                              className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
-                            >
-                              Mark as Served
-                            </button>
+                          {/* Footer: PRINT / DELETE */}
+                          {hasViewableOrder && (
+                            <div className="grid grid-cols-3 mt-auto border-t border-line-soft text-micro font-bold tracking-wide">
+                              <button
+                                className="flex items-center justify-center gap-1 py-2 bg-canvas/40 text-brand-dark hover:bg-brand-light transition-colors"
+                                onClick={e => { e.stopPropagation(); onPrintBill?.(orderInfo.id, table.id); }}
+                                title="Print Bill"
+                              >
+                                <Printer size={12} />
+                              </button>
+                              <span className="flex items-center justify-center py-2 border-l border-line-soft text-ui font-bold text-brand-dark">{totalPrice}</span>
+                              <button
+                                className="flex items-center justify-center gap-1 py-2 bg-canvas/40 text-brand-dark border-l border-line-soft hover:bg-brand-soft transition-colors"
+                                onClick={e => { e.stopPropagation(); onCancelOrder?.(orderInfo.id, table.id); }}
+                                title="Cancel Order"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           )}
                         </div>
                       );
                     })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              );
+            })}
+          </section>
         );
       })}
 
       {orderMode === 'takeaway' && (
-        <div className="text-center mt-10 text-gray-500 text-sm">
+        <section className="ui-panel text-center py-10 text-ui text-ink-muted">
           Takeaway selected. Opening menu…
-        </div>
+        </section>
       )}
     </div>
   );
 };
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TakeawayOrdersModal — today's takeaway orders picker
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1260,17 +1256,20 @@ export const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeaway
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
 
-        const todayTakeaway = all.filter(o => {
-          if (!takeawayTableIds.includes(String(o.table_id))) return false;
-          if (o.status?.toLowerCase() === 'completed') return false;
-          if (o.status?.toLowerCase() === 'draft') return false;
-          const created = new Date(
-            typeof o.created_at === 'string'
-              ? o.created_at.replace(' ', 'T').split('.')[0] + 'Z'
-              : o.created_at
-          );
-          return created >= todayStart;
-        }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        const takeawayOnly = all.filter(o =>
+          takeawayTableIds.includes(String(o.table_id)) &&
+          !['completed', 'draft'].includes(o.status?.toLowerCase())
+        );
+        
+        const latestDay = takeawayOnly
+          .map(o => o.business_day_start)
+          .filter(Boolean)
+          .sort()
+          .pop();
+        
+        const todayTakeaway = takeawayOnly
+          .filter(o => !latestDay || o.business_day_start === latestDay)
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
         setOrders(todayTakeaway);
       } catch (err) {
@@ -1284,73 +1283,66 @@ export const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeaway
 
   if (!isOpen) return null;
 
-  const statusStyle = (s) => ({
-    pending: 'bg-orange-100 text-orange-700',
-    preparing: 'bg-blue-100 text-blue-700',
-    ready: 'bg-green-100 text-green-700',
-    served: 'bg-purple-100 text-purple-700',
-  }[s?.toLowerCase()] || 'bg-gray-100 text-gray-600');
+  const statusStyle = (s) => ORDER_STATUS_BAR[s?.toLowerCase()]?.bar || 'border-t-line-strong';
 
   const calcElapsed = (createdAt) => {
     if (!createdAt) return '';
     const diff = Date.now() - parseISTTimestamp(createdAt);
     const m = Math.floor(diff / 60000);
     if (m < 1) return 'Just now';
-    if (m < 60) return `${m} min ago`;
+    if (m < 60) return `${m} min `;
     const h = Math.floor(m / 60);
-    return h < 24 ? `${h} hr ago` : `${Math.floor(h / 24)} day ago`;
+    return h < 24 ? `${h} hr ` : `${Math.floor(h / 24)} day `;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-xl w-full max-w-md bg-white shadow-xl flex flex-col max-h-[80vh]">
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-md max-h-[80vh] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Takeaway orders">
         {/* Header */}
-        <div className="px-5 py-4 border-b flex justify-between items-center">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-gray-800">Today's Takeaway Orders</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Select an order to add more items</p>
+            <h2 className="text-panel-title text-brand-dark">Today's Takeaway Orders</h2>
+            <p className="text-micro text-ink-muted mt-0.5">Select an order to add more items</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X size={20} />
+          <button onClick={onClose} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
+            <X size={16} />
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+        <div className="flex-1 overflow-y-auto bg-canvas px-modal py-card space-y-item-sm">
           {loading && (
-            <p className="text-sm text-center text-gray-400 py-6">Loading…</p>
+            <p className="text-ui text-center text-ink-muted py-6">Loading…</p>
           )}
           {!loading && orders.length === 0 && (
-            <p className="text-sm text-center text-gray-400 py-6">No takeaway orders today yet.</p>
+            <p className="text-ui text-center text-ink-muted py-6">No takeaway orders today yet.</p>
           )}
           {!loading && orders.map(order => (
             <button
               key={order.id}
               onClick={() => { onSelectOrder(order); onClose(); }}
-              className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-action-primary hover:bg-orange-50 transition group"
+              className={`w-full text-left p-3 rounded-panel border border-line border-t-bar ${statusStyle(order.status)} bg-surface shadow-panel hover:shadow-panel-hover transition-shadow`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-gray-800 font-mono">
+                  <span className="text-ui font-bold text-brand-dark font-mono">
                     #{order.dinein_order_id || order.id}
                   </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${statusStyle(order.status)}`}>
-                    {order.status?.toUpperCase()}
-                  </span>
+                  <ItemStatusBadge status={order.status?.toLowerCase()} />
                 </div>
-                <span className="text-sm font-bold text-action-primary">
+                <span className="text-ui font-bold text-brand-dark">
                   ₹{Number(order.total_price || 0).toFixed(0)}
                 </span>
               </div>
-              <div className="flex items-center justify-between mt-1.5 text-xs text-gray-500">
+              <div className="flex items-center justify-between mt-1.5 text-ui-sm text-ink-muted">
                 <span>{(order.items || []).length} item{(order.items || []).length !== 1 ? 's' : ''}</span>
                 <span className="flex items-center gap-1">
-                  <Clock size={11} className="text-orange-400" />
+                  <Clock size={11} className="text-brand" />
                   {calcElapsed(order.created_at)}
                 </span>
               </div>
               {(order.items || []).length > 0 && (
-                <p className="mt-1 text-xs text-gray-400 truncate">
+                <p className="mt-1 text-ui-sm text-ink-muted truncate">
                   {order.items.slice(0, 3).map(i => i.item_name).join(', ')}
                   {order.items.length > 3 ? ` +${order.items.length - 3} more` : ''}
                 </p>
@@ -1360,10 +1352,10 @@ export const TakeawayOrdersModal = ({ isOpen, onClose, clientId, token, takeaway
         </div>
 
         {/* Footer — new order option */}
-        <div className="px-4 py-3 border-t bg-gray-50 rounded-b-xl">
+        <div className="px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             onClick={() => { onSelectOrder(null); onClose(); }}
-            className="w-full py-2.5 rounded-lg border-2 border-dashed border-orange-300 text-orange-600 text-sm font-semibold hover:bg-orange-50 transition"
+            className="w-full h-control rounded-button-sm border-2 border-dashed border-brand-line bg-surface text-brand-dark text-ui font-semibold hover:bg-brand-light transition-colors"
           >
             + Start a new takeaway order
           </button>
@@ -1376,19 +1368,19 @@ export const StockConfirmModal = ({ pending, onCancel, onConfirmed }) => {
   if (!pending) return null;
   const { item } = pending;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-xl w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-red-600">Stock Alert</h2>
-          <button onClick={onCancel} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Stock alert">
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h2 className="text-panel-title text-brand-dark">Stock Alert</h2>
+          <button onClick={onCancel} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors"><X size={16} /></button>
         </div>
-        <div className="px-6 py-5">
-          <p className="text-sm text-gray-700 font-semibold mb-1">{item?.name}</p>
-          <p className="text-sm text-gray-500">Availability reached zero. Do you still want to proceed?</p>
+        <div className="flex-1 overflow-y-auto px-modal py-card">
+          <p className="text-ui text-brand-dark font-bold mb-1">{item?.name}</p>
+          <p className="text-ui text-ink-muted">Availability reached zero. Do you still want to proceed?</p>
         </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
-          <button onClick={onCancel} className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Cancel</button>
-          <button onClick={onConfirmed} className="flex-1 py-2.5 rounded-lg font-bold text-sm bg-red-600 hover:bg-red-700 text-white">Proceed</button>
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
+          <button onClick={onCancel} className="ui-btn">Cancel</button>
+          <button onClick={onConfirmed} className="ui-btn ui-btn-add">Proceed</button>
         </div>
       </div>
     </div>

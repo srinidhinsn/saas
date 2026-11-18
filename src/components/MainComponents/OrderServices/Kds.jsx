@@ -1,13 +1,13 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-icons/fa';
-import { Filter, Clock, Users, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw } from 'lucide-react';
+import { Filter, Clock, Users, User, Package, Truck, Trash2, BarChart2, X, ChevronRight, Calendar, RotateCcw, LayoutGrid, ListChecks, Store } from 'lucide-react';
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import { parseISTTimestamp, getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
-import { isPackagingMenuRecord  } from '../../utils/Menu-utils/menuUtils';
+import { isPackagingMenuRecord } from '../../utils/Menu-utils/menuUtils';
 import { returnRentalItems } from '../../utils/Menu-utils/rentalReturn';
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -18,6 +18,7 @@ const KDS_CONFIG = {
   FILTERS: {
     ALL: 'ALL',
     DINEIN: 'DINEIN',
+    WALKIN: 'WALKIN',
     TAKEAWAY: 'TAKEAWAY',
     DELIVERY: 'DELIVERY',
   },
@@ -44,9 +45,46 @@ const KDS_CONFIG = {
 const ORDER_FILTER_OPTIONS = [
   { key: KDS_CONFIG.FILTERS.ALL, label: 'All Orders', Icon: Filter },
   { key: KDS_CONFIG.FILTERS.DINEIN, label: 'Dine-In', Icon: Users },
+  { key: KDS_CONFIG.FILTERS.WALKIN, label: 'Walk-In', Icon: User },
   { key: KDS_CONFIG.FILTERS.TAKEAWAY, label: 'Takeaway', Icon: Package },
   { key: KDS_CONFIG.FILTERS.DELIVERY, label: 'Delivery', Icon: Truck },
 ];
+
+const STATUS_FILTER_OPTIONS = [
+  { key: 'ALL', label: 'All Status' },
+  { key: KDS_CONFIG.STATUS.PENDING, label: 'Pending' },
+  { key: KDS_CONFIG.STATUS.PREPARING, label: 'Preparing' },
+  { key: KDS_CONFIG.STATUS.READY, label: 'Ready' },
+  { key: KDS_CONFIG.STATUS.SERVED, label: 'Served' },
+];
+
+const VIEWS = { ORDER: 'order', ITEM: 'item', COUNTER: 'counter' };
+
+const VIEW_TABS = [
+  { key: VIEWS.ORDER, label: 'Order View', Icon: LayoutGrid },
+  { key: VIEWS.ITEM, label: 'Item View', Icon: ListChecks },
+  { key: VIEWS.COUNTER, label: 'Counter View', Icon: Store },
+];
+
+// Top-edge colour of an order card = order status (same tokens as the floor view)
+const STATUS_BAR = {
+  pending: 'border-t-status-pending',
+  preparing: 'border-t-status-preparing',
+  ready: 'border-t-status-ready',
+  served: 'border-t-status-served',
+};
+
+const ORDER_STATUS_BAR = {
+  pending: { bar: 'border-t-status-pending', dot: 'bg-status-pending' },
+  preparing: { bar: 'border-t-status-preparing', dot: 'bg-status-preparing' },
+  ready: { bar: 'border-t-status-ready', dot: 'bg-status-ready' },
+  served: { bar: 'border-t-status-served', dot: 'bg-status-served' },
+  cancelled: { bar: 'border-t-gray-300', dot: 'bg-gray-300' },
+};
+
+const INVENTORY_API = import.meta.env.VITE_API_INVENTORY_SERVICE_URL;
+const COUNTER_ROOT = import.meta.env.VITE_MENU_COUNTER;
+const CATEGORY_ROOT = import.meta.env.VITE_MENU_DEFAULT_ROOT;
 
 // ─── Elapsed time helper ───────────────────────────────────────────────────────
 
@@ -128,6 +166,34 @@ const isServedLikeStatus = (status) => {
   return normalized === KDS_CONFIG.STATUS.SERVED || normalized.includes('return');
 };
 
+// Order mode of a card: the order's own `mode` when the backend sends it,
+// otherwise inferred from the table name (Walk-in / Takeaway / Delivery tables).
+const getOrderMode = (card, tablesMap) => {
+  const { WALKIN, TAKEAWAY, DELIVERY, DINEIN } = KDS_CONFIG.FILTERS;
+  const clean = (v) => String(v || '').toLowerCase().replace(/[^a-z]/g, '');
+  const mode = clean(card.mode);
+  if (mode.includes('walk')) return WALKIN;
+  if (mode.includes('take')) return TAKEAWAY;
+  if (mode.includes('deliver')) return DELIVERY;
+  if (mode.includes('dine')) return DINEIN;
+  const table = clean(tablesMap[card.table_id]);
+  if (table.includes('walk')) return WALKIN;
+  if (table.includes('takeaway')) return TAKEAWAY;
+  if (table.includes('deliver')) return DELIVERY;
+  return DINEIN;
+};
+
+// Status shown for a card: "ready" once every item is ready/served (same rule as the card's top bar)
+const getCardStatus = (card) => {
+  const { READY, SERVED } = KDS_CONFIG.STATUS;
+  if (card.items?.length > 0 && card.items.every((i) => i.status === SERVED)) return SERVED;
+  const allReady =
+    card.items?.length > 0 &&
+    card.items.every((i) => i.status === READY || i.status === SERVED) &&
+    !card.items.every((i) => i.status === SERVED);
+  return allReady ? READY : card.status;
+};
+
 // ─── Derive card-level status from its items ───────────────────────────────────
 const minutesElapsed = (createdAt) => {
   if (!createdAt) return 0;
@@ -153,82 +219,11 @@ const isComboItem = (orderItem, menuRecord) => {
   return isComboCategory && hasLineItems;
 };
 
-// ─── Delete item confirmation modal ───────────────────────────────────────────
+// ─── Shared aggregation logic ──────────────────────────────────────────────────
+// Groups active (not served / cancelled) items by name. `predicate` lets the
+// counter view reuse this for each counter.
 
-const DeleteItemModal = ({ isOpen, onClose, onConfirm, itemName }) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="w-full max-w-sm rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
-        <div className="px-6 py-4 border-b">
-          <h3 className="text-lg font-semibold text-red-600">Remove Item</h3>
-        </div>
-        <div className="px-6 py-4">
-          <p className="text-sm text-gray-600">
-            Remove <span className="font-semibold">{itemName}</span> from this order?
-          </p>
-        </div>
-        <div className="px-6 py-4 flex justify-end gap-3 border-t">
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
-          >
-            Remove
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-
-// ─── Delete order confirmation modal ──────────────────────────────────────────
-
-const DeleteOrderModal = ({ isOpen, onClose, onConfirm, cardToDelete }) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="w-full max-w-md rounded-xl overflow-hidden shadow-lg bg-white text-gray-900">
-        <div className="px-6 py-5 border-b">
-          <h3 className="text-lg font-semibold">Confirm Delete</h3>
-        </div>
-        <div className="px-6 py-4">
-          <p className="text-sm text-gray-600">
-            {!cardToDelete?.is_sub_order
-              ? 'Delete this order and ALL its sub-orders?'
-              : `Delete sub-order #${cardToDelete?.dinein_order_id}?`}
-          </p>
-        </div>
-        <div className="px-6 py-4 flex justify-end gap-3 border-t">
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 rounded-md bg-red-500 text-white font-semibold hover:bg-red-600 transition-colors"
-          >
-            Yes
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-          >
-            No
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─── AggregatePanel ─────────────────────────────────────────────────────────────
-
-const AggregatePanel = ({ cards, tablesMap,menuItemsMap, onClose }) => {
+const buildItemEntries = (cards, tablesMap, predicate = () => true) => {
   const aggregateMap = {};
 
   cards.forEach((card) => {
@@ -236,10 +231,9 @@ const AggregatePanel = ({ cards, tablesMap,menuItemsMap, onClose }) => {
       tablesMap[card.table_id] || `${KDS_CONFIG.DEFAULT_TABLE_PREFIX}${card.table_id}`;
     (card.items || []).forEach((item) => {
       if (item.status === KDS_CONFIG.STATUS.SERVED || isCancelledStatus(item.status)) return;
+      if (!predicate(item)) return;
       const name = item.item_name || 'Unnamed';
-      if (!aggregateMap[name]) {
-        aggregateMap[name] = { totalQty: 0, orders: [] };
-      }
+      if (!aggregateMap[name]) aggregateMap[name] = { totalQty: 0, orders: [] };
       aggregateMap[name].totalQty += item.quantity || 1;
       aggregateMap[name].orders.push({
         tableLabel,
@@ -252,105 +246,233 @@ const AggregatePanel = ({ cards, tablesMap,menuItemsMap, onClose }) => {
     });
   });
 
-  const entries = Object.entries(aggregateMap).sort(
-    (a, b) => b[1].totalQty - a[1].totalQty
-  );
-
+  const entries = Object.entries(aggregateMap).sort((a, b) => b[1].totalQty - a[1].totalQty);
   entries.forEach(([, data]) => {
     data.orders.sort(
       (a, b) => parseISTTimestamp(a.createdAt || 0) - parseISTTimestamp(b.createdAt || 0)
     );
   });
+  return entries;
+};
 
-  const urgencyColor = (createdAt) => {
-    const m = minutesElapsed(createdAt);
-    if (m >= 20) return 'bg-red-100 text-red-700 border-red-300';
-    if (m >= 10) return 'bg-orange-100 text-orange-700 border-orange-300';
-    return 'bg-green-50 text-green-700 border-green-200';
-  };
+// ─── ItemCard — one card per item, same structure as KitchenCard ───────────────
 
-  const urgencyDot = (createdAt) => {
-    const m = minutesElapsed(createdAt);
-    if (m >= 20) return 'bg-red-500';
-    if (m >= 10) return 'bg-orange-400';
-    return 'bg-green-400';
-  };
+const ItemCard = ({ itemName, data }) => {
+  const orderCount = data.orders.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-action-primary rounded-t-2xl">
-          <div className="flex items-center gap-3">
-            <BarChart2 size={22} className="text-white" />
-            <h2 className="text-lg font-bold text-white">Kitchen Aggregate View</h2>
-            <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full font-semibold">
-              {entries.length} items
-            </span>
-          </div>
-          <button onClick={onClose} className="text-white hover:text-white/70 transition-colors">
-            <X size={22} />
-          </button>
-        </div>
+    <div className="flex flex-col overflow-hidden ui-card">
 
-        <div className="flex items-center gap-4 px-6 py-2 bg-gray-50 border-b text-xs text-gray-500">
-          <span className="font-semibold">Priority:</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> &gt;20 min — urgent</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400 inline-block" /> 10–20 min — watch</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> &lt;10 min — fresh</span>
-        </div>
-
-        <div className="overflow-y-auto flex-1 p-6 space-y-4">
-          {entries.length === 0 ? (
-            <p className="text-center text-gray-400 py-8">No active items</p>
-          ) : (
-            entries.map(([itemName, data]) => (
-              <div key={itemName} className="rounded-xl border border-gray-200 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-                  <span className="font-bold text-gray-800 text-base">{itemName}</span>
-                  <span className="bg-action-primary text-white text-sm font-bold px-3 py-1 rounded-full">
-                    × {data.totalQty} total
-                  </span>
-                </div>
-                <div className="divide-y divide-gray-100">
-                  {data.orders.map((ord, idx) => (
-                    <div
-                      key={`${ord.cardId}-${idx}`}
-                      className={`flex items-center justify-between px-4 py-2.5 ${urgencyColor(ord.createdAt)} border-l-4`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${urgencyDot(ord.createdAt)}`}
-                        />
-                        <div>
-                          <span className="font-semibold text-sm">{ord.tableLabel}</span>
-                          <span className="text-xs ml-2 opacity-70">#{ord.dineinOrderId}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-semibold opacity-60">
-                          {idx === 0 ? '🔴 Serve first' : `#${idx + 1}`}
-                        </span>
-                        <span className="text-xs opacity-60">
-                          {calculateElapsedTime(ord.createdAt)} ago
-                        </span>
-                        <span className="font-bold text-sm">× {ord.qty}</span>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-semibold
-                            ${ord.itemStatus === 'ready' ? 'bg-green-200 text-green-800' :
-                              ord.itemStatus === 'preparing' ? 'bg-orange-200 text-orange-800' :
-                                'bg-blue-100 text-blue-700'}`}
-                        >
-                          {ord.itemStatus}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
+      {/* ── Card header ── */}
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
+        <div className="flex items-center justify-between w-full gap-3">
+          <span className="text-body-sm font-bold text-brand-dark truncate" title={itemName}>
+            {itemName}
+          </span>
+          <span className="text-kpi text-brand-dark flex-shrink-0">× {data.totalQty}</span>
         </div>
       </div>
+
+      {/* ── Card body — order list ── */}
+      <div className="px-3 py-2 space-y-2 flex-1">
+        {data.orders.map((ord, idx) => (
+          <div key={`${ord.cardId}-${idx}`} className="flex flex-col w-full rounded-button-sm">
+            <div className="flex items-center justify-between w-full">
+              <span className="font-semibold text-ui text-ink">
+                <span className="mr-1">{ord.qty} x</span>
+                <span>{ord.tableLabel}</span>
+                <span className="text-ui-sm ml-2 text-ink-muted">#{ord.dineinOrderId}</span>
+              </span>
+              <span className="inline-flex items-center gap-1 text-micro font-bold px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line">
+                <span
+                  className={`h-1.5 w-1.5 rounded-badge
+                    ${ord.itemStatus === 'ready' ? 'bg-status-ready' :
+                      ord.itemStatus === 'preparing' ? 'bg-status-preparing' :
+                        'bg-status-pending'}`}
+                />
+                {ord.itemStatus}
+              </span>
+            </div>
+            <div className="mt-0.5 flex items-center justify-between text-micro text-ink-muted">
+              <span>{calculateElapsedTime(ord.createdAt)} ago</span>
+              <span className="font-semibold text-ink-soft">{idx === 0 ? 'Serve first' : `#${idx + 1}`}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Card footer ── */}
+      <div className="px-3 py-2 border-t border-line-soft bg-canvas/40 flex items-center justify-between">
+        <span className="text-micro font-bold tracking-wide uppercase text-ink-muted">
+          {orderCount} {orderCount === 1 ? 'order' : 'orders'}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// ─── ItemView (formerly AggregatePanel) ────────────────────────────────────────
+
+const ItemView = ({ cards, tablesMap }) => {
+  const entries = buildItemEntries(cards, tablesMap);
+
+  if (entries.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-ui text-ink-muted">No active items</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-tiles">
+      {entries.map(([itemName, data]) => (
+        <ItemCard key={itemName} itemName={itemName} data={data} />
+      ))}
+    </div>
+  );
+};
+
+// ─── CounterView — items grouped by the counter they belong to ─────────────────
+// Counter → assigned category ids (can be a level-one group or a child category,
+// same as CounterManager). An item belongs to a counter if its category, or any
+// ancestor of its category, is assigned to that counter.
+
+const collectIds = (nodes = []) =>
+  nodes.flatMap((n) => [n.id, ...collectIds(n.subCategories || [])]);
+
+const buildParentMap = (nodes = [], parentId = null, map = {}) => {
+  nodes.forEach((n) => {
+    if (parentId) map[n.id] = parentId;
+    buildParentMap(n.subCategories || [], n.id, map);
+  });
+  return map;
+};
+
+const CounterView = ({ cards, tablesMap, menuItemsMap, clientId, token }) => {
+  const [counters, setCounters] = useState([]);
+  const [parentMap, setParentMap] = useState({});
+  const [loadingCounters, setLoadingCounters] = useState(true);
+
+  useEffect(() => {
+    if (!clientId || !token) return;
+    let cancelled = false;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const load = async () => {
+      try {
+        const [counterRes, catRes] = await Promise.all([
+          axios.get(`${INVENTORY_API}/${clientId}/inventory/read_category?category_id=${COUNTER_ROOT}`, {
+            params: { client_id: clientId }, headers,
+          }),
+          axios.get(`${INVENTORY_API}/${clientId}/inventory/read_category?category_id=${CATEGORY_ROOT}`, {
+            params: { client_id: clientId }, headers,
+          }),
+        ]);
+        if (cancelled) return;
+        setCounters(counterRes.data?.data?.[0]?.subCategories || []);
+        setParentMap(buildParentMap(catRes.data?.data?.[0]?.subCategories || [], catRes.data?.data?.[0]?.id));
+      } catch (err) {
+        console.error('Error loading counters:', err);
+        toast.error('Failed to load counters');
+      } finally {
+        if (!cancelled) setLoadingCounters(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [clientId, token]);
+
+  // counterId -> Set of assigned category ids (including descendants)
+  const counterCategorySets = useMemo(() => {
+    const m = {};
+    counters.forEach((c) => { m[c.id] = new Set(collectIds(c.subCategories || [])); });
+    return m;
+  }, [counters]);
+
+  // Which counters does this order item belong to?
+  const countersForItem = useCallback((item) => {
+    const rec = menuItemsMap[String(item.item_id)];
+    const catId = rec?.category_id;
+    if (!catId) return [];
+    const chain = [];
+    let cur = catId;
+    const seen = new Set();
+    while (cur && !seen.has(cur)) {
+      chain.push(cur);
+      seen.add(cur);
+      cur = parentMap[cur];
+    }
+    return counters
+      .filter((c) => chain.some((id) => counterCategorySets[c.id]?.has(id)))
+      .map((c) => c.id);
+  }, [menuItemsMap, parentMap, counters, counterCategorySets]);
+
+  const sections = useMemo(() => {
+    const result = counters.map((c) => ({
+      id: c.id,
+      name: c.name,
+      entries: buildItemEntries(cards, tablesMap, (item) => countersForItem(item).includes(c.id)),
+    }));
+    result.push({
+      id: '__unassigned__',
+      name: 'Unassigned',
+      entries: buildItemEntries(cards, tablesMap, (item) => countersForItem(item).length === 0),
+    });
+    return result;
+  }, [counters, cards, tablesMap, countersForItem]);
+
+  if (loadingCounters) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-ui text-ink-muted">Loading counters...</div>
+      </div>
+    );
+  }
+
+  const shownSections = sections.filter((s) => s.id !== '__unassigned__' || s.entries.length > 0);
+  const totalQty = (s) => s.entries.reduce((sum, [, d]) => sum + d.totalQty, 0);
+
+  if (shownSections.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-ui text-ink-muted">
+          No counters configured. Create them from Counter Management.
+        </div>
+      </div>
+    );
+  }
+
+  // Counters sit side by side so every counter is visible at once.
+  // Each column stacks its item cards vertically; with many counters the
+  // row scrolls horizontally instead of squeezing the cards.
+  return (
+    <div className="flex items-start gap-tiles overflow-x-auto pb-2">
+      {shownSections.map((section) => (
+        <section key={section.id} className="flex-1 min-w-[280px]">
+          <div className="flex items-center justify-between px-3 py-2 mb-3 rounded-panel bg-brand-light border border-brand-line">
+            <div className="flex items-center gap-2">
+              <Store size={16} className="text-brand" />
+              <h3 className="text-panel-title text-brand-dark">{section.name}</h3>
+            </div>
+            <span className="text-micro font-bold px-2 py-0.5 rounded-badge bg-surface text-brand-dark border border-brand-line">
+              {section.entries.length} items · {totalQty(section)} qty
+            </span>
+          </div>
+
+          {section.entries.length === 0 ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-ui text-ink-muted">No active items</div>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {section.entries.map(([itemName, data]) => (
+                <ItemCard key={itemName} itemName={itemName} data={data} />
+              ))}
+            </div>
+          )}
+        </section>
+      ))}
     </div>
   );
 };
@@ -374,10 +496,10 @@ const ComboComponentsList = ({ menuRecord, menuItemsMap, parentQuantity = 1 }) =
         components.map((comp, idx) => (
           <div
             key={comp.id || idx}
-            className="flex items-center gap-1.5 pl-3 border-l-2 border-violet-300 py-0.5"
+            className="flex items-center gap-1.5 pl-3 border-l-2 border-brand-line py-0.5"
           >
-            <ChevronRight size={10} className="text-violet-400 flex-shrink-0" />
-            <span className="text-[11px] text-violet-700 font-medium leading-tight">
+            <ChevronRight size={10} className="text-brand flex-shrink-0" />
+            <span className="text-ui-sm text-brand-dark font-semibold leading-tight">
               {parentQuantity > 1 && (
                 <span className="font-bold mr-1">{parentQuantity}×</span>
               )}
@@ -386,8 +508,8 @@ const ComboComponentsList = ({ menuRecord, menuItemsMap, parentQuantity = 1 }) =
           </div>
         ))
       ) : (
-        <div className="pl-3 border-l-2 border-violet-200 py-0.5">
-          <span className="text-[11px] text-violet-500 font-medium">
+        <div className="pl-3 border-l-2 border-brand-line py-0.5">
+          <span className="text-ui-sm text-ink-muted font-semibold">
             {parentQuantity > 1 ? `${parentQuantity}× ` : ''}
             {componentIds.length} included item{componentIds.length !== 1 ? 's' : ''}
           </span>
@@ -431,7 +553,7 @@ const KitchenCard = ({
   card,
   tablesMap,
   menuItemsMap,
-  onItemStatusChange,nowTick = Date.now(), isRental = false, 
+  onItemStatusChange, nowTick = Date.now(), isRental = false,
 }) => {
   // Track which item buttons are currently being saved to prevent double-clicks
   const [pendingItemIds, setPendingItemIds] = useState(new Set());
@@ -440,20 +562,22 @@ const KitchenCard = ({
   const rentedDateLabel = isRental ? formatRentedDate(card.created_at) : null;
   const agingDays = isRental ? calculateAgingDays(card.created_at) : null;
   const allReady =
-  card.items?.length > 0 &&
-  card.items.every((i) => i.status === KDS_CONFIG.STATUS.READY || i.status === KDS_CONFIG.STATUS.SERVED) &&
-  !card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED);
+    card.items?.length > 0 &&
+    card.items.every((i) => i.status === KDS_CONFIG.STATUS.READY || i.status === KDS_CONFIG.STATUS.SERVED) &&
+    !card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED);
 
   const statusColorClass =
-  allReady
-    ? 'text-yellow-500'
-    : card.status === KDS_CONFIG.STATUS.SERVED
-      ? 'text-green-600'
-      : card.status === KDS_CONFIG.STATUS.PENDING
-        ? 'text-blue-600'
-        : card.status === KDS_CONFIG.STATUS.PREPARING
-          ? 'text-orange-600'
-          : '';
+    allReady
+      ? 'text-status-ready'
+      : card.status === KDS_CONFIG.STATUS.SERVED
+        ? 'text-status-served'
+        : card.status === KDS_CONFIG.STATUS.PENDING
+          ? 'text-status-pending'
+          : card.status === KDS_CONFIG.STATUS.PREPARING
+            ? 'text-status-preparing'
+            : '';
+
+  const cardBar = STATUS_BAR[allReady ? KDS_CONFIG.STATUS.READY : card.status] || 'border-t-line-strong';
 
   const handleStatusClick = async (cardId, itemId, newStatus) => {
     if (pendingItemIds.has(itemId)) return; // debounce rapid taps
@@ -470,22 +594,22 @@ const KitchenCard = ({
   };
 
   return (
-    <div className="rounded-xl shadow-md overflow-hidden border border-gray-200 bg-white transition-transform transform hover:-translate-y-0.5 flex flex-col">
+    <div className={`flex flex-col overflow-hidden ui-card ${cardBar}`}>
 
       {/* ── Card header ── */}
-      <div className="flex items-center justify-between px-4 py-3 bg-action-primary text-text-white">
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
         <div className="flex items-center justify-between w-full">
 
           {/* Table name */}
-          <span className="text-sm md:text-base font-semibold">
+          <span className="text-body-sm font-bold text-brand-dark">
             {tablesMap[card.table_id] || `${KDS_CONFIG.DEFAULT_TABLE_PREFIX}${card.table_id}`}
           </span>
-          <div className="flex items-center gap-2 text-xl font-semibold text-white">
-            <Clock size={16} />
+          <div className="flex items-center gap-1 text-ui font-bold text-ink-muted">
+            <Clock size={14} className="text-brand" />
             <span>{elapsedTime}</span>
           </div>
           <div className="flex flex-col items-end">
-            <span className="text-xl font-semibold text-orange-100/80">
+            <span className="text-body-sm font-bold text-brand-dark">
               #{card.dinein_order_id}
             </span>
           </div>
@@ -493,25 +617,25 @@ const KitchenCard = ({
       </div>
 
       {/* ── Card body — item list ── */}
-      <div className="bg-bg-primary px-4 py-4 space-y-3 flex-1">
+      <div className="px-3 py-2 space-y-2 flex-1">
         {groupItemsWithAddons(card.items, menuItemsMap).map(({ main: item, addons }, idx) => {
           const menuRecord = menuItemsMap[String(item.item_id)];
           const combo = isComboItem(item, menuRecord);
           const isPending = pendingItemIds.has(item.id);
           const isCancelled = isCancelledStatus(item.status);
-          const isReturned = isServedLikeStatus(item.status);    
+          const isReturned = isServedLikeStatus(item.status);
           return (
-            <div key={item.id || idx} className="flex flex-col w-full rounded-lg bg-white">
+            <div key={item.id || idx} className="flex flex-col w-full rounded-button-sm">
               {/* Main item row — unchanged */}
               <div className="flex items-center w-full">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-medium text-sm">
+                    <span className="font-semibold text-ui text-ink">
                       <span className="mr-1">{item.quantity} x</span>
                       <span>{item.item_name || 'Unnamed Item'}</span>
                     </span>
                     {combo && (
-                      <span className="text-[10px] bg-violet-100 text-violet-700 font-bold px-1.5 py-0.5 rounded-full">
+                      <span className="text-micro bg-brand-pill text-brand-dark border border-brand-line font-bold px-1.5 py-0.5 rounded-badge">
                         COMBO
                       </span>
                     )}
@@ -527,8 +651,8 @@ const KitchenCard = ({
                     return (
                       <div className="mt-1">
                         <span
-                          className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full
-                            ${overdue ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}
+                          className={`inline-flex items-center gap-1 text-micro font-bold px-2 py-0.5 rounded-badge
+                            ${overdue ? 'bg-state-occupied-bg text-state-occupied' : 'bg-state-other-bg text-state-other'}`}
                           title={tier.label ? `Tier: ${tier.label}` : undefined}
                         >
                           {overdue ? `⚠ Overdue ${durationLabel}` : `⏳ ${durationLabel} left`}
@@ -538,81 +662,78 @@ const KitchenCard = ({
                   })()}
                 </div>
                 <div className="flex items-center gap-1 ml-3">
-                {isRental ? (
-                   isReturned ? (
-                    <span
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-500"
-                    >
-                      <FaCheckCircle size={14} className="text-green-500" />
-                      Returned
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={isPending || isCancelled}
-                      onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.CANCELLED)}
-                      title="Mark as Returned"
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors
-                        ${isPending || isCancelled
-                          ? 'opacity-40 cursor-not-allowed bg-gray-100 text-gray-400'
-                          : 'bg-green-600 text-white hover:bg-green-700'}`}
-                    >
-                      <RotateCcw size={14} />
-                      Mark as Returned
-                    </button>)
-                  ) :(<>   <button
+                  {isRental ? (
+                    isReturned ? (
+                      <span
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-button-sm text-ui-sm font-semibold bg-brand-light text-ink-muted border border-brand-line"
+                      >
+                        <FaCheckCircle size={14} className="text-state-vacant" />
+                        Returned
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isPending || isCancelled}
+                        onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.CANCELLED)}
+                        title="Mark as Returned"
+                        className="ui-btn ui-btn-add !h-8"
+                      >
+                        <RotateCcw size={14} />
+                        Mark as Returned
+                      </button>)
+                  ) : (<>   <button
                     type="button"
                     disabled={isPending || isCancelled}
                     onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PENDING)}
                     title="Mark as Pending"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     <FaClock
                       size={20}
-                      className={item.status === 'pending' ? 'text-blue-600' : 'text-gray-400'}
+                      className={item.status === 'pending' ? 'text-status-pending' : 'text-ink-faint'}
                     />
                   </button>
-                  <button
-                    type="button"
-                    disabled={isPending || isCancelled}
-                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
-                    title="Mark as Preparing"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    <FaHourglassHalf
-                      size={20}
-                      className={item.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'}
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isPending || isCancelled}
-                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
-                    title="Mark as Ready"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    <FaCheckCircle
-                      size={20}
-                      className={item.status === 'ready' ? 'text-green-500' : 'text-gray-400'}
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isPending || isCancelled}
-                    onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.SERVED)}
-                    title="Mark as Served"
-                    className={`p-2 rounded-md hover:bg-gray-100 transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                  >
-                    <FaConciergeBell
-                      size={20}
-                      className={item.status === 'served' ? 'text-purple-500' : 'text-gray-400'}
-                    />
-                  </button></>)} 
+                    <button
+                      type="button"
+                      disabled={isPending || isCancelled}
+                      onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.PREPARING)}
+                      title="Mark as Preparing"
+                      className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      <FaHourglassHalf
+                        size={20}
+                        className={item.status === 'preparing' ? 'text-status-preparing' : 'text-ink-faint'}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending || isCancelled}
+                      onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.READY)}
+                      title="Mark as Ready"
+                      className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      <FaCheckCircle
+                        size={20}
+                        className={item.status === 'ready' ? 'text-status-ready' : 'text-ink-faint'}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending || isCancelled}
+                      onClick={() => handleStatusClick(card.card_id, item.id, KDS_CONFIG.STATUS.SERVED)}
+                      title="Mark as Served"
+                      className={`p-2 rounded-button-sm hover:bg-brand-light transition-colors ${isPending || isCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      <FaConciergeBell
+                        size={20}
+                        className={item.status === 'served' ? 'text-status-served' : 'text-ink-faint'}
+                      />
+                    </button></>)}
                 </div>
               </div>
 
               {/* Combo components list — unchanged */}
-              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} parentQuantity={item.quantity ?? 1}  />}
+              {combo && <ComboComponentsList menuRecord={menuRecord} menuItemsMap={menuItemsMap} parentQuantity={item.quantity ?? 1} />}
 
               {/* Addon rows — identified by "addon_" prefix on frontend_unique_key */}
               {/* Addon rows */}
@@ -623,32 +744,32 @@ const KitchenCard = ({
                     const isAddonCancelled = isCancelledStatus(addon.status);
                     return (
                       <div key={addon.id || ai}
-                        className="flex items-center gap-1.5 pl-3 border-l-2 border-blue-300 py-0.5">
-                        <ChevronRight size={10} className="text-blue-400 flex-shrink-0" />
-                        <span className="text-[11px] text-blue-700 font-medium leading-tight flex-1">
+                        className="flex items-center gap-1.5 pl-3 border-l-2 border-brand-line py-0.5">
+                        <ChevronRight size={10} className="text-brand flex-shrink-0" />
+                        <span className="text-ui-sm text-ink-soft font-semibold leading-tight flex-1">
                           {addon.quantity} × {addon.item_name || 'Addon'}
                         </span>
                         <div className="flex items-center gap-1">
                           <button type="button" disabled={isAddonPending || isAddonCancelled}
                             onClick={() => handleStatusClick(card.card_id, addon.id, KDS_CONFIG.STATUS.PENDING)}
-                            className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                            <FaClock size={14} className={addon.status === 'pending' ? 'text-blue-600' : 'text-gray-400'} />
+                            className={`p-1 rounded-seg hover:bg-brand-light ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <FaClock size={14} className={addon.status === 'pending' ? 'text-status-pending' : 'text-ink-faint'} />
                           </button>
                           <button type="button" disabled={isAddonPending || isAddonCancelled}
                             onClick={() => handleStatusClick(card.card_id, addon.id, KDS_CONFIG.STATUS.PREPARING)}
-                            className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                            <FaHourglassHalf size={14} className={addon.status === 'preparing' ? 'text-orange-500' : 'text-gray-400'} />
+                            className={`p-1 rounded-seg hover:bg-brand-light ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <FaHourglassHalf size={14} className={addon.status === 'preparing' ? 'text-status-preparing' : 'text-ink-faint'} />
                           </button>
                           <button type="button" disabled={isAddonPending || isAddonCancelled}
                             onClick={() => handleStatusClick(card.card_id, addon.id, KDS_CONFIG.STATUS.READY)}
-                            className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                            <FaCheckCircle size={14} className={addon.status === 'ready' ? 'text-green-500' : 'text-gray-400'} />
+                            className={`p-1 rounded-seg hover:bg-brand-light ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <FaCheckCircle size={14} className={addon.status === 'ready' ? 'text-status-ready' : 'text-ink-faint'} />
                           </button>
                           <button type="button" disabled={isAddonPending || isAddonCancelled}
                             onClick={() => handleStatusClick(card.card_id, addon.id, KDS_CONFIG.STATUS.SERVED)}
                             title="Mark as Served"
-                            className={`p-1 rounded hover:bg-gray-100 ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
-                            <FaConciergeBell size={14} className={addon.status === 'served' ? 'text-purple-500' : 'text-gray-400'} />
+                            className={`p-1 rounded-seg hover:bg-brand-light ${isAddonPending || isAddonCancelled ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                            <FaConciergeBell size={14} className={addon.status === 'served' ? 'text-status-served' : 'text-ink-faint'} />
                           </button>
                         </div>
                       </div>
@@ -662,11 +783,11 @@ const KitchenCard = ({
       </div>
 
       {/* ── Card footer — status label ── */}
-      <div className="px-4 py-3 border-t border-gray-100 bg-white flex items-center justify-between">
-        <span className={`text-l font-semibold uppercase ${statusColorClass}`}>
+      {/* <div className="px-3 py-2 border-t border-line-soft bg-canvas/40 flex items-center justify-between">
+        <span className={`text-micro font-bold tracking-wide uppercase ${statusColorClass}`}>
           {allReady ? 'ready' : card.status}
         </span>
-      </div>
+      </div> */}
     </div>
   );
 };
@@ -674,34 +795,36 @@ const KitchenCard = ({
 
 // ─── Main KitchenDisplay component ────────────────────────────────────────────
 
-const KitchenDisplay = ({clientId, token, realm}) => {
-  const isRental = (realm || '').trim().toLowerCase() === 'rental'; 
+const KitchenDisplay = ({ clientId, token, realm }) => {
+  const isRental = (realm || '').trim().toLowerCase() === 'rental';
   const [cards, setCards] = useState([]);
   const [tablesMap, setTablesMap] = useState({});
   const [menuItemsMap, setMenuItemsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [orderFilter, setOrderFilter] = useState('ALL');
-  const [showAggregate, setShowAggregate] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [activeView, setActiveView] = useState(VIEWS.ORDER);
   const [nowTick, setNowTick] = useState(Date.now());
   // ── Date filter ──────────────────────────────────────────────────────────
   // Defaults to today (live view). Selecting an earlier date switches the
   // page into a "missed orders" lookup mode: same hide-served filtering,
   // but no polling, since past orders don't change on their own.
-const todayDate = new Date().toISOString().split('T')[0];
-const [datePreset, setDatePreset] = useState('today');
-const [customFrom, setCustomFrom] = useState(todayDate);
-const [customTo, setCustomTo] = useState(todayDate);
-const datePresetRef = useRef('today');
-const customFromValRef = useRef(todayDate);
-const customToValRef = useRef(todayDate);
-useEffect(() => { datePresetRef.current = datePreset; }, [datePreset]);
-useEffect(() => { customFromValRef.current = customFrom; }, [customFrom]);
-useEffect(() => { customToValRef.current = customTo; }, [customTo]);
-useEffect(() => {                                      // ← add
-  if (!isRental) return;
-  const t = setInterval(() => setNowTick(Date.now()), 30000);
-  return () => clearInterval(t);
-}, [isRental]);
+  const todayDate = new Date().toISOString().split('T')[0];
+  const [datePreset, setDatePreset] = useState('today');
+  const [customFrom, setCustomFrom] = useState(todayDate);
+  const [customTo, setCustomTo] = useState(todayDate);
+  const datePresetRef = useRef('today');
+  const customFromValRef = useRef(todayDate);
+  const customToValRef = useRef(todayDate);
+  const [showOrderFilter, setShowOrderFilter] = useState(false);
+  useEffect(() => { datePresetRef.current = datePreset; }, [datePreset]);
+  useEffect(() => { customFromValRef.current = customFrom; }, [customFrom]);
+  useEffect(() => { customToValRef.current = customTo; }, [customTo]);
+  useEffect(() => {                                      // ← add
+    if (!isRental) return;
+    const t = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, [isRental]);
   // Stores the canonical item order (array of item ids) per card_id.
   // Persists across re-renders and poll ticks so item positions never shift.
   const itemOrderRef = useRef({});
@@ -768,6 +891,7 @@ useEffect(() => {                                      // ← add
           root_dinein_order_id: mergedOrder.dinein_order_id,
           table_id: mergedOrder.table_id,
           status: mergedOrder.status || 'pending',
+          mode: mergedOrder.mode,
           created_at: mergedOrder.created_at,
           items: activeItems,
           is_sub_order: false,
@@ -778,7 +902,7 @@ useEffect(() => {                                      // ← add
     // One card per sub-order: sort strictly by created_at ascending
     return subOrders
       .slice()
-      .filter((subOrder) => !isCancelledStatus(subOrder.status)) 
+      .filter((subOrder) => !isCancelledStatus(subOrder.status))
       .sort((a, b) => parseISTTimestamp(a.created_at || 0) - parseISTTimestamp(b.created_at || 0))
       .map((subOrder) => ({
         card_id: subOrder.id,
@@ -787,6 +911,7 @@ useEffect(() => {                                      // ← add
         root_dinein_order_id: mergedOrder.dinein_order_id,
         table_id: mergedOrder.table_id,
         status: subOrder.status || 'pending',
+        mode: subOrder.mode ?? mergedOrder.mode,
         created_at: subOrder.created_at,
         items: itemsBySubOrder[subOrder.id] || [],
         is_sub_order: String(subOrder.dinein_order_id).includes('-'),
@@ -839,16 +964,11 @@ useEffect(() => {                                      // ← add
           return;
         }
 
-        // Skip fully-served groups
-        if (mergedOrder.status === KDS_CONFIG.STATUS.SERVED) return;
+        // Served groups are kept: the Order Status filter hides them unless "Served" is chosen
 
         parseIntoCards(mergedOrder).forEach((card) => {
           if (!card.items || card.items.length === 0) return;
           if (isCancelledStatus(card.status)) return;
-          if (
-            card.items.length > 0 &&
-            card.items.every((i) => i.status === KDS_CONFIG.STATUS.SERVED)
-          ) return;
           allCards.push(card);
         });
       });
@@ -924,9 +1044,9 @@ useEffect(() => {                                      // ← add
   }, [fetchOrders]);
 
   useEffect(() => {
-  setLoading(true);
-  fetchOrders();
-}, [datePreset, customFrom, customTo]);
+    setLoading(true);
+    fetchOrders();
+  }, [datePreset, customFrom, customTo]);
 
   // ─── Item status change ───────────────────────────────────────────────────────
 
@@ -938,21 +1058,21 @@ useEffect(() => {                                      // ← add
     if (!targetItem) return;
 
     const fkey = targetItem.frontend_unique_key || '';
-  const isParentItem = !fkey.startsWith('addon_') && !fkey.startsWith('cchild_');
+    const isParentItem = !fkey.startsWith('addon_') && !fkey.startsWith('cchild_');
 
-  const packagingChildren = isParentItem
-    ? (card.items || []).filter(i =>
+    const packagingChildren = isParentItem
+      ? (card.items || []).filter(i =>
         (i.frontend_unique_key || '').startsWith(`addon_${fkey}_`) &&
         isPackagingMenuRecord(menuItemsMap[String(i.item_id)]) &&
         !isCancelledStatus(i.status)
       )
-    : [];
+      : [];
 
-  const changedIds = new Set([String(itemId), ...packagingChildren.map(c => String(c.id))]);
-  const previousStatusMap = {};
-  (card.items || []).forEach(i => {
-    if (changedIds.has(String(i.id))) previousStatusMap[i.id] = i.status;
-  });
+    const changedIds = new Set([String(itemId), ...packagingChildren.map(c => String(c.id))]);
+    const previousStatusMap = {};
+    (card.items || []).forEach(i => {
+      if (changedIds.has(String(i.id))) previousStatusMap[i.id] = i.status;
+    });
 
     const updatedItems = (card.items || []).map((i) =>
       changedIds.has(String(i.id)) && !isCancelledStatus(i.status)
@@ -972,32 +1092,32 @@ useEffect(() => {                                      // ← add
     inflightUpdatesRef.current += 1;
 
     try {
-    const buildPayload = (item) => ({
-      id: item.id,
-      item_id: item.item_id,
-      item_name: item.item_name,
-      quantity: item.quantity,
-      status: newStatus,
-      note: item.note || '',
-      slug: item.slug || '',
-      unit_price: item.unit_price || 0,
-      line_total: (item.unit_price || 0) * (item.quantity || 1),
-      client_id: clientIdRef.current,
-      order_id: card.sub_order_id,
-      frontend_unique_key: item.frontend_unique_key || null,
-      is_addon: item.id !== targetItem.id,
-      parent_item_key: item.id !== targetItem.id ? targetItem.frontend_unique_key : null,
-    });
-
-    if (isRental) {
-      const nextMap = await returnRentalItems({
-        items: [targetItem, ...packagingChildren],
-        menuItemsMap,
-        clientId: clientIdRef.current,
-        token: tokenRef.current,
+      const buildPayload = (item) => ({
+        id: item.id,
+        item_id: item.item_id,
+        item_name: item.item_name,
+        quantity: item.quantity,
+        status: newStatus,
+        note: item.note || '',
+        slug: item.slug || '',
+        unit_price: item.unit_price || 0,
+        line_total: (item.unit_price || 0) * (item.quantity || 1),
+        client_id: clientIdRef.current,
+        order_id: card.sub_order_id,
+        frontend_unique_key: item.frontend_unique_key || null,
+        is_addon: item.id !== targetItem.id,
+        parent_item_key: item.id !== targetItem.id ? targetItem.frontend_unique_key : null,
       });
-      if (nextMap) setMenuItemsMap(nextMap);
-    } else {
+
+      if (isRental) {
+        const nextMap = await returnRentalItems({
+          items: [targetItem, ...packagingChildren],
+          menuItemsMap,
+          clientId: clientIdRef.current,
+          token: tokenRef.current,
+        });
+        if (nextMap) setMenuItemsMap(nextMap);
+      } else {
         const itemsPayload = [targetItem, ...packagingChildren].map(buildPayload);
         await axios.post(
           `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientIdRef.current}/order_items/update?order_id=${card.sub_order_id}`,
@@ -1027,7 +1147,7 @@ useEffect(() => {                                      // ← add
       setCards((prev) =>
         prev.map((c) => {
           if (c.card_id !== cardId) return c;
-          const rolledBackItems  = c.items.map((i) =>
+          const rolledBackItems = c.items.map((i) =>
             changedIds.has(String(i.id)) ? { ...i, status: previousStatusMap[i.id] } : i
           );
           return { ...c, items: rolledBackItems, status: deriveStatus(rolledBackItems) };
@@ -1042,102 +1162,134 @@ useEffect(() => {                                      // ← add
   // ─── Filter cards (sort already applied at fetch time) ───────────────────────
   const filteredCards = cards
     .filter((card) => {
+      if (statusFilter === 'ALL' && getCardStatus(card) === KDS_CONFIG.STATUS.SERVED) return false;
+      if (statusFilter !== 'ALL' && getCardStatus(card) !== statusFilter) return false;
       if (orderFilter === KDS_CONFIG.FILTERS.ALL) return true;
-      const tableName = tablesMap[card.table_id] || '';
-      const isTakeaway = tableName.toLowerCase().includes('takeaway');
-      if (orderFilter === KDS_CONFIG.FILTERS.TAKEAWAY) return isTakeaway;
-      if (orderFilter === KDS_CONFIG.FILTERS.DINEIN) return !isTakeaway;
-      return true;
+      return getOrderMode(card, tablesMap) === orderFilter;
     });
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <>
-      <div className="min-h-screen w-full bg-gray-50 text-gray-900">
-        <div className="mx-auto p-6 lg:py-8">
+    <div className="ui-page">
+      <div className="mx-auto">
 
-          {/* ── Filter bar ── */}
-          <div className="mb-3 overflow-x-auto">
-            <div className="flex gap-2 items-center min-w-max">
-              {ORDER_FILTER_OPTIONS.map(({ key, label, Icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setOrderFilter(key)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${orderFilter === key
-                     ? 'bg-action-primary text-text-white shadow-sm'
-                     : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-                    }`}
-                >
-                  <Icon size={16} />
-                  {label}
-                </button>
-              ))}
-
+        {/* ── Toolbar: view tabs on the left, filters on the right ── */}
+        <div className="ui-panel flex flex-wrap items-center justify-between gap-3">
+          <div className="ui-tabs">
+            {VIEW_TABS.map(({ key, label, Icon }) => (
               <button
-                onClick={() => setShowAggregate(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all bg-purple-600 text-white hover:bg-purple-700 shadow-sm ml-2"
+                key={key}
+                onClick={() => setActiveView(key)}
+                className={`ui-tab inline-flex items-center gap-2 ${activeView === key
+                  ? 'ui-tab-active'
+                  : ''
+                  }`}
               >
-                <BarChart2 size={16} />
-                Aggregate View
-                {filteredCards.length > 0 && (
-                  <span className="bg-white/20 text-white text-xs px-1.5 py-0.5 rounded-full font-bold">
-                    {filteredCards.length}
-                  </span>
-                )}
+                <Icon size={16} />
+                {label}
               </button>
-
-              {/* ── Date filter — defaults to today, lets staff look back for
-                   missed orders on a previous date. Future dates disabled. ── */}
-              <DateRangeFilter
-                datePreset={datePreset}
-                setDatePreset={setDatePreset}
-                customFrom={customFrom}
-                setCustomFrom={setCustomFrom}
-                customTo={customTo}
-                setCustomTo={setCustomTo}
-              />
-            </div>
+            ))}
           </div>
 
-          {/* ── Cards grid ── */}
-          <div className="w-full">
-            {loading ? (
+          <div className="flex items-center gap-x-3 gap-y-1 text-micro text-ink-muted">
+            {Object.entries(ORDER_STATUS_BAR).map(([status, s]) => (
+              <span key={status} className="inline-flex items-center gap-1 capitalize">
+                <span className={`h-2 w-2 rounded-badge ${s.dot}`} />
+                {status}
+              </span>
+            ))}
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-badge bg-state-reserved" /> Draft
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="ui-filter relative min-w-[160px]">
+              <label className="ui-filter-label">
+                Order Type
+              </label>
+              <select
+                value={orderFilter}
+                onChange={(e) => setOrderFilter(e.target.value)}
+                className="ui-filter-control p-2"
+              >
+                {ORDER_FILTER_OPTIONS.map(({ key, label }) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="ui-filter relative min-w-[160px]">
+              <label className="ui-filter-label">
+                Order Status
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="ui-filter-control p-2"
+              >
+                {STATUS_FILTER_OPTIONS.map(({ key, label }) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <DateRangeFilter
+              datePreset={datePreset}
+              setDatePreset={setDatePreset}
+              customFrom={customFrom}
+              setCustomFrom={setCustomFrom}
+              customTo={customTo}
+              setCustomTo={setCustomTo}
+            />
+          </div>
+        </div>
+
+        {/* ── Active view ── */}
+        <div className="w-full">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-ui text-ink-muted">Loading orders...</div>
+            </div>
+          ) : activeView === VIEWS.ORDER ? (
+            filteredCards.length === 0 ? (
               <div className="flex items-center justify-center py-12">
-                <div className="text-lg font-medium text-gray-500">Loading orders...</div>
-              </div>
-            ) : filteredCards.length === 0 ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-lg font-medium text-gray-400">
-                  { 'No active orders'}
-                </div>
+                <div className="text-ui text-ink-muted">No active orders</div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-tiles">
                 {filteredCards.map((card) => (
                   <KitchenCard
                     key={card.card_id}
                     card={card}
                     tablesMap={tablesMap}
                     menuItemsMap={menuItemsMap}
-                    onItemStatusChange={handleItemStatusChange} nowTick={nowTick} isRental={isRental} 
+                    onItemStatusChange={handleItemStatusChange}
+                    nowTick={nowTick}
+                    isRental={isRental}
                   />
                 ))}
               </div>
-            )}
-          </div>
+            )
+          ) : activeView === VIEWS.ITEM ? (
+            <ItemView cards={filteredCards} tablesMap={tablesMap} />
+          ) : (
+            <CounterView
+              cards={filteredCards}
+              tablesMap={tablesMap}
+              menuItemsMap={menuItemsMap}
+              clientId={clientId}
+              token={token}
+            />
+          )}
         </div>
       </div>
-
-      {showAggregate && (
-        <AggregatePanel
-          cards={filteredCards}
-          tablesMap={tablesMap}
-          menuItemsMap={menuItemsMap}
-          onClose={() => setShowAggregate(false)}
-        />
-      )}
-    </>
+    </div>
   );
 };
 
