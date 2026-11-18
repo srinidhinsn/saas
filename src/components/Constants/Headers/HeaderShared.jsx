@@ -1,4 +1,3 @@
-
 import { APP_ROOT } from '../../config/pathConfig';
 
 import React, { useEffect, useState } from 'react';
@@ -26,6 +25,8 @@ const TEKHAWK_LOGO_PATH = logo;
 export const navMap = {
 
   home: (clientId) => `/${APP_ROOT}/${clientId}/home`,
+
+  analytics: (clientId) => `/${APP_ROOT}/${clientId}/analytics`,
 
   table: (clientId) => `/${APP_ROOT}/${clientId}/sub-tables`,
 
@@ -61,6 +62,8 @@ const NAV_ICONS = {
 
   home: LayoutDashboard,
 
+  analytics: ChartNoAxesCombined,
+
   order: ShoppingCart,
 
   kds: Monitor,
@@ -83,11 +86,11 @@ const NAV_ICONS = {
 
 
 
-const LEFT_NAV_ORDER = ['home', 'order', 'kds', 'summary', 'billing'];
+const LEFT_NAV_ORDER = ['home', 'analytics', 'order', 'kds', 'summary', 'billing'];
 
 const RIGHT_NAV_ORDER = ['table', 'menu', 'inventory', 'counter', 'users'];
 
-const MOBILE_NAV_ORDER = ['home', 'order', 'kds', 'summary', 'billing', 'table', 'menu', 'inventory', 'users', 'profile'];
+const MOBILE_NAV_ORDER = ['home','analytics', 'order', 'kds', 'summary', 'billing', 'table', 'menu', 'inventory', 'users', 'profile'];
 
 
 
@@ -295,57 +298,95 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
         {/* Desktop Header */}
 
-        <div className="mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
+        <div className="hidden lg:block mx-auto px-4 md:px-2">
 
 
 
-          {/* Left Navigation Tabs */}
+          {/* Top Row - Application Logo, Client Name and Profile */}
 
-          <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-ink-tab">
-
-            {leftTabs.map(tab => (
-
-              <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
-
-            ))}
-
-          </div>
+          <div className="flex items-center justify-between py-3 border-b border-brand-tab-line">
 
 
 
-          {/* Client Name - Centre */}
+            {/* Application Logo and Client Name */}
 
-          <button
+            <div className="flex items-center gap-3 min-w-0">
 
-            type="button"
+              <button
 
-            onClick={() => handleNavigate('home')}
+                type="button"
 
-            className="text-xl lg:text-xl font-semibold tracking-tight text-brand-dark hover:text-brand transition-colors duration-200 shrink-0"
+                onClick={() => handleNavigate('home')}
 
-          >
+                className="flex items-center gap-3 shrink-0"
 
-            <span>{displayLabel}</span>
+              >
 
-          </button>
+                <img
 
+                  src={TEKHAWK_LOGO_PATH}
 
+                  alt="Application Logo"
 
-          {/* Right Navigation Tabs */}
+                  className="h-7 w-auto object-contain"
 
-          <div className="hidden lg:flex items-center space-x-8 text-ink-tab">
+                />
 
-            {rightTabs.map(tab => (
-
-              <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
-
-            ))}
+              </button>
 
 
+
+              <div className="h-7 w-px bg-brand-tab-line" />
+
+
+
+              <button
+
+                type="button"
+
+                onClick={() => handleNavigate('home')}
+
+                className=" text-xs font-semibold tracking-tight text-brand-dark hover:text-brand transition-colors duration-200 truncate"
+
+                title={displayLabel}
+
+              >
+
+                <span>{displayLabel}</span>
+
+              </button>
+
+            </div>
+
+
+
+            {/* Second Row - Navigation Tabs */}
+
+            <div className="flex items-center gap-2 py-2 overflow-x-auto text-ink-tab">
+
+              {leftTabs.map(tab => (
+
+                <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
+
+              ))}
+
+
+
+              {rightTabs.map(tab => (
+
+                <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
+
+              ))}
+
+            </div>
+
+
+
+            {/* Profile Menu */}
 
             {isVisible('profile') && (
 
-              <div className="relative">
+              <div className="relative shrink-0">
 
                 <button
 
@@ -445,11 +486,53 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
           </div>
 
+        </div>
+
+
+
+        {/* Mobile Header */}
+
+        <div className="lg:hidden mx-auto px-4 md:px-2 py-3 flex items-center justify-between">
+
+
+
+          {/* Application Logo and Client Name */}
+
+          <button
+
+            type="button"
+
+            onClick={() => handleNavigate('home')}
+
+            className="flex items-center gap-2 min-w-0"
+
+          >
+
+            <img
+
+              src={TEKHAWK_LOGO_PATH}
+
+              alt="Application Logo"
+
+              className="h-8 w-auto object-contain shrink-0"
+
+            />
+
+
+
+            <span className="text-lg font-semibold tracking-tight text-brand-dark hover:text-brand transition-colors duration-200 truncate">
+
+              {displayLabel}
+
+            </span>
+
+          </button>
+
 
 
           {/* Mobile Menu Button */}
 
-          <div className="lg:hidden flex items-center">
+          <div className="flex items-center shrink-0">
 
             <button
 
