@@ -28,7 +28,7 @@ import TenantSwitcher from '../Constants/TenanatFloater/TenantFloater';
 import CustomerChat from '../Constants/Chatbots/CustomerChat';
 import Super_User_Data from '../Super_User/Header/Super_User_Data';
 import Super_User_Tenant from '../Super_User/Header/Super_User_tenat';
-
+import AnalyticsPage from '../Constants/analytics/Analytics';
 const RoutesManager = ({ token: appToken }) => {
   const { clientId: paramClientId } = useParams();
   const [clientId, setClientId] = useState(localStorage.getItem("selected_client_id") || paramClientId);  
@@ -99,6 +99,10 @@ const RoutesManager = ({ token: appToken }) => {
       <Route
         path="home"
         element={<DashBoardPage clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
+      />
+      <Route
+        path="analytics"
+        element={<AnalyticsPage clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
       />
       <Route
         path="managing-tables"

@@ -27,6 +27,8 @@ export const navMap = {
 
   home: (clientId) => `/${APP_ROOT}/${clientId}/home`,
 
+  analytics: (clientId) => `/${APP_ROOT}/${clientId}/analytics`,
+
   table: (clientId) => `/${APP_ROOT}/${clientId}/sub-tables`,
 
   menu: (clientId) => `/${APP_ROOT}/${clientId}/menu`,
@@ -61,6 +63,8 @@ const NAV_ICONS = {
 
   home: LayoutDashboard,
 
+  analytics: ChartNoAxesCombined,
+
   order: ShoppingCart,
 
   kds: Monitor,
@@ -83,11 +87,11 @@ const NAV_ICONS = {
 
 
 
-const LEFT_NAV_ORDER = ['home', 'order', 'kds', 'summary', 'billing'];
+const LEFT_NAV_ORDER = ['home', 'analytics', 'order', 'kds', 'summary', 'billing'];
 
 const RIGHT_NAV_ORDER = ['table', 'menu', 'inventory', 'counter', 'users'];
 
-const MOBILE_NAV_ORDER = ['home', 'order', 'kds', 'summary', 'billing', 'table', 'menu', 'inventory', 'users', 'profile'];
+const MOBILE_NAV_ORDER = ['home','analytics', 'order', 'kds', 'summary', 'billing', 'table', 'menu', 'inventory', 'users', 'profile'];
 
 
 
@@ -292,194 +296,143 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
       <header className="sticky top-0 z-50 bg-bg-primary dark:bg-bg-primary-dark border-b border-brand-tab-line shadow-tabs transition-colors duration-300">
 
 
-
         {/* Desktop Header */}
+        <div className="hidden lg:block mx-auto px-4 md:px-2">
 
-        <div className="mx-auto px-4 md:px-2 py-3 lg:py-4 flex items-center justify-between">
+          {/* Top Row - Application Logo, Client Name and Profile */}
+          <div className="flex items-center justify-between py-3 border-b border-brand-tab-line">
 
+            {/* Application Logo and Client Name */}
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => handleNavigate('home')}
+                className="flex items-center gap-3 shrink-0"
+              >
+                <img
+                  src={TEKHAWK_LOGO_PATH}
+                  alt="Application Logo"
+                  className="h-7 w-auto object-contain"
+                />
+              </button>
 
+              <div className="h-7 w-px bg-brand-tab-line" />
 
-          {/* Left Navigation Tabs */}
+              <button
+                type="button"
+                onClick={() => handleNavigate('home')}
+                className=" text-xs font-semibold tracking-tight text-brand-dark hover:text-brand transition-colors duration-200 truncate"
+                title={displayLabel}
+              >
+                <span>{displayLabel}</span>
+              </button>
+            </div>
 
-          <div className="hidden lg:flex items-center space-x-8 md:space-x-2 text-ink-tab">
-
+            {/* Second Row - Navigation Tabs */}
+          <div className="flex items-center gap-2 py-2 overflow-x-auto text-ink-tab">
             {leftTabs.map(tab => (
-
               <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
-
             ))}
-
-          </div>
-
-
-
-          {/* Client Name - Centre */}
-
-          <button
-
-            type="button"
-
-            onClick={() => handleNavigate('home')}
-
-            className="text-xl lg:text-xl font-semibold tracking-tight text-brand-dark hover:text-brand transition-colors duration-200 shrink-0"
-
-          >
-
-            <span>{displayLabel}</span>
-
-          </button>
-
-
-
-          {/* Right Navigation Tabs */}
-
-          <div className="hidden lg:flex items-center space-x-8 text-ink-tab">
 
             {rightTabs.map(tab => (
-
               <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
-
             ))}
+          </div>
 
-
-
+            {/* Profile Menu */}
             {isVisible('profile') && (
-
-              <div className="relative">
-
+              <div className="relative shrink-0">
                 <button
-
                   type="button"
-
                   onClick={() => setProfileOpen(prev => !prev)}
-
                   className={`ui-tab !px-2 !py-[2.5px] !text-base !leading-6 inline-flex items-center justify-center ${active === 'profile' || profileOpen ? 'ui-tab-active' : ''}`}
-
                   aria-label="More options"
-
                   aria-expanded={profileOpen}
-
                 >
-
                   <MoreVertical size={20} strokeWidth={2} />
-
                 </button>
 
-
-
                 {profileOpen && (
-
                   <>
-
                     <button
-
                       type="button"
-
                       className="fixed inset-0 z-40 cursor-default"
-
                       onClick={() => setProfileOpen(false)}
-
                       aria-label="Close menu"
-
                     />
 
-
-
                     <div className="absolute right-0 top-full mt-2 z-50 w-44 bg-surface border border-brand-line rounded-panel shadow-soft overflow-hidden">
-
                       <button
-
                         type="button"
-
                         onClick={() => handleNavigate('profile')}
-
                         className={`w-full px-4 py-3 text-left text-ui font-semibold transition-colors ${active === 'profile'
-
                             ? 'bg-brand-light text-brand-dark'
-
                             : 'text-ink-soft hover:bg-brand-light hover:text-brand-dark'
-
                           }`}
-
                       >
-
                         My Profile
-
                       </button>
-
-
 
                       <div className="border-t border-line-soft" />
 
-
-
                       <button
-
                         type="button"
-
                         onClick={() => {
-
                           setProfileOpen(false);
-
                           onLogout?.();
-
                         }}
-
                         className="w-full px-4 py-3 text-left text-ui font-semibold text-action-danger hover:bg-brand-light transition-colors"
-
                       >
-
                         Logout
-
                       </button>
-
                     </div>
-
                   </>
-
                 )}
-
               </div>
-
             )}
-
           </div>
 
+          
+        </div>
 
+        {/* Mobile Header */}
+        <div className="lg:hidden mx-auto px-4 md:px-2 py-3 flex items-center justify-between">
+
+          {/* Application Logo and Client Name */}
+          <button
+            type="button"
+            onClick={() => handleNavigate('home')}
+            className="flex items-center gap-2 min-w-0"
+          >
+            <img
+              src={TEKHAWK_LOGO_PATH}
+              alt="Application Logo"
+              className="h-8 w-auto object-contain shrink-0"
+            />
+
+            <span className="text-lg font-semibold tracking-tight text-brand-dark hover:text-brand transition-colors duration-200 truncate">
+              {displayLabel}
+            </span>
+          </button>
 
           {/* Mobile Menu Button */}
-
-          <div className="lg:hidden flex items-center">
-
+          <div className="flex items-center shrink-0">
             <button
-
               type="button"
-
               onClick={() => setMobileOpen(prev => !prev)}
-
               aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-
               aria-expanded={mobileOpen}
-
               className="p-2 rounded-button border border-brand-line bg-brand-light text-brand-dark hover:bg-brand-soft transition-all"
-
             >
-
               <div className="relative w-6 h-6">
-
                 <span className={`block absolute left-0 right-0 h-0.5 bg-current transform transition-all duration-300 ${mobileOpen ? 'rotate-45 top-2.5' : 'top-1'}`} />
-
                 <span className={`block absolute left-0 right-0 h-0.5 bg-current transform transition-all duration-300 ${mobileOpen ? 'opacity-0' : 'top-2.5'}`} />
-
                 <span className={`block absolute left-0 right-0 h-0.5 bg-current transform transition-all duration-300 ${mobileOpen ? '-rotate-45 top-2.5' : 'top-4'}`} />
-
               </div>
-
             </button>
-
           </div>
-
         </div>
+
 
 
 

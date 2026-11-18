@@ -1,5 +1,6 @@
 export const NAV_TABS = [
   { id: 'home',      label: 'DashBoard',  screen_id: 'default_dashboard' },
+  { id: 'analytics', label: 'Analytics',  screen_id: 'default_analytics' },
   { id: 'table',     label: 'Table',      screen_id: 'default_tables' },
   { id: 'menu',      label: 'Menu',       screen_id: 'default_menu' },
   { id: 'billing',   label: 'Billing',    screen_id: 'default_invoice' },
