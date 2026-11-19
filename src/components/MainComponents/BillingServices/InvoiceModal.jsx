@@ -705,7 +705,7 @@ export default function InvoiceModal({
                         className={`ml-2 text-micro px-2 py-0.5 rounded-badge font-bold
                           ${paymentStatus === 'Paid'
                             ? 'bg-state-vacant-bg text-state-vacant'
-                            : 'bg-state-reserved-bg text-state-reserved'}`}
+                            : 'bg-state-occupied-bg text-state-occupied'}`}
                       >
                         {paymentStatus}
                       </span>

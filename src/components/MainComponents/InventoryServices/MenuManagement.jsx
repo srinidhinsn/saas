@@ -1132,7 +1132,7 @@ const handleBulkUpdate = async () => {
                       </div>
 
                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleItemClick(item)}>
-                        <h3 className="text-ui md:text-body-sm font-bold text-ink truncate"title={item.name} line-clamp-2>{item.name}</h3>
+                        <h3 className="text-ui md:text-body-sm font-bold text-ink line-clamp-2 truncate"title={item.name}>{item.name}</h3>
                         {/* {item.description && <p className="text-ui-sm text-ink-muted line-clamp-1">{item.description}</p>} */}
                         <div className="flex items-center justify-between gap-2 mt-1">
                           <div className="flex items-center gap-2">

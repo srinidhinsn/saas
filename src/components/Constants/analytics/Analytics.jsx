@@ -1203,7 +1203,7 @@ function Analytics({ clientId: propClientId, token: propToken, subscription: pro
   return (
     <div className="min-h-screen bg-canvas font-sans text-ink">
       <main className="max-w-page mx-auto px-page-x pb-page-b">
-        <div className="sticky top-0 z-[1000] bg-surface -mx-page-x">
+        <div className="sticky top-0 z-30 bg-surface -mx-page-x">
           <header className="h-[54px] flex items-center justify-between px-6 border-b border-line-divider bg-surface">
             <h1 className="text-page-title text-brand-dark">TEKHAWK Intelligent Analytics</h1>
             <div className="flex items-center gap-3">
@@ -1212,7 +1212,7 @@ function Analytics({ clientId: propClientId, token: propToken, subscription: pro
           </header>
         </div>
         {/* Filters follow the services too: a filter for a service the user has not bought is hidden */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5 px-5 pt-3 pb-3 bg-surface border-b border-line-divider relative z-[1100]">
+        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5 px-5 pt-3 pb-3 bg-surface border-b border-line-divider relative z-20">
           <HRSelect label="Restaurant" value={clientId} onChange={setClientId} options={(filterData?.clients || [{ id: clientId, name: 'My Restaurant' }]).map(i => ({ value: i.id, label: i.name }))} />
           <HRSelect label="When" value={period} onChange={choosePeriod} options={[{ value: 'today', label: 'Today' }, { value: 'thisMonth', label: 'This Month' }, { value: 'all', label: 'All' }, { value: 'last7', label: 'Last 7 days' }, { value: 'last30', label: 'Last 30 days' }, { value: 'last90', label: 'Last 3 months' }, { value: 'last365', label: 'Last 12 months' }, { value: 'custom', label: 'Choose dates' }]} />
           {has('table') && <HRSelect label="Dining Area" value={area} onChange={setArea} options={[{ value: 'all', label: 'All' }, ...(filterData?.areas || []).map(i => ({ value: i, label: i }))]} />}

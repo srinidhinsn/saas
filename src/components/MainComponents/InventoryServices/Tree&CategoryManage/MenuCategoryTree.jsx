@@ -917,70 +917,63 @@ const generateCategoryId = (name, parentName, existingCategories = [], parentId 
 
   const renderMobileCategories = (items) => {
     const flatCategories = flattenAllCategories(items);
- 
+
     return flatCategories.map((category) => {
       const isSelected = selectedCategoryId === category.id;
       const canEdit = !category.isVirtualRoot;
- 
+      const showActions = isSelected && canEdit;
+
       return (
         <div
           key={category.id || category.name}
-          className="relative flex-shrink-0"
+          className={`
+            flex items-stretch flex-shrink-0
+            h-9 overflow-hidden
+            rounded-badge shadow-button
+            transition-colors
+            ${isSelected
+              ? 'bg-brand text-text-white shadow-seg-active'
+              : 'bg-surface border border-brand-line text-ink-soft'
+            }
+          `}
         >
           <button
-            onClick={() => {
-              onSelectCategory(category.id);
-              // if (category.children?.length) {
-              //   setSidebarCategories(category.children);
-              // }
-            }}
- 
+            type="button"
+            onClick={() => onSelectCategory(category.id)}
             className={`
               flex items-center justify-between gap-2
-              px-3 py-2
-              rounded-badge
-              font-semibold text-ui
-              transition-colors shadow-button
-              whitespace-nowrap
-              flex-shrink-0
-              w-[140px]
-              h-9
-              ${isSelected
-                ? 'bg-brand text-text-white shadow-seg-active'
-                : 'bg-surface border border-brand-line text-ink-soft hover:bg-brand-light'
-              }
+              px-3 min-w-[96px] max-w-[160px]
+              font-semibold text-ui whitespace-nowrap
+              transition-colors
+              ${isSelected ? '' : 'hover:bg-brand-light'}
             `}
           >
             <span className="truncate">{category.name}</span>
             {category.showCount && (
-              <span className={`text-micro px-2 py-0.5 rounded-badge font-bold 
+              <span className={`text-micro px-2 py-0.5 rounded-badge font-bold
                 ${isSelected ? 'bg-white text-brand-dark' : 'bg-brand-light text-brand-dark'}`}>
                 {category.count}
               </span>
             )}
           </button>
- 
-          {canEdit && (
-            <div className="absolute -top-1 -right-1 flex gap-1 z-10">
+
+          {showActions && (
+            <div className="flex items-stretch border-l border-white/25">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEdit(category);
-                }}
-                className="w-6 h-6 rounded-full bg-brand text-white shadow-button flex items-center justify-center hover:scale-110 transition-transform"
-                aria-label="Edit category"
+                type="button"
+                onClick={() => handleEdit(category)}
+                className="grid place-items-center w-9 hover:bg-white/15 active:bg-white/25 transition-colors"
+                aria-label={`Edit ${category.name}`}
               >
-                <Edit size={12} />
+                <Edit size={14} />
               </button>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(category);
-                }}
-                className="w-6 h-6 rounded-full bg-brand-dark text-white shadow-button flex items-center justify-center hover:scale-110 transition-transform"
-                aria-label="Delete category"
+                type="button"
+                onClick={() => handleDelete(category)}
+                className="grid place-items-center w-9 border-l border-white/25 hover:bg-white/15 active:bg-white/25 transition-colors"
+                aria-label={`Delete ${category.name}`}
               >
-                <Trash2 size={12} />
+                <Trash2 size={14} />
               </button>
             </div>
           )}
