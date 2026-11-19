@@ -10,12 +10,12 @@ from models.response_model import ResponseModel
 from models.saas_context import SaasContext
 from utils.auth import verify_token
 
-from ..services import builders
-from ..services.constants import (
+from services import builders
+from services.constants import (
     ALL, DEFAULT_END, DEFAULT_START, STOCK_INVENTORY_ID, OrderType, TimeOfDay,
 )
-from ..services.context import AnalyticsContext, load_context
-from ..services.schemas import AnalyticsFilters
+from services.context import AnalyticsContext, load_context
+from services.schemas import AnalyticsFilters
 
 router = APIRouter()
 
