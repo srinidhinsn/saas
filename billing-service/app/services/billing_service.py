@@ -6,10 +6,37 @@ from typing import List, Dict, Any, Optional
 # billing_service.py
 from models.billing_model import PaymentStatusEnum, ApprovalStatusEnum 
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_,func, text
 from datetime import datetime, timedelta
+import os, zlib
+from entity.billing_entity import BillingDocumentEntity
+from zoneinfo import ZoneInfo
+TIMEZONE = os.getenv("TIMEZONE", "UTC")
 
+def _next_invoice_number(db: Session, client_id: str) -> str:
+    """INV-YYYY-000001, sequence restarts every day, per client."""
+    now_local = datetime.now(ZoneInfo(TIMEZONE)).replace(tzinfo=None)
+    day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start + timedelta(days=1)
 
+    # Serialize concurrent issues for the same client + day (released on commit/rollback)
+    lock_key = zlib.crc32(f"{client_id}:{day_start.date()}".encode())
+    db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": lock_key})
+
+    # Invoices already numbered today for this client (inactive ones included on purpose,
+    # so a soft-deleted invoice never frees up its number)
+    issued_today = (
+        db.query(func.count(BillingDocumentEntity.id))
+        .filter(
+            BillingDocumentEntity.client_id == client_id,
+            BillingDocumentEntity.document_number.isnot(None),
+            BillingDocumentEntity.invoice_date >= day_start,
+            BillingDocumentEntity.invoice_date < day_end,
+        )
+        .scalar()
+    ) or 0
+
+    return f"INV-{now_local.year}-{issued_today + 1:06d}"
 
 # ---------------------------------- support functions ----------------------------------
 # Get Items by Document ID
@@ -21,31 +48,68 @@ def get_billing_document_items(document_id: int, client_id: str, db: Session) ->
     ).all()
     return BillingDocumentItemEntity.copyToModels(items)
 
+def _merge_payment_methods(existing_list, incoming_list):
+    """Append new payment entries; replace an entry with the same method+status if it's an update."""
+    existing_list = list(existing_list or [])
+    incoming_list = incoming_list or []
+    for new_entry in incoming_list:
+        matched = False
+        for i, old_entry in enumerate(existing_list):
+            if isinstance(old_entry, dict) and old_entry.get("method") == new_entry.get("method") and not old_entry.get("verified_at"):
+                existing_list[i] = {**old_entry, **new_entry}
+                matched = True
+                break
+        if not matched:
+            existing_list.append(new_entry)
+    return existing_list
 # ---------------------------------- endpoint functions ----------------------------------
 
 # 1. /create_document
 def create_document_service(doc: BillingDocument, db: Session) -> BillingDocument:
     try:
-        # Convert the Pydantic model to a dictionary and map to the SQLAlchemy model
         document_data = doc.dict(exclude_unset=True)
+        target = None 
+        if document_data.get("document_type") == "Invoice" and document_data.get("order_id") and document_data.get("client_id"):
+            existing = (
+                db.query(BillingDocumentEntity)
+                .filter(
+                    BillingDocumentEntity.client_id == document_data["client_id"],
+                    BillingDocumentEntity.order_id == str(document_data["order_id"]),
+                    BillingDocumentEntity.document_type == "Invoice",
+                    BillingDocumentEntity.is_active == True,
+                )
+                .order_by(BillingDocumentEntity.id.desc())
+                .first()
+            )
+            if existing:
+                incoming_status = document_data.pop("status", None)
+                incoming_payment_methods = document_data.pop("payment_method", None)
 
-        # Ensure default values for missing fields
-        if "payment_status" not in document_data:
-            document_data["payment_status"] = PaymentStatusEnum.pending
-        if "approval_status" not in document_data:
-            document_data["approval_status"] = ApprovalStatusEnum.pending
-        if "document_version" not in document_data:
-            document_data["document_version"] = 1
+                for key, value in document_data.items():
+                    setattr(existing, key, value)
 
-        # Create the SQLAlchemy object using the cleaned data
-        db_doc = BillingDocumentEntity(**document_data)
+                if incoming_payment_methods is not None:
+                    existing.payment_method = _merge_payment_methods(existing.payment_method, incoming_payment_methods)
 
-        db.add(db_doc)
+                if incoming_status and existing.status in (None, "Draft"):
+                    existing.status = incoming_status
+
+                target = existing
+
+        if target is None:
+            if "payment_status" not in document_data:
+                document_data["payment_status"] = PaymentStatusEnum.pending
+            if "approval_status" not in document_data:
+                document_data["approval_status"] = ApprovalStatusEnum.pending
+            if "document_version" not in document_data:
+                document_data["document_version"] = 1
+            target = BillingDocumentEntity(**document_data)
+            db.add(target)
+
         db.commit()
-        db.refresh(db_doc)
+        db.refresh(target)
+        return BillingDocumentEntity.copyToModel(target)
 
-        # Return the Pydantic model after inserting into the database
-        return BillingDocumentEntity.copyToModel(db_doc)
     except Exception as e:
         db.rollback()
         print(f"Error while creating document: {e}")
@@ -53,7 +117,7 @@ def create_document_service(doc: BillingDocument, db: Session) -> BillingDocumen
 
 
 # 2. /read_document
-def read_documents_service(client_id: str, document_type: str = None, status: str = None, db: Session = None, limit=100, offset=0):
+def read_documents_service(client_id: str, document_type: str = None, status: str = None,order_id: str = None, db: Session = None, limit=100, offset=0):
     query = db.query(BillingDocumentEntity).filter(
         BillingDocumentEntity.client_id == client_id,
         BillingDocumentEntity.is_active == True
@@ -62,7 +126,9 @@ def read_documents_service(client_id: str, document_type: str = None, status: st
         query = query.filter(BillingDocumentEntity.document_type == document_type)
     if status:
         query = query.filter(BillingDocumentEntity.status == status)
-    
+    if order_id:
+        query = query.filter(BillingDocumentEntity.order_id == str(order_id))    
+    query = query.order_by(BillingDocumentEntity.updated_at.desc().nullslast(), BillingDocumentEntity.id.desc())
     query = query.offset(offset).limit(limit)
     results = query.all()
     return BillingDocumentEntity.copyToModels(results)
@@ -77,11 +143,13 @@ def update_document_service(updates: BillingDocument, client_id: str, db: Sessio
 
     if not db_doc:
         raise HTTPException(status_code=404, detail="Document not found")
-
+    update_data = updates.dict(exclude_unset=True)
+    incoming_payment_methods = update_data.pop("payment_method", None)
     # Update the new fields
-    for key, value in updates.dict(exclude_unset=True).items():
+    for key, value in update_data.items():
         setattr(db_doc, key, value)
-
+    if incoming_payment_methods is not None:
+        db_doc.payment_method = _merge_payment_methods(db_doc.payment_method, incoming_payment_methods)
     db.commit()
     db.refresh(db_doc)
     return BillingDocumentEntity.copyToModel(db_doc)
@@ -455,12 +523,12 @@ def issue_invoice(db: Session, client_id: str, invoice_id: int) -> dict:
 
     # Assign number if missing
     if not doc.document_number:
-        # Simple sequence: INV-YYYY-<id>  (replace with your own numbering logic)
-        year = datetime.now().strftime("%Y")
-        doc.document_number = f"INV-{year}-{invoice_id:06d}"
+        doc.document_number = _next_invoice_number(db, client_id)
 
     doc.status = "Issued"
-    doc.invoice_date = datetime.now()
+    doc.invoice_date = datetime.now(ZoneInfo(TIMEZONE)).replace(tzinfo=None)
+    if not doc.payment_status:
+        doc.payment_status = PaymentStatusEnum.pending
     db.commit()
     db.refresh(doc)
     return {
@@ -469,9 +537,3 @@ def issue_invoice(db: Session, client_id: str, invoice_id: int) -> dict:
         "status": doc.status,
         "invoice_date": doc.invoice_date.isoformat()
     }
-
-
-
-
-
-

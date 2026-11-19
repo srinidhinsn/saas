@@ -3,14 +3,61 @@ from sqlalchemy.orm import Session
 from entity.order_entity import DineinOrder as DBOrder, OrderItem as DBOrderItem
 from entity.order_entity import DineinOrder as Db_Order_Entity, OrderItem as Db_OrderItem_Entity
 from entity.inventory_entity import InventoryEntity, InventoryTransactionEntity, CategoryEntity
-from models.order_model import TransactionTypeEnum, MovementTypeEnum, OrderStatusEnum
+from models.order_model import TransactionTypeEnum, MovementTypeEnum, OrderStatusEnum, resolve_realm_from_context
 from models.inventory_model import InventoryTransaction
 from utils.transaction import create_transaction , TxPayload
 from decimal import Decimal
 from models.response_model import ResponseModel
 from fastapi import HTTPException
-from models.order_model import DineinOrderModel 
+from models.order_model import DineinOrderModel , resolve_base_status
+from .order_status import _status_label
+from models.saas_context import SaasContext
+from entity.billing_entity import BillingDocumentEntity
+import os,re
+from datetime import datetime, timedelta, time
+from zoneinfo import ZoneInfo
+from sqlalchemy import text, or_
 
+TIMEZONE   = os.getenv("TIMEZONE", "UTC")
+DEFAULT_RESET_HOUR = int(os.getenv("ORDER_NUMBER_RESET_HOUR", "0"))
+
+def _reset_hour(client_id=None) -> int:
+    if client_id:
+        key = "ORDER_NUMBER_RESET_HOUR_" + re.sub(r"[^A-Za-z0-9]", "_", str(client_id)).upper()
+        raw = os.getenv(key)
+        if raw not in (None, ""):
+            try:
+                h = int(raw)
+                if 0 <= h <= 23:
+                    return h
+            except ValueError:
+                pass
+    return DEFAULT_RESET_HOUR
+
+def _day_bounds(dt=None, client_id=None):
+    h = _reset_hour(client_id)
+    dt = (dt or datetime.now(ZoneInfo(TIMEZONE))).replace(tzinfo=None)
+    start = datetime.combine((dt - timedelta(hours=h)).date(), time.min) + timedelta(hours=h)
+    return start, start + timedelta(days=1)
+
+def next_order_number(db, client_id: str) -> int:
+    db.execute(text("SELECT 1 FROM client WHERE id = :c FOR UPDATE"), {"c": client_id})
+    s, e = _day_bounds(client_id=client_id)
+    return db.execute(text("""
+    SELECT COALESCE(MAX(
+             CASE WHEN dinein_order_id ~ '^[0-9]+(-[0-9]+)?$'
+                  THEN split_part(dinein_order_id,'-',1)::bigint END), 0) + 1
+    FROM dinein_order WHERE client_id = :c AND created_at >= :s AND created_at < :e """), {"c": client_id, "s": s, "e": e}).scalar_one()
+
+def group_filters(order):
+    root = _root_dinein_id(order.dinein_order_id or str(order.id))
+    s, e = _day_bounds(order.created_at, order.client_id)
+    return [
+        Db_Order_Entity.client_id == order.client_id,  or_(Db_Order_Entity.dinein_order_id == root,Db_Order_Entity.dinein_order_id.like(f"{root}-%")),
+        Db_Order_Entity.created_at >= s,Db_Order_Entity.created_at < e,]
+
+def _is_rental_realm(context) -> bool:
+    return (resolve_realm_from_context(context) or "").strip().lower() == "rental"
 
 def build_billing_payload_from_order(order: DBOrder, items: List[DBOrderItem]) -> Dict[str, Any]:
     return {
@@ -74,7 +121,7 @@ def _order_row_to_flat(order) -> dict:
     }
 
 
-def _merge_group(orders: list) -> dict:
+def _merge_group(orders: list,context=None, db: Session = None) -> dict:
     """
     Merge root + sub-order DB rows into one response dict for /dinein/table.
     Used by TakeOrder floor view to show one entry per table group.
@@ -87,12 +134,30 @@ def _merge_group(orders: list) -> dict:
     orders = sorted(orders, key=lambda o: o.created_at or 0)
     root = orders[0]
     merged_items = []
+    invoice = None
+    if root.invoice_id:
+       try:
+           invoice_id = int(root.invoice_id)
+       except (TypeError, ValueError):
+           invoice_id = None
+
+       if invoice_id:
+           invoice = (
+            db.query(BillingDocumentEntity)
+            .filter(
+                BillingDocumentEntity.id == invoice_id,
+                BillingDocumentEntity.client_id == root.client_id,
+            )
+            .first()
+        )
+    all_cancelled = all((o.status or "").lower() == OrderStatusEnum.cancelled.value for o in orders)
     for order in orders:
         for item in order.items:
-            if (item.status or "").lower() == OrderStatusEnum.cancelled.value:
+            if not all_cancelled and (item.status or "").lower() == OrderStatusEnum.cancelled.value:
                 continue
             m = Db_OrderItem_Entity.copyToModel(item).dict()
             m["batch_label"] = order.dinein_order_id
+            m["status_canonical"] = resolve_base_status(context, item.status) if context else item.status
             m["sub_order_id"] = order.id
             # ✅ FIX: explicitly carry parent_item_key so frontend can re-group
             m["parent_item_key"] = getattr(item, "parent_item_key", None)
@@ -109,6 +174,7 @@ def _merge_group(orders: list) -> dict:
             "created_at": o.created_at,
             "status": o.status,
             "total_price": o.total_price or 0,
+            "created_by": o.created_by, 
         }
         for o in orders
     ]
@@ -132,7 +198,21 @@ def _merge_group(orders: list) -> dict:
         "item_names": [i.get("item_name", "") for i in merged_items],
         "sub_orders": sub_orders_meta,           # for TakeOrder count + timer
         "order_count": len(orders),              # total batches incl. root
-    }
+        "created_by": root.created_by,  
+        "handler_id": root.handler_id, 
+        "invoice_id": root.invoice_id,
+        "invoice_number": (invoice.document_number
+        if invoice
+        else None),
+        "invoice_status": (invoice.status
+        if invoice
+        else root.invoice_status),
+        "payment_status": (invoice.payment_status
+        if invoice
+        else "Pending"),
+        "approval_status": (invoice.approval_status
+        if invoice
+        else None), }
 
 # ───────────────────────────────────────────────────────────────────────────
 
@@ -176,11 +256,10 @@ def _convert(recipe_qty: float, recipe_unit: str, stock_unit: str) -> float:
     raise ValueError(f"Incompatible unit dimensions: recipe='{ru}', stock='{su}'")
 
 # ── Stock deduction ──────────────────────────────────────────────────────────
-def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
-
+def _deduct_stock_for_order(db: Session, client_id: str, order_id: int, context: SaasContext) -> None: 
     def _tx(item_id, tx_type, qty, remarks):
         create_transaction(
-            db=db, client_id=client_id,
+            db=db, context=context,
             payload=TxPayload(item_id=item_id, tx_type=tx_type, ref_id=order_id, qty=qty, remarks=remarks)
         )
 
@@ -201,6 +280,7 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
                     total,
                     f"[{label}] Order #{order_id} | {menu_item.name} x{ordered_qty}",
                 )
+
             except ValueError:
                 _tx(
                     menu_item.id,
@@ -214,7 +294,7 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
                 TransactionTypeEnum.order_deduction,
                 ordered_qty,
                 f"[{TransactionTypeEnum.order_deduction.value}] Order #{order_id} | {menu_item.name} x{ordered_qty}",
-            )
+            ) 
 
         # Recipe ingredients
         for ingredient in (menu_item.recipe or []):
@@ -257,7 +337,7 @@ def _deduct_stock_for_order(db: Session, client_id: str, order_id: int) -> None:
         .filter(
             Db_OrderItem_Entity.order_id == order_id,
             Db_OrderItem_Entity.client_id == client_id,
-            Db_OrderItem_Entity.status != OrderStatusEnum.cancelled,
+            Db_OrderItem_Entity.status != (_status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled),
         )
         .all()
     )
@@ -320,22 +400,17 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
             status_code=404,
             detail=f"Order {body.id} not found"
         )
-
+    if ((order.dinein_order_id or "").startswith("D")
+        and body.status is not None and body.status not in (OrderStatusEnum.draft, OrderStatusEnum.cancelled)):
+        order.dinein_order_id = str(next_order_number(db, client_id))
+        order.created_at = datetime.now(ZoneInfo(TIMEZONE))
+        body.dinein_order_id = None
     # ── Cancel entire order group ───────────────────────────────────────────
     if body.status == OrderStatusEnum.cancelled:
-        root_id = _root_dinein_id(order.dinein_order_id)
-
-        related_orders = (
-            db.query(Db_Order_Entity)
-            .filter(
-                Db_Order_Entity.client_id == client_id,
-                Db_Order_Entity.dinein_order_id.like(f"{root_id}%"),
-            )
-            .all()
-        )
+        related_orders = db.query(Db_Order_Entity).filter(*group_filters(order)).all()
 
         for o in related_orders:
-            o.status = OrderStatusEnum.cancelled
+            o.status = _status_label(context, body.status) or body.status
 
             order_items = (
                 db.query(Db_OrderItem_Entity)
@@ -347,7 +422,7 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
             )
 
             for item in order_items:
-                item.status = OrderStatusEnum.cancelled
+                item.status = _status_label(context, OrderStatusEnum.cancelled) or OrderStatusEnum.cancelled
 
         cancellation_reason = getattr(body, "cancellation_reason", None)
         if cancellation_reason:
@@ -371,8 +446,10 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
             OrderStatusEnum.served,
             OrderStatusEnum.completed
         ]
-
-        order.status = body.status
+        resolved_status = _status_label(context, body.status) or body.status
+        order.status = resolved_status
+        if body.invoice_status is not None:
+            order.invoice_status = body.invoice_status
 
         order_items = (
             db.query(Db_OrderItem_Entity)
@@ -385,13 +462,13 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
 
         for item in order_items:
             if item.status != OrderStatusEnum.cancelled:
-                item.status = body.status
+                item.status = resolved_status
 
         db.flush()
 
         deducted_count = 0
         if should_deduct:
-            _deduct_stock_for_order(db=db, client_id=client_id, order_id=order.id)
+            _deduct_stock_for_order(db=db, client_id=client_id, order_id=order.id, context=context)
             deducted_count += 1
 
         db.commit()
@@ -408,7 +485,7 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
     # ── Normal single order update (for other statuses) ────────────────────
     if body.status not in [OrderStatusEnum.cancelled, OrderStatusEnum.served, OrderStatusEnum.completed]:
         if body.status is not None:
-            order.status = body.status
+            order.status = _status_label(context, body.status) or body.status
 
         if body.total_price is not None:
             order.total_price = body.total_price
@@ -418,7 +495,8 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
 
         if body.dinein_order_id is not None:
             order.dinein_order_id = body.dinein_order_id
-
+        if body.invoice_status is not None:
+            order.invoice_status = body.invoice_status
         db.commit()
         db.refresh(order)
 
@@ -426,7 +504,7 @@ def update_order_status_service(client_id: str, body: DineinOrderModel, context,
             screen_id=context.screen_id,
             data={
                 "message": "Status updated",
-                "new_status": order.status,
+                "new_status": order.status,"new_status_label": _status_label(context, order.status),
             },
         )
 

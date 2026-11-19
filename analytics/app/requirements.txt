@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+psycopg2-binary
+sqlalchemy
+alembic
+passlib
+bcrypt==4.3.0
+python-jose
+setuptools
+pytest
+httpx
+python-dotenv
+saas_common_lib_473815
+tzdata
+psycopg[binary]

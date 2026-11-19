@@ -37,7 +37,7 @@ class DineinOrder(Base):
                  onupdate=lambda: datetime.now(ZoneInfo(TIMEZONE)))
     status = Column(String, nullable=True)
     items = relationship("OrderItem", backref="order",
-                         cascade="all, delete-orphan")
+                         cascade="all, delete-orphan",order_by="OrderItem.id")
 
     @staticmethod
     def copyToModel(dineinOrder):
