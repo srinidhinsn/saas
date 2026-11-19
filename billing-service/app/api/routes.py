@@ -13,7 +13,7 @@ from services.billing_service import (
     generate_invoice, issue_invoice
 )
 import os
-from services.payment_services import create_phonepe_order_service, verify_phonepe_payment_service,create_razorpay_order_service, verify_razorpay_payment_service
+from services.payment_services import create_phonepe_order_service, verify_phonepe_payment_service,create_razorpay_order_service, verify_razorpay_payment_service, get_available_gateways_service
 from datetime import datetime
 
 router = APIRouter()
@@ -278,6 +278,12 @@ def issue_invoice_route(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/verify/payment_gateways", response_model=ResponseModel[dict])
+def get_payment_gateways(client_id: str,context: SaasContext = Depends(verify_token),):
+    if client_id != context.client_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    return ResponseModel(screen_id=context.screen_id,status="success",message="Available payment gateways",data=get_available_gateways_service(client_id))
+    
 @router.post("/razorpay")
 def create_order(client_id: str,request_data: RazorpayOrderRequest,context: SaasContext = Depends(verify_token),db: Session = Depends(get_db),):
     if client_id != context.client_id:
