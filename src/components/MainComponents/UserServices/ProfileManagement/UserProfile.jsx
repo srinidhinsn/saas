@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -12,11 +11,11 @@ import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 
 const inp =
-  "w-full px-3 py-2 rounded-lg text-sm border border-gray-200 bg-white text-black outline-none transition-colors focus:border-red-500 placeholder:text-gray-300";
+  "w-full h-control px-item rounded-button-sm text-ui border border-brand-line bg-surface text-ink outline-none transition-colors focus:border-brand-ring focus:shadow-focus-ring placeholder:text-ink-faint disabled:opacity-50 disabled:cursor-not-allowed";
 
 function Label({ icon, children }) {
   return (
-    <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
+    <label className="flex items-center gap-1.5 text-micro font-bold uppercase tracking-wide text-ink-muted mb-1">
       {icon}{children}
     </label>
   );
@@ -27,7 +26,7 @@ function PwField({ value, onChange, placeholder, show, onToggle }) {
     <div className="relative">
       <input className={inp} type={show ? "text" : "password"} value={value} onChange={onChange} placeholder={placeholder} />
       <button type="button" onClick={onToggle}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black transition-colors">
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint hover:text-brand-dark transition-colors">
         {show ? <EyeOff size={14} /> : <Eye size={14} />}
       </button>
     </div>
@@ -35,22 +34,22 @@ function PwField({ value, onChange, placeholder, show, onToggle }) {
 }
 
 function Spin() {
-  return <span className="inline-block w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />;
+  return <span className="inline-block w-4 h-4 rounded-badge border-2 border-white/30 border-t-white animate-spin-slow" />;
 }
 
 function SectionCard({ title, subtitle, icon, children }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200">
-      <div className="flex items-center gap-3 px-5 py-3.5 border-b border-gray-200">
-        <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-200 flex items-center justify-center shrink-0 text-gray-600">
+    <div className="ui-card !p-0 !mb-0">
+      <div className="flex items-center gap-3 px-card py-item border-b border-line-divider">
+        <div className="w-8 h-8 rounded-button-sm bg-brand-light border border-brand-line flex items-center justify-center shrink-0 text-brand-dark">
           {icon}
         </div>
         <div>
-          <h3 className="text-sm font-bold text-black">{title}</h3>
-          <p className="text-xs text-gray-400">{subtitle}</p>
+          <h3 className="text-panel-title text-brand-dark">{title}</h3>
+          <p className="text-ui-sm text-ink-muted">{subtitle}</p>
         </div>
       </div>
-      <div className="p-5">{children}</div>
+      <div className="p-card">{children}</div>
     </div>
   );
 }
@@ -217,23 +216,23 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
   const pwMismatch = passwordForm.new_password && passwordForm.confirm_password && passwordForm.new_password !== passwordForm.confirm_password;
 
   if (fetchingProfile) return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
+    <div className="min-h-screen bg-canvas font-sans flex items-center justify-center">
       <div className="text-center space-y-3">
-        <div className="w-9 h-9 mx-auto rounded-full border-2 border-gray-200 border-t-red-500 animate-spin" />
-        <p className="text-sm text-gray-400 font-medium">Loading profile…</p>
+        <div className="w-9 h-9 mx-auto rounded-badge border-2 border-brand-soft border-t-brand animate-spin-slow" />
+        <p className="text-ui text-ink-muted font-semibold">Loading profile…</p>
       </div>
     </div>
   );
 
   if (!token) return (
-    <div className="min-h-screen bg-white flex items-center justify-center px-4">
-      <div className="bg-white border border-gray-200 rounded-xl p-10 max-w-sm w-full text-center">
-        <div className="w-14 h-14 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center mx-auto mb-5">
-          <Lock size={22} className="text-red-500" />
+    <div className="min-h-screen bg-canvas font-sans flex items-center justify-center px-4">
+      <div className="ui-panel !mb-0 !p-8 max-w-sm w-full text-center">
+        <div className="w-14 h-14 bg-brand-light border border-brand-line rounded-panel flex items-center justify-center mx-auto mb-5">
+          <Lock size={22} className="text-brand" />
         </div>
-        <h2 className="text-lg font-bold text-black mb-2">Authentication required</h2>
-        <p className="text-sm text-gray-400 mb-6">Please login to access your profile.</p>
-        <button onClick={() => navigate('/login')} className="w-full py-2.5 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition-colors">
+        <h2 className="text-page-title text-brand-dark mb-2">Authentication required</h2>
+        <p className="text-ui text-ink-muted mb-6">Please login to access your profile.</p>
+        <button onClick={() => navigate('/login')} className="ui-btn ui-btn-add w-full">
           Go to login
         </button>
       </div>
@@ -241,46 +240,46 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
   );
 
   return (
-    <div className="bg-white min-h-[calc(100vh-64px)] p-4 sm:p-5 lg:p-6 xl:p-8">
+    <div className="ui-page">
       <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-5 lg:gap-6 items-start">
 
         {/* ══ LEFT SIDEBAR ══ */}
         <div className="w-full lg:w-72 xl:w-80 shrink-0 flex flex-col gap-4 lg:sticky lg:top-6">
 
           {/* Profile identity card */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="w-14 h-14 rounded-full bg-black flex items-center justify-center text-white font-bold text-lg mb-3">
+          <div className="ui-card p-4">
+            <div className="w-14 h-14 rounded-full bg-brand flex items-center justify-center text-text-white font-bold text-lg mb-3">
               {initials || <User size={20} />}
             </div>
-            <p className="text-[15px] font-bold text-black leading-tight">{fullName || "Your name"}</p>
-            <p className="text-xs text-gray-400 mt-0.5 break-all">{profileForm.email || "your@email.com"}</p>
+            <p className="text-body-sm font-bold text-brand-dark leading-tight">{fullName || "Your name"}</p>
+            <p className="text-ui-sm text-ink-muted mt-0.5 break-all">{profileForm.email || "your@email.com"}</p>
             {userRole && (
-              <span className="inline-flex items-center gap-1.5 mt-2.5 text-[10px] font-bold uppercase tracking-wide bg-gray-50 text-gray-600 border border-gray-200 rounded-full px-2.5 py-0.5">
+              <span className="ui-pill mt-2.5 border border-brand-line uppercase tracking-wide">
                 {userRole}
               </span>
             )}
           </div>
 
           {/* Meta chips */}
-          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+          <div className="ui-card divide-y divide-line-soft">
             {[
               { icon: <Phone size={13} />, label: "Phone", val: profileForm.phone || "—" },
               { icon: <Calendar size={13} />, label: "Date of birth", val: profileForm.dob || "—" },
               { icon: <Hash size={13} />, label: "Client ID", val: clientId || "—", mono: true },
             ].map(({ icon, label, val, mono }) => (
               <div key={label} className="flex items-center gap-3 px-4 py-3">
-                <div className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center shrink-0 text-gray-500">{icon}</div>
+                <div className="w-7 h-7 rounded-button-sm border border-brand-line bg-brand-light flex items-center justify-center shrink-0 text-brand-dark">{icon}</div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
-                  <p className={`text-[13px] font-semibold text-black truncate ${mono ? "font-mono" : ""}`}>{val}</p>
+                  <p className="text-micro font-bold uppercase tracking-wide text-ink-muted">{label}</p>
+                  <p className={`text-ui font-semibold text-ink truncate ${mono ? "font-mono" : ""}`}>{val}</p>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Save status tracker */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-3">Unsaved changes</p>
+          <div className="ui-card p-4">
+            <p className="text-micro font-bold uppercase tracking-wide text-ink-muted mb-3">Unsaved changes</p>
             <div className="space-y-2">
               {[
                 { key: "personal", label: "Personal info", icon: <User size={12} /> },
@@ -289,14 +288,14 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
               ].map(({ key, label, icon }) => {
                 const done = savedSections[key];
                 return (
-                  <div key={key} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border ${done ? "bg-gray-50 border-gray-200" : "border-gray-200"}`}>
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${done ? "bg-black text-white" : "text-gray-400"}`}>
+                  <div key={key} className={`flex items-center gap-2.5 px-3 py-2 rounded-button-sm border ${done ? "bg-brand-light border-brand-line" : "border-line"}`}>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${done ? "bg-brand text-text-white" : "text-ink-faint"}`}>
                       {done ? <CheckCircle size={11} /> : icon}
                     </div>
-                    <span className={`text-[12px] font-semibold flex-1 ${done ? "text-black" : "text-gray-400"}`}>{label}</span>
+                    <span className={`text-ui font-semibold flex-1 ${done ? "text-brand-dark" : "text-ink-muted"}`}>{label}</span>
                     {done
-                      ? <span className="text-[10px] text-gray-500 font-bold">Saved</span>
-                      : <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                      ? <span className="text-micro text-brand-dark font-bold">Saved</span>
+                      : <span className="w-1.5 h-1.5 rounded-full bg-state-reserved" />
                     }
                   </div>
                 );
@@ -337,9 +336,9 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
                   onChange={e => setProfileForm({ ...profileForm, dob: e.target.value })} />
               </div>
             </div>
-            <div className="flex justify-end mt-5 pt-4 border-t border-gray-200">
+            <div className="flex justify-end mt-5 pt-4 border-t border-line">
               <button onClick={handleProfileSave} disabled={profileLoading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="ui-btn ui-btn-add">
                 {profileLoading ? <Spin /> : <><CheckCircle size={14} /><span>Save personal info</span></>}
               </button>
             </div>
@@ -355,15 +354,15 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
                       <button
                         type="button"
                         onClick={() => setAddressForm(addr)}
-                        className={`px-4 py-2 rounded-lg text-sm border transition-colors
+                        className={`ui-btn
                           ${addressForm.id === addr.id
-                            ? "bg-black text-white border-black"
-                            : "bg-white border-gray-200 hover:border-gray-400"
+                            ? "ui-btn-add"
+                            : ""
                           }`}
                       >
                         {index === 0 && (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full mr-1
-                            ${addressForm.id === addr.id ? "bg-white/20 text-white border border-white/30" : "bg-gray-50 text-gray-500 border border-gray-200"}`}>
+                          <span className={`text-micro font-bold px-1.5 py-0.5 rounded-badge mr-1
+                            ${addressForm.id === addr.id ? "bg-white/20 text-white border border-white/30" : "bg-brand-light text-brand-dark border border-brand-line"}`}>
                             Primary
                           </span>)}
                         {addr.name}
@@ -371,7 +370,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
 
                       {addressForm.id === addr.id && index !== 0 && (
                         <button type="button" onClick={() => handleSetPrimary(addr.id)}
-                          className="px-3 py-2 rounded-lg text-xs border border-dashed border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">
+                          className="ui-btn !h-7 !border-dashed">
                           Set as primary
                         </button>)}
                     </div>))}
@@ -392,7 +391,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
                         contact_number: ""
                       })
                     }
-                    className="px-4 py-2 rounded-lg border border-dashed border-gray-300 text-gray-600 text-sm hover:bg-gray-50 transition-colors"
+                    className="ui-btn !border-dashed"
                   >
                     + Add address
                   </button>
@@ -442,9 +441,9 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
                   onChange={e => setAddressForm({ ...addressForm, contact_number: e.target.value })} placeholder="+91 98765 43210" />
               </div>
             </div>
-            <div className="flex justify-end mt-5 pt-4 border-t border-gray-200">
+            <div className="flex justify-end mt-5 pt-4 border-t border-line">
               <button onClick={handleAddressSave} disabled={addressLoading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="ui-btn ui-btn-add">
                 {addressLoading ? <Spin /> : <><CheckCircle size={14} /><span>Save address</span></>}
               </button>
             </div>
@@ -452,12 +451,12 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
 
           {/* ── Security ── */}
           <SectionCard title="Security settings" subtitle="Reset your account password" icon={<Fingerprint size={15} />}>
-            <div className="inline-flex bg-gray-50 border border-gray-200 rounded-lg p-1 mb-5 gap-1">
+            <div className="ui-toggle mb-5">
               {[["otp", "OTP verification"], ["old_password", "Old password"]].map(([m, lbl]) => (
                 <button key={m}
                   onClick={() => { setResetMethod(m); setPasswordForm(p => ({ ...p, otp: "", old_password: "" })); setOtpSent(false); }}
-                  className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors
-                    ${resetMethod === m ? "bg-black text-white" : "text-gray-500 hover:text-black"}`}>
+                  className={`ui-toggle-btn
+                    ${resetMethod === m ? "ui-toggle-btn-active" : ""}`}>
                   {lbl}
                 </button>
               ))}
@@ -473,7 +472,7 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
               {resetMethod === "otp" && !otpSent && (
                 <div className="sm:col-span-2">
                   <button onClick={handleSendOtp} disabled={passwordLoading}
-                    className="flex items-center gap-2 px-5 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50">
+                    className="ui-btn ui-btn-add">
                     {passwordLoading ? <Spin /> : <><Send size={13} /><span>Send OTP to email</span></>}
                   </button>
                 </div>
@@ -483,12 +482,12 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
                 <div className="sm:col-span-2">
                   <Label icon={<Key size={11} />}>Enter OTP</Label>
                   <div className="flex gap-2">
-                    <input className={`${inp} flex-1 text-center tracking-[0.4em] text-base font-bold`}
+                    <input className={`${inp} flex-1 text-center tracking-[0.4em] !text-body font-bold`}
                       value={passwordForm.otp} maxLength={6}
                       onChange={e => setPasswordForm({ ...passwordForm, otp: e.target.value })}
                       placeholder="------" />
                     <button onClick={handleSendOtp}
-                      className="shrink-0 px-4 rounded-lg border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 transition-colors">
+                      className="ui-btn shrink-0">
                       Resend
                     </button>
                   </div>
@@ -514,15 +513,15 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
                 <div>
                   <PwField value={passwordForm.confirm_password} show={showConfirm} onToggle={() => setShowConfirm(v => !v)}
                     onChange={e => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })} placeholder="Confirm password" />
-                  {pwMatch && <p className="text-[11px] text-black font-semibold mt-1.5 flex items-center gap-1"><CheckCircle size={11} /> Passwords match</p>}
-                  {pwMismatch && <p className="text-[11px] text-red-600 font-semibold mt-1.5">Passwords don't match</p>}
+                  {pwMatch && <p className="text-ui-sm text-state-vacant font-semibold mt-1.5 flex items-center gap-1"><CheckCircle size={11} /> Passwords match</p>}
+                  {pwMismatch && <p className="text-ui-sm text-state-occupied font-semibold mt-1.5">Passwords don't match</p>}
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end mt-5 pt-4 border-t border-gray-200">
+            <div className="flex justify-end mt-5 pt-4 border-t border-line">
               <button onClick={handleResetPassword} disabled={passwordLoading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                className="ui-btn ui-btn-add">
                 {passwordLoading ? <Spin /> : <><Shield size={14} /><span>Reset password</span></>}
               </button>
             </div>

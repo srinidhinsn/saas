@@ -230,35 +230,35 @@ function navigation(){
     );
   }
 
-
+  const isDisabled = loading || !form.username || !form.password
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: '#f9fafb' }}>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-canvas font-sans">
       <div className="w-full max-w-md">
 
 
         {/* Login Card */}
-        <div className="bg-white rounded-xl shadow-md p-8 md:p-10">
+        <div className="bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg p-8 md:p-10">
           {/* Avatar Circle with Spinning Text */}
           <div className="relative w-32 h-32 mx-auto mb-8">
-            <div className="w-32 h-32 rounded-full flex items-center justify-center relative z-10 shadow-lg" style={{ backgroundColor: '#f97316' }}>
+            <div className="w-32 h-32 rounded-full flex items-center justify-center relative z-10 shadow-soft bg-brand">
               <User size={48} className="text-white" strokeWidth={2} />
             </div>
 
           </div>
 
-          <h2 className="text-2xl font-semibold text-center mb-2" style={{ color: '#111827' }}>
+          <h2 className="text-page-title text-center mb-2 text-ink">
             Welcome Back
           </h2>
-          <p className="text-center mb-6" style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+          <p className="text-center mb-6 text-ui text-ink-muted">
             Please login to your account
           </p>
 
           {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-5 flex items-center gap-2 text-red-600 animate-shake">
+            <div className="ui-error flex items-center gap-2 mb-5 animate-shake">
               <AlertCircle size={18} />
-              <span className="text-sm">{error}</span>
+              <span className="text-ui">{error}</span>
             </div>
           )}
 
@@ -266,12 +266,12 @@ function navigation(){
           <div className="space-y-5">
             {/* Username Input */}
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: '#111827' }}>
+              <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">
                 Username
               </label>
               <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#9ca3af' }}>
-                  <User size={20} />
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-ink-faint">
+                  <User size={16} />
                 </div>
                 <input
                   type="text"
@@ -280,32 +280,19 @@ function navigation(){
                   value={form.username}
                   onChange={handleChange}
                   onKeyPress={handleKeyPress}
-                  className="w-full pl-12 pr-4 py-3 border-2 rounded-lg text-base transition-all outline-none"
-                  style={{
-                    borderColor: '#e5e7eb',
-                    backgroundColor: '#ffffff',
-                    color: '#111827',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#f97316';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.boxShadow = 'none';
-                  }}
+                  className="ui-input h-11"
                 />
               </div>
             </div>
 
             {/* Password Input */}
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: '#111827' }}>
+              <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">
                 Password
               </label>
               <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#9ca3af' }}>
-                  <Lock size={20} />
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-ink-faint">
+                  <Lock size={16} />
                 </div>
                 <input
                   type="password"
@@ -314,26 +301,13 @@ function navigation(){
                   value={form.password}
                   onChange={handleChange}
                   onKeyPress={handleKeyPress}
-                  className="w-full pl-12 pr-4 py-3 border-2 rounded-lg text-base transition-all outline-none"
-                  style={{
-                    borderColor: '#e5e7eb',
-                    backgroundColor: '#ffffff',
-                    color: '#111827',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#f97316';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.boxShadow = 'none';
-                  }}
+                  className="ui-input h-11"
                 />
               </div>
             </div>
 
             {/* Forgot Password Link */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-end">
               {/* <span
                 onClick={() => navigation()}
                 className="text-sm cursor-pointer transition-colors font-medium"
@@ -345,10 +319,7 @@ function navigation(){
               </span> */}
               <span
                 onClick={() => setShowForgot(true)}
-                className="text-sm cursor-pointer transition-colors font-medium"
-                style={{ color: '#f97316' }}
-                onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
-                onMouseOut={(e) => e.target.style.textDecoration = 'none'}
+                className="text-ui cursor-pointer transition-colors font-semibold text-brand hover:underline"
               >
                 Forgot Password?
               </span>
@@ -357,28 +328,8 @@ function navigation(){
             {/* Login Button */}
             <button
               onClick={handleLogin}
-              disabled={loading || !form.username || !form.password}
-              className="w-full py-3.5 rounded-lg text-base font-semibold tracking-wide transition-all shadow-sm"
-              style={{
-                backgroundColor: loading || !form.username || !form.password ? '#d1d5db' : '#f97316',
-                color: '#ffffff',
-                cursor: loading || !form.username || !form.password ? 'not-allowed' : 'pointer',
-                boxShadow: loading || !form.username || !form.password ? 'none' : '0 1px 3px rgba(249, 115, 22, 0.3)',
-              }}
-              onMouseOver={(e) => {
-                if (!loading && form.username && form.password) {
-                  e.target.style.backgroundColor = '#ea580c';
-                  e.target.style.transform = 'translateY(-1px)';
-                  e.target.style.boxShadow = '0 4px 6px rgba(249, 115, 22, 0.4)';
-                }
-              }}
-              onMouseOut={(e) => {
-                if (!loading && form.username && form.password) {
-                  e.target.style.backgroundColor = '#f97316';
-                  e.target.style.transform = 'translateY(0)';
-                  e.target.style.boxShadow = '0 1px 3px rgba(249, 115, 22, 0.3)';
-                }
-              }}
+              disabled={isDisabled}
+              className="ui-btn ui-btn-add w-full h-11 tracking-wide"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -395,8 +346,8 @@ function navigation(){
           </div>
 
           {/* Additional Info */}
-          <div className="mt-6 pt-6 border-t text-center" style={{ borderColor: '#e5e7eb' }}>
-            <p className="text-xs" style={{ color: '#9ca3af' }}>
+          <div className="mt-6 pt-6 border-t border-line text-center">
+            <p className="text-ui-sm text-ink-faint">
               Need help? Contact your administrator
             </p>
           </div>
@@ -413,8 +364,7 @@ function navigation(){
       {/* Forgot Password Modal */}
       {showForgot && (
         <div
-          className="fixed inset-0 flex items-center justify-center z-50 p-4"
-          style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+          className="ui-backdrop font-sans"
           onClick={() => {
             setShowForgot(false);
             setForgotStep(1);
@@ -423,17 +373,17 @@ function navigation(){
           }}
         >
           <div
-            className="bg-white rounded-xl p-8 max-w-md w-full shadow-2xl"
+            className="ui-modal animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ backgroundColor: '#fed7aa' }}>
-                <Lock size={28} style={{ color: '#f97316' }} />
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 bg-brand-light">
+                <Lock size={28} className="text-brand" />
               </div>
-              <h3 className="text-xl font-semibold mb-2" style={{ color: '#111827' }}>
+              <h3 className="text-page-title mb-1 text-ink">
                 {forgotStep === 1 ? 'Forgot Password' : 'Reset Password'}
               </h3>
-              <p className="text-sm" style={{ color: '#6b7280' }}>
+              <p className="text-ui text-ink-muted">
                 {forgotStep === 1
                   ? 'Enter your username to receive an OTP'
                   : 'Enter the OTP and your new password'}
@@ -442,9 +392,9 @@ function navigation(){
 
             {/* Error Message */}
             {forgotError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-center gap-2 text-red-600 animate-shake">
+              <div className="ui-error flex items-center gap-2 mb-4 animate-shake">
                 <AlertCircle size={18} />
-                <span className="text-sm">{forgotError}</span>
+                <span className="text-ui">{forgotError}</span>
               </div>
             )}
 
@@ -452,12 +402,12 @@ function navigation(){
             {forgotStep === 1 && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: '#111827' }}>
+                  <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">
                     Username
                   </label>
                   <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#9ca3af' }}>
-                      <User size={20} />
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-ink-faint">
+                      <User size={16} />
                     </div>
                     <input
                       type="text"
@@ -465,20 +415,7 @@ function navigation(){
                       placeholder="Enter your username"
                       value={forgotForm.username}
                       onChange={handleForgotChange}
-                      className="w-full pl-12 pr-4 py-3 border-2 rounded-lg text-base transition-all outline-none"
-                      style={{
-                        borderColor: '#e5e7eb',
-                        backgroundColor: '#ffffff',
-                        color: '#111827',
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = '#f97316';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = '#e5e7eb';
-                        e.target.style.boxShadow = 'none';
-                      }}
+                      className="ui-input h-11"
                     />
                   </div>
                 </div>
@@ -486,24 +423,7 @@ function navigation(){
                 <button
                   onClick={handleRequestOtp}
                   disabled={forgotLoading || !forgotForm.username}
-                  className="w-full py-3 rounded-lg font-semibold transition-all shadow-sm"
-                  style={{
-                    backgroundColor: forgotLoading || !forgotForm.username ? '#d1d5db' : '#f97316',
-                    color: '#ffffff',
-                    cursor: forgotLoading || !forgotForm.username ? 'not-allowed' : 'pointer',
-                  }}
-                  onMouseOver={(e) => {
-                    if (!forgotLoading && forgotForm.username) {
-                      e.target.style.backgroundColor = '#ea580c';
-                      e.target.style.transform = 'translateY(-1px)';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (!forgotLoading && forgotForm.username) {
-                      e.target.style.backgroundColor = '#f97316';
-                      e.target.style.transform = 'translateY(0)';
-                    }
-                  }}
+                  className="ui-btn ui-btn-add w-full h-11"
                 >
                   {forgotLoading ? 'Sending OTP...' : 'Send OTP'}
                 </button>
@@ -514,12 +434,12 @@ function navigation(){
             {forgotStep === 2 && (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: '#111827' }}>
+                  <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">
                     OTP Code
                   </label>
                   <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#9ca3af' }}>
-                      <Lock size={20} />
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-ink-faint">
+                      <Lock size={16} />
                     </div>
                     <input
                       type="text"
@@ -527,31 +447,18 @@ function navigation(){
                       placeholder="Enter OTP"
                       value={forgotForm.otp}
                       onChange={handleForgotChange}
-                      className="w-full pl-12 pr-4 py-3 border-2 rounded-lg text-base transition-all outline-none"
-                      style={{
-                        borderColor: '#e5e7eb',
-                        backgroundColor: '#ffffff',
-                        color: '#111827',
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = '#f97316';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = '#e5e7eb';
-                        e.target.style.boxShadow = 'none';
-                      }}
+                      className="ui-input h-11"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: '#111827' }}>
+                  <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">
                     New Password
                   </label>
                   <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#9ca3af' }}>
-                      <Lock size={20} />
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-ink-faint">
+                      <Lock size={16} />
                     </div>
                     <input
                       type="password"
@@ -559,31 +466,18 @@ function navigation(){
                       placeholder="Enter new password"
                       value={forgotForm.new_password}
                       onChange={handleForgotChange}
-                      className="w-full pl-12 pr-4 py-3 border-2 rounded-lg text-base transition-all outline-none"
-                      style={{
-                        borderColor: '#e5e7eb',
-                        backgroundColor: '#ffffff',
-                        color: '#111827',
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = '#f97316';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = '#e5e7eb';
-                        e.target.style.boxShadow = 'none';
-                      }}
+                      className="ui-input h-11"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: '#111827' }}>
+                  <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">
                     Confirm Password
                   </label>
                   <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#9ca3af' }}>
-                      <Lock size={20} />
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-ink-faint">
+                      <Lock size={16} />
                     </div>
                     <input
                       type="password"
@@ -591,20 +485,7 @@ function navigation(){
                       placeholder="Confirm new password"
                       value={forgotForm.confirm_password}
                       onChange={handleForgotChange}
-                      className="w-full pl-12 pr-4 py-3 border-2 rounded-lg text-base transition-all outline-none"
-                      style={{
-                        borderColor: '#e5e7eb',
-                        backgroundColor: '#ffffff',
-                        color: '#111827',
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = '#f97316';
-                        e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)';
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = '#e5e7eb';
-                        e.target.style.boxShadow = 'none';
-                      }}
+                      className="ui-input h-11"
                     />
                   </div>
                 </div>
@@ -615,44 +496,14 @@ function navigation(){
                       setForgotStep(1);
                       setForgotError('');
                     }}
-                    className="flex-1 py-3 rounded-lg font-semibold transition-all border-2"
-                    style={{
-                      borderColor: '#e5e7eb',
-                      backgroundColor: '#ffffff',
-                      color: '#6b7280',
-                    }}
-                    onMouseOver={(e) => {
-                      e.target.style.borderColor = '#d1d5db';
-                      e.target.style.backgroundColor = '#f9fafb';
-                    }}
-                    onMouseOut={(e) => {
-                      e.target.style.borderColor = '#e5e7eb';
-                      e.target.style.backgroundColor = '#ffffff';
-                    }}
+                    className="ui-btn flex-1 h-11"
                   >
                     Back
                   </button>
                   <button
                     onClick={handleResetPassword}
                     disabled={forgotLoading || !forgotForm.otp || !forgotForm.new_password || !forgotForm.confirm_password}
-                    className="flex-1 py-3 rounded-lg font-semibold transition-all shadow-sm"
-                    style={{
-                      backgroundColor: forgotLoading || !forgotForm.otp || !forgotForm.new_password || !forgotForm.confirm_password ? '#d1d5db' : '#f97316',
-                      color: '#ffffff',
-                      cursor: forgotLoading || !forgotForm.otp || !forgotForm.new_password || !forgotForm.confirm_password ? 'not-allowed' : 'pointer',
-                    }}
-                    onMouseOver={(e) => {
-                      if (!forgotLoading && forgotForm.otp && forgotForm.new_password && forgotForm.confirm_password) {
-                        e.target.style.backgroundColor = '#ea580c';
-                        e.target.style.transform = 'translateY(-1px)';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (!forgotLoading && forgotForm.otp && forgotForm.new_password && forgotForm.confirm_password) {
-                        e.target.style.backgroundColor = '#f97316';
-                        e.target.style.transform = 'translateY(0)';
-                      }
-                    }}
+                    className="ui-btn ui-btn-add flex-1 h-11"
                   >
                     {forgotLoading ? 'Resetting...' : 'Reset Password'}
                   </button>
@@ -668,10 +519,7 @@ function navigation(){
                   setForgotError('');
                   setForgotForm({ username: '', otp: '', new_password: '', confirm_password: '' });
                 }}
-                className="text-sm transition-colors"
-                style={{ color: '#6b7280' }}
-                onMouseOver={(e) => e.target.style.color = '#f97316'}
-                onMouseOut={(e) => e.target.style.color = '#6b7280'}
+                className="text-ui transition-colors text-ink-muted hover:text-brand"
               >
                 Back to Login
               </button>

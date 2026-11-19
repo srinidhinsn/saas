@@ -2,23 +2,49 @@ import axios from 'axios';
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { deduplicateOrderItems } from '../utils/Menu-utils/menuUtils';
-import { X, Trash2, Printer, Eye, Lock } from "lucide-react";
+import { X, Trash2, Printer, Eye } from "lucide-react";export const DLG_SHELL =
+  "flex flex-col w-full max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line " +
+  "border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in";
+export const DLG_HEAD =
+  "flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0";
+export const DLG_FOOT =
+  "flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0";
+export const DLG_CLOSE =
+  "grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface " +
+  "text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors";
+export const FIELD_BASE =
+  "h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink outline-none " +
+  "placeholder:text-ink-faint transition-colors focus:border-brand-ring focus:shadow-focus-ring";
+export const FIELD = FIELD_BASE + " w-full";
+const REASON_ON = "bg-brand-soft text-brand-darker border-brand-ring shadow-seg-active";
+const REASON_OFF = "bg-surface text-ink-toggle border-brand-line hover:border-brand-ring";
+
+
 
 export const PAYMENT_METHODS = [
   { value: "Cash", label: "Cash" },
   { value: "razorpay_upi", label: "UPI (Razorpay)" },
   { value: "razorpay_card", label: "Card (Razorpay)" },
+  { value: "phonepe", label: "PhonePe" },
   { value: "Due", label: "Due" },
 ];
+export const isRazorpayMethod = (method) =>
+  method === "razorpay_upi" || method === "razorpay_card";
 
+export const isPhonePeMethod = (method) => method === "phonepe";
 export const isOnlinePaymentMethod = (method) =>
   method === "razorpay_upi" || method === "razorpay_card";
 
 export const needsRazorpay = (splitPaymentEnabled, paymentSplits, method) =>
   splitPaymentEnabled
-    ? paymentSplits.some(s => isOnlinePaymentMethod(s.method))
-    : isOnlinePaymentMethod(method);
-
+    ? paymentSplits.some(s => isRazorpayMethod(s.method))
+    : isRazorpayMethod(method);
+export const filterPaymentMethods = (gateways = {}) =>
+      PAYMENT_METHODS.filter(m => {
+        if (isRazorpayMethod(m.value)) return !!gateways.razorpay;
+        if (isPhonePeMethod(m.value)) return !!gateways.phonepe;
+        return true;
+      });
 // Sum of all amounts across split rows
 export const sumSplits = (splits) =>
   splits.reduce((sum, s) => sum + Number(s.amount || 0), 0);
@@ -324,56 +350,56 @@ export const getInitialOrderMode = (order, tablesMap = {}) => {
 
 export const StatusBadge = ({ status }) => {
   const styles = {
-    pending: 'bg-orange-100 text-orange-700 border-orange-200',
-    preparing: 'bg-blue-100 text-blue-700 border-blue-200',
-    ready: 'bg-green-100 text-green-700 border-green-200',
-    served: 'bg-gray-100 text-gray-600 border-gray-200',
+    pending: 'bg-state-other-bg text-state-other border-state-other/30',
+    preparing: 'bg-state-reserved-bg text-state-reserved border-state-reserved/30',
+    ready: 'bg-state-vacant-bg text-state-vacant border-state-vacant/30',
+    served: 'bg-brand-light text-brand-dark border-brand-line',
   };
   const s = status?.toLowerCase();
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border
-        ${styles[s] || 'bg-bg-tertiary text-text-secondary border-border-default'}`}
+      className={`inline-flex items-center px-2.5 py-1 rounded-badge text-micro font-bold border capitalize
+        ${styles[s] || 'bg-brand-light text-ink-muted border-brand-line'}`}
     >
       {status || '—'}
     </span>
   );
 };
-
+ 
 // ─────────────────────────────────────────────────────────────────────────────
 // CancelOrderConfirmModal
 // ─────────────────────────────────────────────────────────────────────────────
-
+ 
 export const CancelOrderConfirmModal = ({ isOpen, onClose, onConfirm }) => {
   const [reason, setReason] = useState('');
   const [customReason, setCustomReason] = useState('');
-
+ 
   useEffect(() => {
     if (isOpen) { setReason(''); setCustomReason(''); }
   }, [isOpen]);
-
+ 
   if (!isOpen) return null;
-
+ 
   const effectiveReason = reason === 'Other' ? customReason : reason;
-
+ 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-red-600">Cancel Order</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
+    <div className="ui-backdrop font-sans">
+      <div className={`${DLG_SHELL} max-w-sm`} role="dialog" aria-modal="true" aria-label="Cancel order">
+        <div className={DLG_HEAD}>
+          <h2 className="text-panel-title text-brand-dark">Cancel order</h2>
+          <button onClick={onClose} className={DLG_CLOSE} aria-label="Close"><X size={16} /></button>
         </div>
-        <div className="px-6 py-5 space-y-4">
-          <p className="text-sm text-gray-600">
-            The order will be marked as <span className="font-semibold text-red-600">cancelled</span> and kept for records. Select a reason:
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
+          <p className="text-ui text-ink-muted">
+            The order will be marked as <span className="font-bold text-brand-dark">cancelled</span> and kept for records. Select a reason:
           </p>
           <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1">
             {ORDER_CANCEL_REASONS.map(r => (
               <button
                 key={r}
                 onClick={() => setReason(r)}
-                className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
-                  ${reason === r ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+                className={`px-2 py-2 rounded-button-sm text-ui font-semibold border text-left transition-colors
+                  ${reason === r ? REASON_ON : REASON_OFF}`}
               >{r}</button>
             ))}
           </div>
@@ -382,93 +408,89 @@ export const CancelOrderConfirmModal = ({ isOpen, onClose, onConfirm }) => {
               value={customReason}
               onChange={e => setCustomReason(e.target.value)}
               placeholder="Describe the reason…"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
+              className={FIELD}
             />
           )}
         </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Go Back</button>
+        <div className={DLG_FOOT}>
+          <button onClick={onClose} className="ui-btn">Go back</button>
           <button
             disabled={!reason || (reason === 'Other' && !customReason.trim())}
             onClick={() => { onConfirm(effectiveReason); onClose(); }}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${reason && !(reason === 'Other' && !customReason.trim()) ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-300 cursor-not-allowed'}`}
-          >Cancel Order</button>
+            className="ui-btn ui-btn-danger"
+          >Cancel order</button>
         </div>
       </div>
     </div>
   );
 };
-
+ 
 // ─────────────────────────────────────────────────────────────────────────────
 // OldItemDeleteModal
 // ─────────────────────────────────────────────────────────────────────────────
-
+ 
 export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemoveAll }) => {
   const [reason, setReason] = useState('');
   const [customReason, setCustomReason] = useState('');
   const [removeQty, setRemoveQty] = useState(1);
-
+ 
   const isServed = item?.status === 'served';
   const transactionType = isServed ? 'WASTAGE' : 'ITEM_CANCELLED';
   const reasonList = isServed ? WASTAGE_REASONS : CANCELLATION_REASONS;
   const typeLabel = isServed ? 'Wastage' : 'Cancellation';
-  const typeColor = isServed ? 'text-red-600' : 'text-orange-600';
-  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200';
-  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600';
-
+  const typeColor = 'text-brand-dark';
+  const typeBg = 'bg-brand-tint border-brand-line';
+ 
   useEffect(() => {
     if (isOpen) { setReason(''); setCustomReason(''); setRemoveQty(1); }
   }, [isOpen]);
-
+ 
   if (!isOpen || !item) return null;
-
+ 
   const maxQty = item.quantity || 1;
   const isRemoveAll = removeQty >= maxQty;
   const effectiveReason = reason === 'Other' ? customReason : reason;
-
+ 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className={`text-lg font-bold ${typeColor}`}>Remove Item</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
+    <div className="ui-backdrop font-sans">
+      <div className={`${DLG_SHELL} max-w-sm`} role="dialog" aria-modal="true" aria-label="Remove item">
+        <div className={DLG_HEAD}>
+          <h2 className="text-panel-title text-brand-dark">Remove item</h2>
+          <button onClick={onClose} className={DLG_CLOSE} aria-label="Close"><X size={16} /></button>
         </div>
-        <div className="px-6 py-5 space-y-4">
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-item">
           <div>
-            <p className="text-sm text-gray-700 font-semibold">{item.item_name || item.name}</p>
-            <p className="text-sm text-gray-500 mt-0.5">Ordered quantity: <span className="font-semibold">{maxQty}</span></p>
+            <p className="text-body-sm font-bold text-ink">{item.item_name || item.name}</p>
+            <p className="text-ui text-ink-muted mt-0.5">Ordered quantity: <span className="font-bold text-ink-soft">{maxQty}</span></p>
           </div>
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-semibold ${typeBg} ${typeColor}`}>
-            <span className="w-2 h-2 rounded-full bg-current inline-block" />
+          <div className={`flex items-center gap-2 px-3 py-2 rounded-panel border text-ui font-semibold ${typeBg} ${typeColor}`}>
+            <span className="w-2 h-2 rounded-badge bg-current inline-block" />
             {typeLabel} — {isServed ? 'Item was already served. Stock will be reversed.' : 'Item not yet served. No stock deduction.'}
           </div>
           {maxQty > 1 && (
             <div>
-              <p className="text-xs font-semibold text-gray-600 mb-2">How many to remove?</p>
+              <p className="text-micro font-bold uppercase tracking-wide text-ink-muted mb-2">How many to remove?</p>
               <div className="flex items-center gap-3">
-                <button onClick={() => setRemoveQty(q => Math.max(1, q - 1))} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold">−</button>
-                <span className="w-10 text-center text-lg font-bold text-gray-800">{removeQty}</span>
-                <button onClick={() => setRemoveQty(q => Math.min(maxQty, q + 1))} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold">+</button>
-                <span className="text-xs text-gray-400 ml-1">of {maxQty}</span>
-                <button onClick={() => setRemoveQty(maxQty)} className="ml-auto text-xs text-red-500 underline font-semibold">Remove all</button>
+                <button onClick={() => setRemoveQty(q => Math.max(1, q - 1))} className="ui-btn h-8 w-8 px-0 text-body font-bold">−</button>
+                <span className="w-10 text-center text-kpi text-ink">{removeQty}</span>
+                <button onClick={() => setRemoveQty(q => Math.min(maxQty, q + 1))} className="ui-btn h-8 w-8 px-0 text-body font-bold">+</button>
+                <span className="text-ui-sm text-ink-muted ml-1">of {maxQty}</span>
+                <button onClick={() => setRemoveQty(maxQty)} className="ml-auto text-ui font-bold text-brand underline">Remove all</button>
               </div>
-              <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-red-400 rounded-full transition-all" style={{ width: `${(removeQty / maxQty) * 100}%` }} />
+              <div className="mt-1 h-1.5 bg-brand-light rounded-badge overflow-hidden">
+                <div className="h-full bg-brand rounded-badge transition-all" style={{ width: `${(removeQty / maxQty) * 100}%` }} />
               </div>
             </div>
           )}
           <div>
-            <p className="text-xs font-semibold text-gray-600 mb-2">Reason</p>
+            <p className="text-micro font-bold uppercase tracking-wide text-ink-muted mb-2">Reason</p>
             <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
               {reasonList.map(r => (
                 <button
                   key={r}
                   onClick={() => setReason(r)}
-                  className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
-                    ${reason === r
-                      ? isServed ? 'bg-red-600 text-white border-red-600' : 'bg-orange-500 text-white border-orange-500'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
+                  className={`px-2 py-2 rounded-button-sm text-ui font-semibold border text-left transition-colors
+                    ${reason === r ? REASON_ON : REASON_OFF}`}
                 >{r}</button>
               ))}
             </div>
@@ -477,112 +499,108 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
                 value={customReason}
                 onChange={e => setCustomReason(e.target.value)}
                 placeholder="Describe the reason…"
-                className="mt-2 w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
+                className={`${FIELD} mt-2`}
               />
             )}
           </div>
         </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Cancel</button>
+        <div className={DLG_FOOT}>
+          <button onClick={onClose} className="ui-btn">Cancel</button>
           <button
             disabled={!reason || (reason === 'Other' && !customReason.trim())}
             onClick={() => {
               if (isRemoveAll) onRemoveAll(transactionType, effectiveReason);
               else onRemoveOne(transactionType, effectiveReason, removeQty);
             }}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${reason && !(reason === 'Other' && !customReason.trim()) ? buttonColor : 'bg-gray-300 cursor-not-allowed'}`}
+            className="ui-btn ui-btn-danger"
           >{isRemoveAll ? `Remove All (${maxQty})` : `Remove ${removeQty}`}</button>
         </div>
       </div>
     </div>
   );
 };
-
+ 
 // ─────────────────────────────────────────────────────────────────────────────
 // OrderItemsViewModal — read-only view of all items for an order, with a
 // per-item delete affordance (routes through OldItemDeleteModal via the
 // parent's onRequestDeleteItem callback).
 // ─────────────────────────────────────────────────────────────────────────────
-
+ 
 export const OrderItemsViewModal = ({ isOpen, onClose, order, onRequestDeleteItem, getOrderTotal }) => {
   if (!isOpen || !order) return null;
-
+ 
   const getItemStatusStyle = (status) => {
     switch (status?.toLowerCase()) {
-      case 'pending': return 'bg-orange-100 text-orange-700';
-      case 'preparing': return 'bg-blue-100 text-blue-700';
-      case 'ready': return 'bg-green-100 text-green-700';
-      case 'served': return 'bg-gray-100 text-gray-600';
-      default: return 'bg-bg-tertiary text-text-secondary';
+      case 'pending': return 'bg-state-other-bg text-state-other';
+      case 'preparing': return 'bg-state-reserved-bg text-state-reserved';
+      case 'ready': return 'bg-state-vacant-bg text-state-vacant';
+      case 'served': return 'bg-brand-light text-brand-dark';
+      default: return 'bg-brand-light text-ink-muted';
     }
   };
-
+ 
   const grandTotal = getOrderTotal(order);
-
+ 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg"
-      onClick={onClose}
-    >
+    <div className="ui-backdrop font-sans" onClick={onClose}>
       <div
-        className="rounded-xl w-full max-w-2xl max-h-[88vh] flex flex-col bg-bg-primary shadow-card border border-border-default"
+        className={`${DLG_SHELL} max-w-2xl`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Order items"
         onClick={e => e.stopPropagation()}
       >
-        <div className="px-6 py-4 border-b border-border-default bg-action-primary rounded-t-xl flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-text-white">Order #{order.id}</h2>
-            <p className="text-sm text-text-white/70 mt-0.5">
+        <div className={DLG_HEAD}>
+          <div className="min-w-0">
+            <h2 className="text-panel-title text-brand-dark">Order #{order.id}</h2>
+            <p className="text-micro text-ink-muted truncate">
               {order._fixedOrderMode === 'takeaway'
                 ? order.customer_name || 'Takeaway'
                 : order._tableName || order.table || order.table_id}
             </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-item">
             <div className="text-right">
-              <p className="text-xs text-text-white/60 uppercase font-semibold tracking-wide">Grand Total</p>
-              <p className="text-2xl font-bold text-text-white">₹{grandTotal.toFixed(2)}</p>
+              <p className="text-micro font-bold uppercase tracking-wide text-ink-muted">Grand total</p>
+              <p className="text-kpi text-brand-dark">₹{grandTotal.toFixed(2)}</p>
             </div>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-white/10 text-text-white transition-colors"><X size={20} /></button>
+            <button onClick={onClose} className={DLG_CLOSE} aria-label="Close"><X size={16} /></button>
           </div>
         </div>
-
-        <div className="flex-1 overflow-y-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-bg-tertiary border-b border-border-default z-10">
+ 
+        <div className="flex-1 overflow-y-auto px-modal pb-card">
+          <table className="ui-table text-ui">
+            <thead>
               <tr>
-                <th className="text-left px-5 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">#</th>
-                <th className="text-left px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">Item</th>
-                <th className="text-center px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">Qty</th>
-                <th className="text-right px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">Unit Price</th>
-                <th className="text-right px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">Total</th>
-                <th className="text-center px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">Status</th>
-                <th className="text-center px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider"></th>
+                <th>#</th>
+                <th>Item</th>
+                <th className="text-center">Qty</th>
+                <th className="text-right">Unit price</th>
+                <th className="text-right">Total</th>
+                <th className="text-center">Status</th>
+                <th></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border-default">
+            <tbody>
               {order.items.map((item, idx) => {
                 const unitPrice = item.unit_price ?? item.price ?? 0;
                 const lineTotal = unitPrice * (item.quantity || 1);
                 const isServedItem = item.status?.toLowerCase() === 'served';
                 return (
-                  <tr key={item.id || idx} className="hover:bg-bg-tertiary/50 transition-colors">
-                    <td className="px-5 py-3 text-text-secondary text-xs">{idx + 1}</td>
-                    <td className="px-4 py-3 font-medium text-text-primary">{item.item_name || 'Unnamed Item'}</td>
-                    <td className="px-4 py-3 text-center font-semibold text-text-primary">{item.quantity || 1}</td>
-                    <td className="px-4 py-3 text-right text-text-secondary">₹{unitPrice.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right font-bold text-text-primary">₹{lineTotal.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getItemStatusStyle(item.status)}`}>{item.status || 'pending'}</span>
+                  <tr key={item.id || idx}>
+                    <td>{idx + 1}</td>
+                    <td className="font-semibold text-ink">{item.item_name || 'Unnamed Item'}</td>
+                    <td className="text-center font-bold text-ink">{item.quantity || 1}</td>
+                    <td className="text-right">₹{unitPrice.toFixed(2)}</td>
+                    <td className="text-right font-bold text-brand-dark">₹{lineTotal.toFixed(2)}</td>
+                    <td className="text-center">
+                      <span className={`text-micro font-bold px-2.5 py-1 rounded-badge capitalize ${getItemStatusStyle(item.status)}`}>{item.status || 'pending'}</span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="text-center">
                       {onRequestDeleteItem && (
                         <button
                           onClick={() => onRequestDeleteItem(item)}
-                          className={`p-1.5 rounded-lg transition-colors
-                            ${isServedItem
-                              ? 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white'
-                              : 'bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white'}`}
+                          className="p-1.5 rounded-button-sm bg-brand-light text-brand-dark hover:bg-brand-soft transition-colors"
                           title={isServedItem ? 'Delete served item (records wastage)' : 'Delete item'}
                         >
                           <Trash2 size={14} />
@@ -595,70 +613,35 @@ export const OrderItemsViewModal = ({ isOpen, onClose, order, onRequestDeleteIte
             </tbody>
           </table>
         </div>
-
-        <div className="px-6 py-4 border-t border-border-default bg-bg-tertiary rounded-b-xl flex justify-between items-center">
-          <span className="text-sm font-medium text-text-secondary">
+ 
+        <div className="px-modal py-item border-t border-line bg-canvas flex justify-between items-center shrink-0">
+          <span className="text-ui font-semibold text-ink-muted">
             {order.items.length} item{order.items.length !== 1 ? 's' : ''}
           </span>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-text-secondary">Grand Total:</span>
-            <span className="text-xl font-bold text-action-primary">₹{grandTotal.toFixed(2)}</span>
+            <span className="text-ui font-semibold text-ink-muted">Grand total:</span>
+            <span className="text-kpi text-brand-dark">₹{grandTotal.toFixed(2)}</span>
           </div>
         </div>
       </div>
     </div>
   );
 };
+ 
+// ─────────────────────────────────────────────────────────────────────────────
+// OrderRowActions — the ONE shared button group (same props as before)
+// ─────────────────────────────────────────────────────────────────────────────
+ 
 
-// ─────────────────────────────────────────────────────────────────────────────
-// OrderRowActions — the ONE shared button group.
-//
-// Exactly 3 always-visible buttons (View items / Print & Invoice / Cancel),
-// plus an optional 4th "Mark As Served" button that only appears when the
-// order status is "ready". This is the single source of truth for the
-// actions column in both OrderSummaryVisible and BillingPage — don't
-// re-implement it locally in either place.
-//
-// Props:
-//   order        - the row's order object (needs .id and .status)
-//   onView       - (order) => void  — opens the items view/manage modal
-//   onPrint      - (order) => void  — opens the invoice modal / prints the bill
-//   onCancel     - (order) => void  — opens the cancel-order confirm modal
-//   onMarkServed - (order) => void  — optional; if omitted, the "Mark As
-//                  Served" button never renders even when status is 'ready'
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────────────────────
-// OrderRowActions — the ONE shared button group.
-//
-// Exactly 3 always-visible buttons (View items / Print & Invoice / Cancel),
-// plus an optional 4th "Mark As Served" button that only appears when the
-// order status is "ready". This is the single source of truth for the
-// actions column in both OrderSummaryVisible and BillingPage — don't
-// re-implement it locally in either place.
-//
-// Props:
-//   order            - the row's order object (needs .id and .status)
-//   onView           - (order) => void  — opens the items view/manage modal
-//   onPrint          - (order) => void  — opens the invoice modal / prints the bill
-//   onCancel         - (order) => void  — opens the cancel-order confirm modal
-//   onMarkServed     - (order) => void  — optional; if omitted, the "Mark As
-//                      Served" button never renders even when status is 'ready'
-//   invoiceGenerated - boolean; once true, the Cancel button is disabled —
-//                      an invoiced order can no longer be cancelled from
-//                      here, mirroring the item-level lock in
-//                      OrderItemsViewModal. View and Print stay enabled.
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed, invoiceGenerated = false }) => {
+export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed }) => {
   if (!order) return null;
   const status = order.status?.toLowerCase();
 
   return (
-    <div className="flex items-center justify-center gap-4 flex-wrap h-full">
+    <div className="flex items-center justify-center gap-3 flex-wrap h-full">
       <button
         onClick={() => onView(order)}
-        className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors"
+        className="p-1.5 rounded-button-sm bg-[#edf2f8] text-[#496582] hover:bg-[#dfe8f2] hover:text-[#354f6b] transition-colors"
         title="View items"
       >
         <Eye size={15} />
@@ -666,7 +649,7 @@ export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed
 
       <button
         onClick={() => onPrint(order)}
-        className="p-1.5 rounded-lg bg-green-100 text-green-700 hover:bg-green-600 hover:text-white transition-colors"
+        className="p-1.5 rounded-button-sm bg-[#e8f4f1] text-[#397b6c] hover:bg-[#d8ebe5] hover:text-[#286556] transition-colors"
         title="Print bill"
       >
         <Printer size={15} />
@@ -675,31 +658,23 @@ export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed
       {status === 'ready' && onMarkServed && (
         <button
           onClick={() => onMarkServed(order)}
-          className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap"
+          className="ui-btn ui-btn-add h-7 px-2.5 text-micro whitespace-nowrap"
         >
           Mark As Served
         </button>
       )}
 
-      {invoiceGenerated ? (
-        <span
-          className="p-1.5 rounded-lg bg-bg-tertiary text-text-secondary/50 cursor-not-allowed inline-flex"
-          title="Invoice already generated — order can no longer be cancelled"
-        >
-          <Lock size={15} />
-        </span>
-      ) : (
-        <button
-          onClick={() => onCancel(order)}
-          className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors"
-          title="Cancel order"
-        >
-          <Trash2 size={15} />
-        </button>
-      )}
+      <button
+        onClick={() => onCancel(order)}
+        className="p-1.5 rounded-button-sm bg-[#f8eded] text-[#b65b5b] hover:bg-[#f1dede] hover:text-[#984444] transition-colors"
+        title="Cancel order"
+      >
+        <Trash2 size={15} />
+      </button>
     </div>
   );
 };
+
 
 export const hasInvoiceBeenGenerated = (order, billingDocMap = {}) =>
   Boolean(billingDocMap?.[order?.id?.toString()]?.document_number);

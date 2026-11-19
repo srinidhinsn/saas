@@ -7,7 +7,7 @@ import RazorpayPayment from "../../Constants/RazorPay/RazorpayPayment";
 import { useClient } from "../../../context/ClientContext";
 import { isPackagingOrderItem, fmt, formatPriceByMode } from '../../utils/Menu-utils/menuUtils';
 import {
-  PAYMENT_METHODS,
+  filterPaymentMethods,
   needsRazorpay,
   sumSplits,
   getBalance,
@@ -17,9 +17,14 @@ import {
   rebalanceOnBlur,
   validateSplitTotal,
   getPaidAndDue,
+  DLG_SHELL,
+  DLG_CLOSE,
+  FIELD_BASE,
+  FIELD
 } from '../../utils/BillingUtils';
+
 import PhonePeIframe from "../../Constants/RazorPay/PhonePeIframe";
-import {generateInvoiceOutput } from '../../utils/InvoiceSupporter/generateInvoiceOutput'
+import { generateInvoiceOutput } from '../../utils/InvoiceSupporter/generateInvoiceOutput'
 // ─────────────────────────────────────────────────────────────────────────────
 // REQ 2 helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -98,15 +103,17 @@ export default function InvoiceModal({
   const { clientDetails } = useClient();
   const clientGstNumber = clientDetails?.gst_number || "";
   const [showPhonePeIframe, setShowPhonePeIframe] = useState(false);
+  const [gateways, setGateways] = useState({ razorpay: false, phonepe: false });
+  const [gatewaysLoaded, setGatewaysLoaded] = useState(false);
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
   const allOrderItems = selectedOrder?.items || [];
-const packagingChargeTotal = Number(
-  allOrderItems
-    .filter(i => isPackagingOrderItem(i, inventoryMap))
-    .reduce((sum, i) => sum + (Number(i.unit_price) || 0) * (Number(i.quantity) || 0), 0)
-    .toFixed(2)
-);
+  const packagingChargeTotal = Number(
+    allOrderItems
+      .filter(i => isPackagingOrderItem(i, inventoryMap))
+      .reduce((sum, i) => sum + (Number(i.unit_price) || 0) * (Number(i.quantity) || 0), 0)
+      .toFixed(2)
+  );
 
   // 1️⃣ Subtotal
   const orderSubtotal = Number(
@@ -138,7 +145,7 @@ const packagingChargeTotal = Number(
 
   const total = calculatedTotal;
 
-const { paidAmount, dueAmount } = getPaidAndDue(paymentSplits);
+  const { paidAmount, dueAmount } = getPaidAndDue(paymentSplits);
 
   // ─── Split payment helpers ─────────────────────────────────────────────────
 
@@ -146,28 +153,28 @@ const { paidAmount, dueAmount } = getPaidAndDue(paymentSplits);
 
   const updateBalance = (splits) => setBalanceAmount(getBalance(splits, total));
 
-const updateSplitAmount = (index, value) => {
-  const next = updateSplitAmountUtil(paymentSplits, index, value, total);
-  setPaymentSplits(next);
-  updateBalance(next);
-};
+  const updateSplitAmount = (index, value) => {
+    const next = updateSplitAmountUtil(paymentSplits, index, value, total);
+    setPaymentSplits(next);
+    updateBalance(next);
+  };
 
-const addSplitRow = () => {
-  setPaymentSplits(prev => addSplitRowUtil(prev, total));
-  setBalanceAmount(0);
-};
+  const addSplitRow = () => {
+    setPaymentSplits(prev => addSplitRowUtil(prev, total));
+    setBalanceAmount(0);
+  };
 
-const removeSplitRow = (index) => {
-  const updated = removeSplitRowUtil(paymentSplits, index);
-  setPaymentSplits(updated);
-  setBalanceAmount(getBalance(updated, total));
-};
+  const removeSplitRow = (index) => {
+    const updated = removeSplitRowUtil(paymentSplits, index);
+    setPaymentSplits(updated);
+    setBalanceAmount(getBalance(updated, total));
+  };
 
-const onSplitAmountBlur = () => {
-  const next = rebalanceOnBlur(paymentSplits, total);
-  setPaymentSplits(next);
-  updateBalance(next);
-};
+  const onSplitAmountBlur = () => {
+    const next = rebalanceOnBlur(paymentSplits, total);
+    setPaymentSplits(next);
+    updateBalance(next);
+  };
 
   // ─── Fetch customers & invoice draft ──────────────────────────────────────
   const searchCustomersLocally = (q) => {
@@ -205,31 +212,31 @@ const onSplitAmountBlur = () => {
           },
         }
       );
-  
+
       const invoices = res.data?.data || [];
-  
+
       const filtered = invoices.filter(
         (d) =>
           d.order_id?.toString() === orderId?.toString() &&
           d.document_type === "Invoice"
       );
-  
+
       if (filtered.length === 0) {
         return {};
       }
-  
+
       filtered.sort((a, b) => {
         const aTime = new Date(
           a.updated_at || a.created_at || 0
         ).getTime();
-  
+
         const bTime = new Date(
           b.updated_at || b.created_at || 0
         ).getTime();
-  
+
         return bTime - aTime;
       });
-  
+
       return filtered[0] || {};
     } catch (err) {
       console.error("Failed to fetch invoice", err);
@@ -242,7 +249,39 @@ const onSplitAmountBlur = () => {
       fetchUniqueCustomers();
     }
   }, [clientId, token]);
+  useEffect(() => {
+    if (!clientId || !token) return;
+    (async () => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/verify/payment_gateways`,
+          { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId } }
+        );
+        setGateways(res.data?.data || { razorpay: false, phonepe: false });
+      } catch (err) {
+        console.error("Failed to fetch payment gateways:", err);
+        setGateways({ razorpay: false, phonepe: false });
+      } finally {
+        setGatewaysLoaded(true);
+      }
+    })();
+  }, [clientId, token]);
 
+  const isMethodAvailable = (value) => {
+    const v = String(value || "").toLowerCase();
+    if (v.includes("razorpay")) return gateways.razorpay;
+    if (v.includes("phonepe")) return gateways.phonepe;
+    return true; // Cash, Due, etc.
+  };
+
+  // If the saved/selected method isn't available for this client, fall back to Cash
+  useEffect(() => {
+    if (!gatewaysLoaded) return;
+    if (!isMethodAvailable(method)) {
+      setMethod("Cash");
+      if (!splitPaymentEnabled) setPaymentSplits([{ method: "Cash", amount: total }]);
+    }
+  }, [gatewaysLoaded, gateways]);
   useEffect(() => {
     const loadInvoiceDraft = async () => {
       if (!initialOrder) return;
@@ -330,7 +369,7 @@ const onSplitAmountBlur = () => {
         );
 
         setPaymentSplits(splits);
-        updateBalance(sumSplits(splits));
+        updateBalance(splits);
       }
     }
   }, [total]);
@@ -367,24 +406,24 @@ const onSplitAmountBlur = () => {
 
     setSaving(true);
     let resolvedCustomerId = selectedOrder.customer_id;
-if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.customer_id) {
-  try {
-    const custRes = await axios.post(
-      `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/customer/find_or_create`,
-      {
-        contact_email: selectedOrder.contact_email,
-        contact_phone: selectedOrder.contact_phone,
-        shipping_address: selectedOrder.shipping_address,
-        customer_id: selectedOrder.customer_id,
-      },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    resolvedCustomerId = custRes.data?.data?.person_id || resolvedCustomerId;
-    console.log("find_or_create response:", custRes.data); // temporary debug
-  } catch (err) {
-    console.error("Failed to resolve/create customer:", err.response?.data || err.message);
-  }
-}
+    if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.customer_id) {
+      try {
+        const custRes = await axios.post(
+          `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/customer/find_or_create`,
+          {
+            contact_email: selectedOrder.contact_email,
+            contact_phone: selectedOrder.contact_phone,
+            shipping_address: selectedOrder.shipping_address,
+            customer_id: selectedOrder.customer_id,
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        resolvedCustomerId = custRes.data?.data?.person_id || resolvedCustomerId;
+        console.log("find_or_create response:", custRes.data); // temporary debug
+      } catch (err) {
+        console.error("Failed to resolve/create customer:", err.response?.data || err.message);
+      }
+    }
     try {
       const payload = {
         client_id: clientId,
@@ -415,7 +454,7 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
       if (!draftId) {
         const res = await axios.post(
           `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/create_document`,
-          {...payload,status: "Draft" },
+          { ...payload, status: "Draft" },
           { headers: { Authorization: `Bearer ${token}` } }
         );
         draftId = res?.data?.data?.id;
@@ -430,21 +469,21 @@ if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.
       }
 
       // REQ 2: Always issue an invoice number on save, not just on payment confirmation
-if (!documentNumber || documentNumber.toLowerCase() === "draft") {
-  try {
-    const issueRes = await axios.post(
-      `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/issue?invoice_id=${draftId}`,
-      null,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const data = issueRes?.data?.data || {};
-    if (data.document_number) setDocumentNumber(data.document_number);
-    if (data.status) setStatus(data.status);
+      if (!documentNumber || documentNumber.toLowerCase() === "draft") {
+        try {
+          const issueRes = await axios.post(
+            `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/issue?invoice_id=${draftId}`,
+            null,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          const data = issueRes?.data?.data || {};
+          if (data.document_number) setDocumentNumber(data.document_number);
+          if (data.status) setStatus(data.status);
 
-  } catch (err) {
-    console.error("Failed to generate invoice number:", err.response?.data || err.message);
-  }
-}
+        } catch (err) {
+          console.error("Failed to generate invoice number:", err.response?.data || err.message);
+        }
+      }
 
       const itemsPayload = selectedOrder.items.map((item) => ({
         item_ref_id: item.item_id?.toString(),
@@ -486,47 +525,47 @@ if (!documentNumber || documentNumber.toLowerCase() === "draft") {
   // Sets invoice payment_status to "Paid", marks order as "served",
   // and THEN frees the table.
 
-const handleConfirmPayment = async () => {
-  setSaving(true);
-  try {
-    const invoiceDraft = await fetchInvoiceDraft(selectedOrder.id);
-    const correctInvoiceDraftId = invoiceDraft?.id || invoiceDraftId;
-    if (!correctInvoiceDraftId) throw new Error("No invoice draft found");
+  const handleConfirmPayment = async () => {
+    setSaving(true);
+    try {
+      const invoiceDraft = await fetchInvoiceDraft(selectedOrder.id);
+      const correctInvoiceDraftId = invoiceDraft?.id || invoiceDraftId;
+      if (!correctInvoiceDraftId) throw new Error("No invoice draft found");
 
-    const updateRes = await axios.post(
-      `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
-      { id: correctInvoiceDraftId, client_id: clientId, payment_status: paymentStatus, status: "Issued" },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const updatedInvoice = updateRes?.data?.data;
+      const updateRes = await axios.post(
+        `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+        { id: correctInvoiceDraftId, client_id: clientId, payment_status: paymentStatus, status: "Issued" },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const updatedInvoice = updateRes?.data?.data;
 
-    // Only auto-mark "served" for dine-in orders — takeaway/delivery
-    // orders are typically prepaid before the food is even ready.
-    const dineIn = isDineInOrder(selectedOrder, tablesMap);
-    await axios.post(
-      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-      {
-        id: selectedOrder.id,
-        ...(dineIn ? { status: "served" } : {}),
-        invoice_status: paymentStatus.toLowerCase(),
-      },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+      // Only auto-mark "served" for dine-in orders — takeaway/delivery
+      // orders are typically prepaid before the food is even ready.
+      const dineIn = isDineInOrder(selectedOrder, tablesMap);
+      await axios.post(
+        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+        {
+          id: selectedOrder.id,
+          ...(dineIn ? { status: "served" } : {}),
+          invoice_status: paymentStatus.toLowerCase(),
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-    await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
+      await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
 
-    setInvoiceDraftId(updatedInvoice?.id || correctInvoiceDraftId);
-    setDocumentNumber(updatedInvoice?.document_number || documentNumber);
-    setPaymentStatus(updatedInvoice?.payment_status || paymentStatus);
-    setStatus(updatedInvoice?.status || "Issued");
-    onClose();
-  } catch (err) {
-    console.error("Payment Confirmation Failed:", err.message);
-    toast.error("Payment confirmation failed");
-  } finally {
-    setSaving(false);
-  }
-};
+      setInvoiceDraftId(updatedInvoice?.id || correctInvoiceDraftId);
+      setDocumentNumber(updatedInvoice?.document_number || documentNumber);
+      setPaymentStatus(updatedInvoice?.payment_status || paymentStatus);
+      setStatus(updatedInvoice?.status || "Issued");
+      onClose();
+    } catch (err) {
+      console.error("Payment Confirmation Failed:", err.message);
+      toast.error("Payment confirmation failed");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // ─── handlePaymentClick ────────────────────────────────────────────────────
 
@@ -642,34 +681,31 @@ const handleConfirmPayment = async () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-bg-primary rounded-2xl shadow-2xl w-full max-w-[1600px] h-[90vh] flex flex-col relative">
+    <div className="ui-backdrop font-sans">
+      <div className={`${DLG_SHELL} max-w-[1600px] h-[90vh] relative`} role="dialog" aria-modal="true" aria-label="Invoice">
         <button
-          className="absolute top-4 right-4 z-10 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary text-2xl font-bold w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md bg-bg-primary border border-border-default"
+          className={`absolute top-4 right-4 z-10 ${DLG_CLOSE}`}
           onClick={onClose}
+          aria-label="Close"
         >
-          <X size={24} />
+          <X size={16} />
         </button>
-
-        <div className="flex flex-col h-full bg-bg-primary">
+ 
+        <div className="flex flex-col h-full min-h-0 bg-canvas">
           {/* Header */}
-          <div className="bg-action-primary px-6 py-4 shadow-lg flex-shrink-0 rounded-t-2xl">
+          <div className="bg-brand-light border-b border-brand-line px-6 py-4 flex-shrink-0">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-text-white font-bold text-xl shadow-md border border-white/30">
-                  {clientId.charAt(0).toUpperCase()}
-                </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-white">{clientId.toUpperCase()}</h1>
-                  <p className="text-white/80 text-sm">
+                  <p className="text-xl text-ink-muted">
                     Invoice #{documentNumber || "Draft"}
                     {/* REQ 2: Show payment status badge in header */}
                     {invoiceDraftId && (
                       <span
-                        className={`ml-2 text-xs px-2 py-0.5 rounded-full font-semibold
+                        className={`ml-2 text-micro px-2 py-0.5 rounded-badge font-bold
                           ${paymentStatus === 'Paid'
-                            ? 'bg-green-300 text-green-900'
-                            : 'bg-yellow-300 text-yellow-900'}`}
+                            ? 'bg-state-vacant-bg text-state-vacant'
+                            : 'bg-state-occupied-bg text-state-occupied'}`}
                       >
                         {paymentStatus}
                       </span>
@@ -677,69 +713,69 @@ const handleConfirmPayment = async () => {
                   </p>
                 </div>
               </div>
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                <div className="text-text-white">
-                  <div className="text-sm font-medium">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
-                  <div className="text-xs text-text-white/80">Order #{selectedOrder.id}</div>
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mr-10">
+                <div className="text-ink">
+                  <div className="text-ui font-semibold">Table: {tablesMap[selectedOrder.table_id]?.name}</div>
+                  <div className="text-ui-sm text-ink-muted">Order #{selectedOrder.dinein_order_id ?? selectedOrder.id}</div>
                 </div>
-                <div className="text-text-white">
-                  <div className="text-sm font-medium">{new Date().toLocaleDateString()}</div>
-                  <div className="text-xs text-text-white/80">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+                <div className="text-ink">
+                  <div className="text-ui font-semibold">{new Date().toLocaleDateString()}</div>
+                  <div className="text-ui-sm text-ink-muted">{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
                 </div>
               </div>
             </div>
           </div>
-
+ 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6">
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-
+ 
               {/* LEFT - Items (2/3 width on xl) */}
               <div className="xl:col-span-2 space-y-6">
-                <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default">
-                  <div className="px-5 py-3 bg-bg-tertiary border-b border-border-default rounded-t-xl">
-                    <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+                <div className="bg-surface rounded-panel shadow-panel border border-line">
+                  <div className="px-5 py-3 bg-brand-light border-b border-brand-line rounded-t-panel">
+                    <h2 className="text-panel-title text-brand-dark flex items-center gap-2">
                       📦 Order Items
                     </h2>
                   </div>
                   <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
-
+ 
                     {(() => {
                       const items = selectedOrder.items || [];
                       const parents = items.filter(i => !_isChildItem(i.frontend_unique_key));
                       return parents.map((item, idx) => {
-
+ 
                         const addons = items.filter(i =>
                           (i.frontend_unique_key || '').startsWith(`addon_${item.frontend_unique_key}_`) &&
                           !isPackagingOrderItem(i, inventoryMap)
                         );
-
+ 
                         return (
                           <div key={idx}>
                             {/* Main item row */}
-                            <div className="flex justify-between items-center py-3 px-4 rounded-lg bg-bg-tertiary border border-border-default hover:border-action-primary transition-all">
+                            <div className="flex justify-between items-center py-3 px-4 rounded-panel bg-canvas border border-line hover:border-brand-ring transition-colors">
                               <div className="flex-1">
-                                <div className="font-semibold text-text-primary">{item.name}</div>
-                                <div className="text-sm text-text-secondary mt-1 flex items-center gap-2">
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-bg-primary text-text-primary font-medium text-xs">
+                                <div className="font-bold text-body-sm text-ink">{item.name}</div>
+                                <div className="text-ui text-ink-muted mt-1 flex items-center gap-2">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark font-bold text-micro">
                                     {item.quantity}x
                                   </span>
                                   <span>@ ₹{formatPriceByMode(item.unit_price || 0, clientId)}</span>
                                 </div>
                               </div>
-                              <div className="font-bold text-text-primary text-lg">
+                              <div className="font-bold text-brand-dark text-body">
                                 ₹{formatPriceByMode((item.unit_price || 0) * (item.quantity || 0), clientId)}
                               </div>
                             </div>
                             {/* Addon rows indented below */}
                             {addons.map((addon, ai) => (
-                              <div key={ai} className="flex justify-between items-center py-1.5 px-4 pl-8 rounded-lg bg-blue-50/50 border border-dashed border-blue-200 mt-0.5 ml-3">
+                              <div key={ai} className="flex justify-between items-center py-1.5 px-4 pl-8 rounded-panel bg-brand-tint border border-dashed border-brand-line mt-0.5 ml-3">
                                 <div className="flex items-center gap-2 flex-1">
-                                  <span className="text-blue-400 text-xs">↳</span>
-                                  <span className="text-sm text-blue-700">{addon.name}</span>
-                                  <span className="text-xs text-blue-500">×{addon.quantity}</span>
+                                  <span className="text-brand-ring text-ui">↳</span>
+                                  <span className="text-ui text-brand-dark">{addon.name}</span>
+                                  <span className="text-ui-sm text-ink-muted">×{addon.quantity}</span>
                                 </div>
-                                <span className="text-xs font-semibold text-blue-600">
+                                <span className="text-ui-sm font-bold text-brand-dark">
                                   +₹{formatPriceByMode((addon.unit_price || 0) * (addon.quantity || 0), clientId)}
                                 </span>
                               </div>
@@ -749,41 +785,41 @@ const handleConfirmPayment = async () => {
                       });
                     })()}
                   </div>
-
+ 
                   {/* Totals */}
-                  <div className="border-t border-border-default bg-bg-tertiary px-5 py-4 rounded-b-xl">
+                  <div className="border-t border-line bg-canvas px-5 py-4 rounded-b-panel">
                     <div className="space-y-2">
-                      <div className="flex justify-between text-text-secondary">
+                      <div className="flex justify-between text-ink text-body-sm">
                         <span>Subtotal</span>
                         <span className="font-semibold">₹{formatPriceByMode(orderSubtotal, clientId)}</span>
                       </div>
-                      <div className="flex justify-between text-action-danger">
+                      <div className="flex justify-between text-brand-dark text-body-sm">
                         <span>Discount</span>
                         <span className="font-semibold">-₹{formatPriceByMode(calculatedDiscount, clientId)}</span>
                       </div>
-                      <div className="flex justify-between text-text-secondary">
+                      <div className="flex justify-between text-ink-muted text-body-sm">
                         <span>GST ({taxPercent}%)</span>
                         <span className="font-semibold">₹{formatPriceByMode(calculatedGST, clientId)}</span>
                       </div>
                       {packagingChargeTotal > 0 && (
-                        <div className="flex justify-between text-text-secondary">
+                        <div className="flex justify-between text-ink-muted text-body-sm">
                           <span>Packaging Charges</span>
                           <span className="font-semibold">₹{formatPriceByMode(packagingChargeTotal, clientId)}</span>
                         </div>
                       )}
-                      <div className="pt-3 border-t border-border-default flex justify-between items-center">
-                        <span className="text-lg font-bold text-text-primary">TOTAL</span>
-                        <span className="text-2xl font-bold text-action-primary">
+                      <div className="pt-3 border-t border-line flex justify-between items-center">
+                        <span className="text-body font-bold text-ink">TOTAL</span>
+                        <span className="text-kpi text-brand-dark">
                           ₹{formatPriceByMode(calculatedTotal, clientId)}
                         </span>
                       </div>
                         {dueAmount > 0 && (
                           <>
-                          <div className="flex justify-between text-text-secondary">
+                          <div className="flex justify-between text-ink-muted text-body-sm">
                             <span>Paid</span>
                             <span className="font-semibold">₹{formatPriceByMode(paidAmount, clientId)}</span>
                           </div>
-                          <div className="flex justify-between text-text-secondary">
+                          <div className="flex justify-between text-ink-muted text-body-sm">
                             <span>Due</span>
                             <span className="font-semibold">₹{formatPriceByMode(dueAmount, clientId)}</span>
                           </div>
@@ -793,14 +829,14 @@ const handleConfirmPayment = async () => {
                   </div>
                 </div>
               </div>
-
+ 
               {/* RIGHT - Customer & Settings (1/3 width on xl) */}
               <div className="space-y-6">
-
+ 
                 {/* Customer Details */}
-                <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default">
-                  <div className="px-5 py-3 bg-bg-tertiary border-b border-border-default rounded-t-xl">
-                    <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                <div className="bg-surface rounded-panel shadow-panel border border-line">
+                  <div className="px-5 py-3 bg-brand-light border-b border-brand-line rounded-t-panel">
+                    <h3 className="text-panel-title text-brand-dark flex items-center gap-2">
                       👤 Customer
                     </h3>
                   </div>
@@ -855,23 +891,23 @@ const handleConfirmPayment = async () => {
                     />
                   </div>
                 </div>
-
+ 
                 {/* Tax & Discount */}
-                <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default">
-                  <div className="px-5 py-3 bg-bg-tertiary border-b border-border-default rounded-t-xl">
-                    <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                <div className="bg-surface rounded-panel shadow-panel border border-line">
+                  <div className="px-5 py-3 bg-brand-light border-b border-brand-line rounded-t-panel">
+                    <h3 className="text-panel-title text-brand-dark flex items-center gap-2">
                       ⚙️ Tax & Discount
                     </h3>
                   </div>
                   <div className="p-4 space-y-3">
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <label className="text-xs font-semibold text-text-secondary mb-1 block">GST (%)</label>
+                        <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">GST (%)</label>
                         <input
                           type="number"
                           value={taxPercent}
                           min="0"
-                          className="w-full border border-border-default rounded-lg px-2 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
+                          className={FIELD}
                           onChange={(e) => {
                             setTaxPercent(Number(e.target.value));
                             setGstManuallyEdited(true);
@@ -879,39 +915,39 @@ const handleConfirmPayment = async () => {
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-semibold text-text-secondary mb-1 block">Discount</label>
+                        <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">Discount</label>
                         <input
                           type="number"
                           value={discount}
                           min="0"
-                          className="w-full border border-border-default rounded-lg px-2 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
+                          className={FIELD}
                           onChange={(e) => setDiscount(Number(e.target.value))}
                         />
                       </div>
                       <div>
-                        <label className="text-xs font-semibold text-text-secondary mb-1 block">Type</label>
+                        <label className="block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted">Type</label>
                         <select
                           value={discountIsPercent ? "percent" : "fixed"}
                           onChange={(e) => setDiscountIsPercent(e.target.value === "percent")}
-                          className="w-full border border-border-default rounded-lg px-2 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
+                          className={FIELD}
                         >
                           <option value="percent">%</option>
                           <option value="fixed">₹</option>
                         </select>
                       </div>
                     </div>
-
+ 
                     {/* Payment Status */}
                     <div>
-                      <label className="text-xs font-semibold text-text-secondary mb-2 block">Payment Status</label>
-                      <div className="flex gap-2 flex-wrap">
+                      <label className="block mb-2 text-micro font-bold uppercase tracking-wide text-ink-muted">Payment Status</label>
+                      <div className="ui-toggle">
                         {["Pending", "Paid", "Partial", "Due"].map((statusOption) => (
                           <button
                             key={statusOption}
                             type="button"
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${paymentStatus === statusOption
-                              ? "bg-action-primary text-text-white shadow-md"
-                              : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary border border-border-default"
+                            className={`ui-toggle-btn ${paymentStatus === statusOption
+                              ? "ui-toggle-btn-active"
+                              : ""
                               }`}
                             onClick={() => setPaymentStatus(statusOption)}
                           >
@@ -922,17 +958,17 @@ const handleConfirmPayment = async () => {
                     </div>
                   </div>
                 </div>
-
+ 
                 {/* Payment Method */}
-                <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default">
-                  <div className="px-5 py-3 bg-bg-tertiary border-b border-border-default rounded-t-xl flex items-center justify-between">
-                    <h3 className="text-base font-bold text-text-primary flex items-center gap-2">
+                <div className="bg-surface rounded-panel shadow-panel border border-line">
+                  <div className="px-5 py-3 bg-brand-light border-b border-brand-line rounded-t-panel flex items-center justify-between">
+                    <h3 className="text-panel-title text-brand-dark flex items-center gap-2">
                       💳 Payment
                     </h3>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        className="w-4 h-4 accent-action-primary rounded"
+                        className="h-4 w-4 accent-brand cursor-pointer"
                         checked={splitPaymentEnabled}
                         onChange={() => {
                           const newSplitEnabled = !splitPaymentEnabled;
@@ -941,15 +977,15 @@ const handleConfirmPayment = async () => {
                           else setPaymentSplits([{ method, amount: total }]);
                         }}
                       />
-                      <span className="text-xs font-medium text-text-secondary">Split</span>
+                      <span className="text-ui font-semibold text-ink-muted">Split</span>
                     </label>
                   </div>
-
+ 
                   <div className="p-4">
                     {splitPaymentEnabled ? (
                       <div className="space-y-2">
                         {paymentSplits.map((split, idx) => (
-                          <div key={idx} className="flex gap-2 items-center p-2 rounded-lg bg-bg-tertiary border border-border-default">
+                          <div key={idx} className="flex gap-2 items-center p-2 rounded-panel bg-canvas border border-line">
                             <select
                               value={split.method}
                               onChange={(e) => {
@@ -957,11 +993,11 @@ const handleConfirmPayment = async () => {
                                 newSplits[idx].method = e.target.value;
                                 setPaymentSplits(newSplits);
                               }}
-                              className="flex-1 border border-border-default rounded-lg px-2 py-1.5 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
+                              className={`${FIELD_BASE} flex-1`}
                             >
-                              {PAYMENT_METHODS.map(m => (
-                                <option key={m.value} value={m.value}>{m.label}</option>
-                              ))}
+                              {filterPaymentMethods(gateways).map(m => (
+  <option key={m.value} value={m.value}>{m.label}</option>
+))}
                             </select>
                             <input
                               type="number"
@@ -970,12 +1006,12 @@ const handleConfirmPayment = async () => {
                               value={split.amount}
                               onChange={(e) => updateSplitAmount(idx, e.target.value)}
                               onBlur={() => onSplitAmountBlur()}
-                              className="w-24 border border-border-default rounded-lg px-2 py-1.5 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
+                              className={`${FIELD_BASE} w-24`}
                             />
                             <button
                               type="button"
                               onClick={() => removeSplitRow(idx)}
-                              className="text-action-danger hover:bg-red-50 font-bold px-2 py-1 rounded-lg"
+                              className="grid place-items-center h-7 w-7 rounded-button-sm text-brand-dark hover:bg-brand-soft disabled:opacity-40"
                               disabled={paymentSplits.length === 1}
                             >
                               <X size={16} />
@@ -985,72 +1021,73 @@ const handleConfirmPayment = async () => {
                         <button
                           type="button"
                           onClick={addSplitRow}
-                          className="w-full bg-action-primary hover:bg-action-primary/90 text-text-white px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
+                          className="ui-btn ui-btn-add w-full"
                         >
                           + Add Payment
                         </button>
                       </div>
                     ) : (
                       <div className="flex gap-2">
-                        <select
-                          value={method}
-                          onChange={(e) => {
-                            setMethod(e.target.value);
-                            setPaymentSplits([{ method: e.target.value, amount: total }]);
-                          }}
-                          className="flex-1 border border-border-default rounded-lg px-3 py-2 text-sm bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary"
-                        >
-                          <option>Cash</option>
-                          <option value="razorpay_upi">UPI (Razorpay)</option>
-                          <option value="razorpay_card">Card (Razorpay)</option>
-                          <option value="phonepe">PhonePe</option>
-                          <option>Due</option>
-                        </select>
+                       <select
+  value={method}
+  onChange={(e) => {
+    setMethod(e.target.value);
+    setPaymentSplits([{ method: e.target.value, amount: total }]);
+  }}
+  className={`${FIELD_BASE} flex-1`}
+>
+  <option value="Cash">Cash</option>
+  {gateways.razorpay && <option value="razorpay_upi">UPI</option>}
+  {gateways.razorpay && <option value="razorpay_card">Card</option>}
+  {gateways.phonepe && <option value="phonepe">PhonePe</option>}
+  <option value="Due">Due</option>
+</select>
                         <input
                           type="number"
                           value={total}
                           readOnly
-                          className="w-28 border border-border-default rounded-lg px-3 py-2 text-sm font-semibold text-right text-text-primary bg-bg-tertiary cursor-not-allowed opacity-70"
+                          className={`${FIELD_BASE} w-28 font-semibold text-right bg-canvas cursor-not-allowed opacity-70`}
                         />
                       </div>
                     )}
                   </div>
                 </div>
-
+ 
                 {/* Action Buttons */}
                 <div className="space-y-2">
                   <div className="flex gap-3">
                     <button
                       onClick={handlePaymentClick}
                       disabled={saving}
-                      className="flex-1 bg-action-primary hover:bg-action-primary/90 text-white px-4 py-3 rounded-xl font-bold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                      className="ui-btn ui-btn-add flex-1 h-11"
                     >
                       <Save size={18} />
                       {saving ? "Saving..." : "Save"}
                     </button>
                     <button
                       onClick={printInvoice}
-                      className="flex-1 bg-bg-primary border-2 border-action-primary hover:bg-action-primary/10 text-text-primary px-4 py-3 rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2"
+                      className="ui-btn flex-1 h-11"
                     >
                       <Printer size={18} />
                       Print
                     </button>
                   </div>  
-
+ 
                   {/* REQ 2: Already paid indicator */}
                   {invoiceDraftId && paymentStatus === "Paid" && (
-                    <div className="flex items-center justify-center gap-2 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 font-semibold text-sm">
-                      <CheckCircle size={18} className="text-green-600" />
+                    <div className="flex items-center justify-center gap-2 py-3 rounded-panel bg-state-vacant-bg border border-state-vacant/30 text-state-vacant font-semibold text-ui">
+                      <CheckCircle size={18} className="text-state-vacant" />
                       Payment Confirmed — Table Freed
                     </div>
                   )}
                 </div>
-
+ 
               </div>
             </div>
           </div>
         </div>
       </div>
+ 
 
       {/* ── Razorpay modal ── */}
       {showRazorpayModal && (
@@ -1118,7 +1155,7 @@ const handleConfirmPayment = async () => {
               setPaymentStatus("Paid");
               setShowRazorpayModal(false);
               toast.success("Payment verified successfully!");
-              if (onSave) onSave(invoiceDraftId); 
+              if (onSave) onSave(invoiceDraftId);
               onClose();
             } catch (err) {
               console.error("VERIFY ERROR:", err.response?.data || err.message);
@@ -1134,37 +1171,37 @@ const handleConfirmPayment = async () => {
         />
       )}
       {showPhonePeIframe && (
-  <PhonePeIframe
-    amount={total}
-    documentId={invoiceDraftId}
-    clientId={clientId}
-    token={token}
-    onPaymentSuccess={async (data) => {
-      try {
-        await axios.post(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-          { id: selectedOrder.id, status: "served", invoice_status: "paid" },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
-        setPaymentStatus("Paid");
-        setStatus("Issued");  
-        setShowPhonePeIframe(false);
-        toast.success("PhonePe payment verified!");
-        if (onSave) onSave(invoiceDraftId); 
-        onClose();
-      } catch (err) {
-        console.error("Post-payment update failed:", err.response?.data || err.message);
-        toast.error("Payment verified but order update failed");
-      }
-    }}
-    onPaymentFailure={(error) => {
-      console.error('PhonePe payment failed:', error);
-      setShowPhonePeIframe(false);
-      toast.error(error.error || 'Payment failed. Please try again.');
-    }}
-  />
-)}
+        <PhonePeIframe
+          amount={total}
+          documentId={invoiceDraftId}
+          clientId={clientId}
+          token={token}
+          onPaymentSuccess={async (data) => {
+            try {
+              await axios.post(
+                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+                { id: selectedOrder.id, status: "served", invoice_status: "paid" },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
+              setPaymentStatus("Paid");
+              setStatus("Issued");
+              setShowPhonePeIframe(false);
+              toast.success("PhonePe payment verified!");
+              if (onSave) onSave(invoiceDraftId);
+              onClose();
+            } catch (err) {
+              console.error("Post-payment update failed:", err.response?.data || err.message);
+              toast.error("Payment verified but order update failed");
+            }
+          }}
+          onPaymentFailure={(error) => {
+            console.error('PhonePe payment failed:', error);
+            setShowPhonePeIframe(false);
+            toast.error(error.error || 'Payment failed. Please try again.');
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -1,27 +1,25 @@
-import React, { useEffect, useState, useRef} from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from 'axios';
 import { toast } from "react-toastify";
 import Modal from "react-modal";
 import {
-  Filter, ShoppingBag,
-  Users, Package, Truck, AlertTriangle,
+  Users, Package, Truck, Store,
+  Eye, Printer, Trash2, Check,
+  CalendarDays, ChevronDown, Search, X,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 Modal.setAppElement("#root");
-import { getDateRangeFromPreset, DateRangeFilter } from '../../utils/dateRange';
 import AgGridTable from '../../utils/AgGridTable';
-import { Printer } from 'lucide-react';
 import InvoiceModal from '../BillingServices/InvoiceModal';
 import { useInvoiceModal, fetchBillingDocumentsMap } from '../../utils/BillingUtils';
 import {
-  OrderRowActions,
   CancelOrderConfirmModal,
   OldItemDeleteModal,
   OrderItemsViewModal,
-  StatusBadge,
   getInitialOrderMode,
-  hasInvoiceBeenGenerated
+  hasInvoiceBeenGenerated,
+  OrderRowActions
 } from '../../utils/BillingUtils';
 
 const normaliseItem = (item) => {
@@ -34,6 +32,53 @@ const normaliseItem = (item) => {
     unit_price: item.unit_price ?? item.price ?? 0,
   };
 };
+
+
+// Sorts Order # numerically (1, 2, 3, … 10) instead of as text; ties fall back to the DB id
+const orderNoComparator = (a, b, nodeA, nodeB) => {
+  const na = parseFloat(String(a ?? '').replace(/[^0-9.]/g, ''));
+  const nb = parseFloat(String(b ?? '').replace(/[^0-9.]/g, ''));
+  if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+  const t = String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true });
+  if (t !== 0) return t;
+  return (Number(nodeA?.data?.id) || 0) - (Number(nodeB?.data?.id) || 0);
+};
+
+const formatLocalDate = (d) => d.toLocaleDateString('en-CA');
+
+// Order-status colours — same map as the KDS card edge and the Order floor legend
+// (status-* tokens for pending / preparing / ready / served)
+const ORDER_STATUS_BAR = {
+  pending:   { dot: 'bg-status-pending' },
+  preparing: { dot: 'bg-status-preparing' },
+  ready:     { dot: 'bg-status-ready' },
+  served:    { dot: 'bg-status-served' },
+  cancelled: { dot: 'bg-ink-faint' },
+  draft:     { dot: 'bg-line-strong' },
+};
+
+// Resolve the order mode from the order's own fields first (walk-in / delivery /
+// takeaway / dine-in), then fall back to the original table-based detection
+const resolveOrderMode = (order, tablesMap) => {
+  const raw = String(order?.order_type || order?.service_type || order?.type || '')
+    .toLowerCase().replace(/[^a-z]/g, '');
+  if (raw.includes('walk')) return 'walkin';
+  if (raw.includes('deliver')) return 'delivery';
+  if (raw.includes('take') || raw.includes('pick')) return 'takeaway';
+  if (raw.includes('dine')) return 'dinein';
+  return getInitialOrderMode(order, tablesMap);
+};
+
+// Day / week (Mon–today) / month / year ranges, ending today
+const getPeriodRange = (period) => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === 'week') start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  else if (period === 'month') start.setDate(1);
+  else if (period === 'year') { start.setMonth(0); start.setDate(1); }
+  return { from: formatLocalDate(start), to: formatLocalDate(now) };
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,13 +99,26 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [tables, setTables] = useState([]);
 
   // ── Singular filter state ─────────────────────────────────────────────────
-  const todayDate = new Date().toISOString().split('T')[0];
-  const [datePreset, setDatePreset] = useState('today');
-  const [customFrom, setCustomFrom] = useState(todayDate);
-  const [customTo, setCustomTo] = useState(todayDate);
+  const [period, setPeriod] = useState('day');
+  const [searchText, setSearchText] = useState('');
   const [filterMode, setFilterMode] = useState(0);
   // Single order-mode selection — NOT multi-select
   const [selectedOrderMode, setSelectedOrderMode] = useState('all');
+
+  // ── Fit-to-viewport: page never scrolls, only the table does ──────────────
+  const rootRef = useRef(null);
+  const [availHeight, setAvailHeight] = useState(null);
+
+  useEffect(() => {
+    const measure = () => {
+      if (!rootRef.current) return;
+      const top = rootRef.current.getBoundingClientRect().top + window.scrollY;
+      setAvailHeight(Math.max(window.innerHeight - top, 420));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [loading]);
 
   // ── View modal ────────────────────────────────────────────────────────────
   const [viewOrder, setViewOrder] = useState(null);
@@ -215,7 +273,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   };
 
   const { invoiceModalOpen, invoiceOrderData, openInvoiceForOrder, closeInvoiceModal } =
-  useInvoiceModal({ clientId, token, inventoryMap });
+    useInvoiceModal({ clientId, token, inventoryMap });
 
   // ─────────────────────────────────────────────────────────────────────────
   // Fetch helpers
@@ -283,7 +341,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       clearNewItemsStorage(order.id);
       return {
         ...order,
-        _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMapRef.current),
+        _fixedOrderMode: order._fixedOrderMode ?? resolveOrderMode(order, tablesMapRef.current),
       };
     }
 
@@ -426,7 +484,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
     return {
       ...order,
-      _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMapRef.current),
+      _fixedOrderMode: order._fixedOrderMode ?? resolveOrderMode(order, tablesMapRef.current),
       items: deduped.map(normaliseItem),
       has_new_items: batchItemsMap.size > 0,
     };
@@ -437,30 +495,30 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-  if (!token || !clientId) return;
-  if (hasFetchedOrdersRef.current) return;
-  hasFetchedOrdersRef.current = true;
+    if (!token || !clientId) return;
+    if (hasFetchedOrdersRef.current) return;
+    hasFetchedOrdersRef.current = true;
 
-  const fetchOrders = async () => {
-    if (!token || !clientId) { setLoading(false); return; }
-    try {
-      const [ordersRes, billingMap] = await Promise.all([
-        axios.get(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        ),
-        fetchBillingDocumentsMap({ clientId, token }),
-      ]);
-      const allOrders = ordersRes.data?.data || [];
-      setOrders(allOrders.map(processOrder));
-      setBillingDocMap(billingMap);
-    } catch (err) {
-      toast.error('Failed to fetch orders');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchOrders = async () => {
+      if (!token || !clientId) { setLoading(false); return; }
+      try {
+        const [ordersRes, billingMap] = await Promise.all([
+          axios.get(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          ),
+          fetchBillingDocumentsMap({ clientId, token }),
+        ]);
+        const allOrders = ordersRes.data?.data || [];
+        setOrders(allOrders.map(processOrder));
+        setBillingDocMap(billingMap);
+      } catch (err) {
+        toast.error('Failed to fetch orders');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
     fetchOrders();
     const interval = setInterval(fetchOrders, 10000);
@@ -498,7 +556,13 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       }
       setOrders(prev => prev.filter(o => o.id !== orderId));
       toast.success('Order cancelled and table freed.');
-      fetchTables();
+      // The original called an undefined `fetchTables()` here, which threw after a
+      // successful cancel and showed "Failed to cancel order". Refresh via menuCache.
+      try {
+        const { list, map } = await menuCache.fetchTables(clientId, token);
+        setTables(list);
+        setTablesMap(map);
+      } catch (e) { console.error('refresh tables failed', e); }
     } catch { toast.error('Failed to cancel order'); }
   };
   // ── REQ: Item delete — now matches TakeOrder (reason + qty + transaction) ──
@@ -584,10 +648,56 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   };
 
   const handlePrintBill = async (orderId) => {
-  await openInvoiceForOrder(orderId);
-};
+    await openInvoiceForOrder(orderId);
+  };
 
-  const { from, to } = getDateRangeFromPreset(datePreset, customFrom, customTo);
+  // ─────────────────────────────────────────────────────────────────────────
+  // Derived helpers
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const getOrderTotal = (order) =>
+    (order.items || [])
+      .filter(item => !item.parent_item_key)
+      .reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+
+  const getOrderModeIcon = (mode) => {
+    if (mode === 'takeaway') return <Package size={12} />;
+    if (mode === 'delivery') return <Truck size={12} />;
+    if (mode === 'walkin') return <Store size={12} />;
+    return <Users size={12} />;
+  };
+  const getOrderModeLabel = (mode) => { if (mode === 'takeaway') return 'Takeaway'; if (mode === 'delivery') return 'Delivery'; if (mode === 'walkin') return 'Walk-in'; return 'Dine In'; };
+
+  // What the user sees as the order number (dinein_order_id), falling back to id
+  const getDisplayOrderId = (order) => order?.dinein_order_id ?? order?.id ?? '';
+
+  const getTableOrCustomer = (order) =>
+    order._fixedOrderMode === 'takeaway'
+      ? order.customer_name || 'Takeaway'
+      : tablesMap[order.table_id] || order.table || String(order.table_id);
+
+  const getBillingDoc = (order) => billingDocMap[order?.id?.toString()];
+
+  // paid | partial | unpaid | not billed
+  const getPaymentKey = (order) => {
+    const doc = getBillingDoc(order);
+    if (!doc) return 'not billed';
+    const ps = (doc.payment_status || '').toLowerCase();
+    if (ps === 'paid') return 'paid';
+    if (ps === 'partial' || (doc.status || '').toLowerCase() === 'partial') return 'partial';
+    return 'unpaid';
+  };
+
+  const openViewModal = (order) => {
+    setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) });
+    setShowViewModal(true);
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Date / mode / status filters (unchanged)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const { from, to } = getPeriodRange(period);
   let filteredOrders = orders.filter(order => {
     const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
     return orderDate >= from && orderDate <= to;
@@ -597,7 +707,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   if (selectedOrderMode !== 'all') {
     filteredOrders = filteredOrders.filter(o => o._fixedOrderMode === selectedOrderMode);
   }
-  
+
   switch (filterMode) {
     case 2:
       filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'pending');
@@ -619,30 +729,139 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Derived helpers
+  // Search — every word typed must match somewhere in the row
+  // (order #, table/customer, mode, status, invoice #, payment, total, item names)
   // ─────────────────────────────────────────────────────────────────────────
 
-  const getOrderTotal = (order) =>
-    (order.items || [])
-      .filter(item => !item.parent_item_key)
-      .reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
+  const searchWords = searchText
+    .toLowerCase()
+    .replace(/#/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
 
-  const getOrderModeIcon = (mode) => {
-    if (mode === 'takeaway') return <Package size={12} />;
-    if (mode === 'delivery') return <Truck size={12} />;
-    return <Users size={12} />;
+  const visibleOrders = searchWords.length === 0
+    ? filteredOrders
+    : filteredOrders.filter(order => {
+        const doc = getBillingDoc(order);
+        const haystack = [
+          getDisplayOrderId(order),
+          order.id,
+          getTableOrCustomer(order),
+          order.customer_name,
+          getOrderModeLabel(order._fixedOrderMode),
+          order._fixedOrderMode,
+          order.status,
+          doc?.document_number,
+          doc?.payment_status || 'not billed',
+          getOrderTotal(order).toFixed(2),
+          ...(order.items || []).map(i => i.item_name || i.name),
+        ]
+          .filter(v => v !== undefined && v !== null && v !== '')
+          .join(' ')
+          .toLowerCase();
+        return searchWords.every(w => haystack.includes(w));
+      });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Cell renderers (plain functions so grid cells don't remount every render)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const renderModePill = (mode) => (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-light text-brand-dark border border-brand-200 whitespace-nowrap">
+      {getOrderModeIcon(mode)}{getOrderModeLabel(mode)}
+    </span>
+  );
+
+  // Lavender pill + status dot (same look as the item-status badge on the Order page)
+ const renderStatusPill = (status) => {
+    const cfg = ORDER_STATUS_BAR[String(status || '').toLowerCase()];
+    return (
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-badge text-micro font-bold uppercase tracking-wide ${cfg?.dot || 'bg-line-strong'} text-white border border-transparent whitespace-nowrap`}>
+        {status || '—'}
+      </span>
+    );
   };
-  const getOrderModeLabel = (mode) => { if (mode === 'takeaway') return 'Takeaway'; if (mode === 'delivery') return 'Delivery'; return 'Dine In'; };
+
+  const renderPaymentPill = (order) => {
+    const doc = getBillingDoc(order);
+    const key = getPaymentKey(order);
+    if (!doc) {
+      return <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary whitespace-nowrap">NOT BILLED</span>;
+    }
+    return (
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-badge text-micro font-bold ${
+        key === 'paid' ? 'bg-state-vacant-bg text-state-vacant'
+          : key === 'partial' ? 'bg-state-reserved-bg text-state-reserved'
+            : 'bg-state-occupied-bg text-state-occupied'
+      }`}>
+        {doc.payment_status?.toUpperCase() ?? 'UNKNOWN'}
+      </span>
+    );
+  };
+
+  // Icons on top, "Mark As Served" pill stacked underneath (only when status = ready)
+  const renderActionButtons = (order) => {
+    if (!order) return null;
+    const canServe = order.status?.toLowerCase() === 'ready';
+    return (
+      <div className="inline-flex flex-col items-stretch gap-1.5 w-[132px] leading-none">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => openViewModal(order)}
+            title="View items"
+            className="p-1.5 rounded-lg bg-brand-light text-brand-dark hover:bg-brand-dark hover:text-text-white transition-colors"
+          >
+            <Eye size={15} />
+          </button>
+          <button
+            onClick={() => handlePrintBill(order.id)}
+            title="Print bill"
+            className="p-1.5 rounded-lg bg-success-soft text-success hover:bg-success hover:text-text-white transition-colors"
+          >
+            <Printer size={15} />
+          </button>
+          <button
+            onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+            title="Cancel order"
+            className="p-1.5 rounded-lg bg-state-occupied-bg text-state-occupied hover:bg-state-occupied hover:text-text-white transition-colors"
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
+        {canServe && (
+          <button
+            onClick={() => handleStatusChange(order.id, 'served')}
+            style={{ height: 28, lineHeight: 1 }}
+            className="w-full inline-flex items-center justify-center gap-1.5 px-2 rounded-lg text-[11px] font-semibold whitespace-nowrap
+                       bg-success-soft text-success border border-success-line
+                       hover:bg-success hover:text-text-white hover:border-success
+                       active:scale-[0.98] transition-all"
+          >
+            <Check size={13} strokeWidth={3} className="shrink-0" />
+            <span style={{ lineHeight: 1 }}>Mark As Served</span>
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Grid columns (AG Grid → per-column filters, sorting, Columns menu, Export)
+  // ─────────────────────────────────────────────────────────────────────────
 
   const orderColumnDefs = [
     {
       headerName: 'Order #',
-      field: 'id',
-      minWidth: 130,
+      colId: 'dinein_order_id',
+      minWidth: 140,
+      comparator: orderNoComparator,
+      sortingOrder: ['asc', 'desc', null],
+      initialSort: 'asc',
+      valueGetter: (params) => (params.data ? getDisplayOrderId(params.data) : ''),
       cellRenderer: (params) => (
         <div className="flex items-center gap-1.5">
-          <span className="font-bold text-action-primary">#{params.value}</span>
-          {params.data?.has_new_items && <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">New</span>}
+          <span className="font-bold text-brand-dark">#{params.value}</span>
+          {params.data?.has_new_items && <span className="text-[9px] font-bold text-text-white bg-brand px-1.5 py-0.5 rounded-full uppercase">New</span>}
         </div>
       ),
     },
@@ -650,22 +869,14 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       headerName: 'Table / Customer',
       field: 'table_id',
       minWidth: 160,
-      valueGetter: (params) => {
-        const order = params.data;
-        if (!order) return '';
-        return order._fixedOrderMode === 'takeaway' ? order.customer_name || 'Takeaway' : tablesMap[order.table_id] || order.table || String(order.table_id);
-      },
+      valueGetter: (params) => (params.data ? getTableOrCustomer(params.data) : ''),
     },
     {
       headerName: 'Mode',
       field: '_fixedOrderMode',
       minWidth: 140,
       valueGetter: (params) => getOrderModeLabel(params.data?._fixedOrderMode),
-      cellRenderer: (params) => (
-        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">
-          {getOrderModeIcon(params.data?._fixedOrderMode)}{getOrderModeLabel(params.data?._fixedOrderMode)}
-        </span>
-      ),
+      cellRenderer: (params) => renderModePill(params.data?._fixedOrderMode),
     },
     {
       headerName: 'Items',
@@ -684,45 +895,26 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       headerName: 'Status',
       field: 'status',
       minWidth: 130,
-      cellRenderer: (params) => <StatusBadge status={params.value} />,
+      cellRenderer: (params) => renderStatusPill(params.value),
     },
     {
-  headerName: 'Invoice #',
-  colId: 'invoice_number',
-  minWidth: 140,
-  sortable: false,
-  valueGetter: (params) => billingDocMap[params.data?.id?.toString()]?.document_number || '',
-  cellRenderer: (params) => (
-    <span className="text-sm font-medium text-text-primary">
-      {params.value || '—'}
-    </span>
-  ),
-},
+      headerName: 'Invoice #',
+      colId: 'invoice_number',
+      minWidth: 140,
+      sortable: false,
+      valueGetter: (params) => getBillingDoc(params.data)?.document_number || '',
+      cellRenderer: (params) => (
+        <span className="text-sm font-medium text-ink-soft">{params.value || '—'}</span>
+      ),
+    },
     {
-  headerName: 'Payment Status',
-  colId: 'payment_status',
-  minWidth: 160,
-  sortable: false,
-  valueGetter: (params) => billingDocMap[params.data?.id?.toString()]?.payment_status || '',
-  cellRenderer: (params) => {
-    const billingDoc = billingDocMap[params.data?.id?.toString()];
-    return billingDoc ? (
-      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${
-        billingDoc.payment_status === 'Paid'
-          ? 'bg-green-100 text-green-700'
-          : billingDoc.status === 'partial'
-            ? 'bg-yellow-100 text-yellow-700'
-            : 'bg-red-100 text-red-700'
-      }`}>
-        {billingDoc.payment_status?.toUpperCase() ?? 'UNKNOWN'}
-      </span>
-    ) : (
-      <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
-        NOT BILLED
-      </span>
-    );
-  },
-},
+      headerName: 'Payment Status',
+      colId: 'payment_status',
+      minWidth: 160,
+      sortable: false,
+      valueGetter: (params) => (params.data ? (getBillingDoc(params.data)?.payment_status || 'Not billed') : ''),
+      cellRenderer: (params) => renderPaymentPill(params.data),
+    },
     {
   headerName: 'Actions',
   colId: 'actions',
@@ -751,21 +943,49 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-bg-primary overflow-x-hidden">
-      <div className="mx-auto px-2 sm:px-4 py-3">
+    <div
+      ref={rootRef}
+      className="bg-canvas overflow-hidden flex flex-col"
+      style={{ height: availHeight ? `${availHeight}px` : '100vh' }}
+    >
+      <div className="mx-auto w-full max-w-[1600px] flex-1 min-h-0 px-3 sm:px-5 py-3 sm:py-4">
 
         {loading ? (
-          <div className="flex items-center justify-center py-24"><div className="w-8 h-8 border-2 border-action-primary border-t-transparent rounded-full animate-spin" /></div>
-        ) : filteredOrders.length === 0 ? (
-          <div className="rounded-xl p-16 text-center bg-bg-primary border border-border-default shadow-card"><ShoppingBag size={40} className="mx-auto mb-3 text-text-secondary opacity-40" /><p className="text-text-secondary text-base font-medium">No orders found</p></div>
+          <div className="flex items-center justify-center py-24">
+            <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+          </div>
         ) : (
-          <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
-            <AgGridTable columnDefs={orderColumnDefs} rowData={filteredOrders} domLayout="normal" height={600} />
+          <div className={`orders-purple-grid h-full min-h-0 flex flex-col bg-surface rounded-xl border border-line shadow-panel p-3 sm:p-4`}>
+
+            {/* Grid — only this area scrolls (rows scroll, header stays) */}
+            <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-line">
+              <AgGridTable
+                columnDefs={orderColumnDefs}
+                rowData={visibleOrders}
+                domLayout="normal"
+                height="100%"
+                rowHeight={72}
+                exportFileName="orders"
+                toolbarLeft={
+                  <div className="flex items-center justify-center gap-x-3 gap-y-1 text-micro text-ink-muted">
+            {Object.entries(ORDER_STATUS_BAR).map(([status, s]) => (
+              <span key={status} className="inline-flex items-center gap-1 capitalize">
+                <span className={`h-2 w-2 rounded-badge ${s.dot}`} />
+                {status}
+              </span>
+            ))}
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-badge bg-state-reserved" /> Draft
+            </span>
+          </div>
+                }
+                overlayNoRowsTemplate={`<div class="p-6 text-sm font-medium text-ink-muted">${searchText ? 'No orders match your search' : 'No orders found'}</div>`}
+              />
+            </div>
           </div>
         )}
       </div>
 
- 
       {/* Modals */}
       <OrderItemsViewModal
         isOpen={showViewModal}
@@ -792,31 +1012,39 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       />
 
       {invoiceModalOpen && invoiceOrderData && (
-  <InvoiceModal
-    clientId={clientId}
-    token={token}
-    selectedOrder={invoiceOrderData}
-    tablesMap={tables.reduce((m, t) => { m[t.id] = t; return m; }, {})}
-    inventoryMap={inventoryMap}
-    onClose={async () => {
-      closeInvoiceModal();
-      setBillingDocMap(await fetchBillingDocumentsMap({ clientId, token }));
-    }}
-    onSave={async (id) => {
-      console.log('Invoice saved:', id);
-      setBillingDocMap(await fetchBillingDocumentsMap({ clientId, token }));
-    }}
-  />
-)}
+        <InvoiceModal
+          clientId={clientId}
+          token={token}
+          selectedOrder={invoiceOrderData}
+          tablesMap={tables.reduce((m, t) => { m[t.id] = t; return m; }, {})}
+          inventoryMap={inventoryMap}
+          onClose={async () => {
+            closeInvoiceModal();
+            setBillingDocMap(await fetchBillingDocumentsMap({ clientId, token }));
+          }}
+          onSave={async (id) => {
+            console.log('Invoice saved:', id);
+            setBillingDocMap(await fetchBillingDocumentsMap({ clientId, token }));
+          }}
+        />
+      )}
 
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: var(--color-bg-tertiary); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-action-primary); }
+        /* Fill the available height: toolbar stays put, grid rows scroll inside */
+        .orders-purple-grid .ag-modern-wrapper {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        }
+        .orders-purple-grid .ag-modern-wrapper > .ag-modern-grid {
+          flex: 1 1 0;
+          min-height: 0;
+          height: auto !important;
+        }
       `}</style>
-      </div>
-      );
+    </div>
+  );
 };
 
-      export default OrderSummaryVisible;
+export default OrderSummaryVisible;

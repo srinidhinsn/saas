@@ -1,9 +1,18 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaLock, FaUser, FaEnvelope, FaPhone, FaCalendar, FaUserShield } from "react-icons/fa";
-import { Search, Plus, Edit, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Edit, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import AgGridTable from '../../../utils/AgGridTable';
 import axios from 'axios';
+
+// Shared theme class strings (standardized purple design)
+const FIELD =
+  "w-full h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink " +
+  "outline-none placeholder:text-ink-faint transition-colors " +
+  "focus:border-brand-ring focus:shadow-focus-ring disabled:opacity-50 disabled:cursor-not-allowed";
+const LABEL =
+  "flex items-center gap-2 mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted";
+
 const ConfirmModal = ({
   open,
   title,
@@ -17,40 +26,41 @@ const ConfirmModal = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-bg-primary rounded-xl shadow-xl w-full max-w-md p-6 relative animate-fadeIn">
-        {/* Close */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-text-primary"
-        >
-          <X size={18} />
-        </button>
-
-        {/* Title */}
-        <h3 className="text-xl font-semibold text-text-primary">
-          {title}
-        </h3>
-
-        {/* Description */}
-        <p className="text-text-secondary mt-2">
-          {description}
-        </p>
-
-        {/* Actions */}
-        <div className="flex justify-end gap-3 mt-6">
+    <div className="ui-backdrop font-sans">
+      <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined}>
+        {/* Title + Close */}
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h3 className="text-panel-title text-brand-dark">
+            {title}
+          </h3>
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-border-default text-text-secondary hover:bg-bg-tertiary"
+            aria-label="Close"
+            className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Description */}
+        <div className="flex-1 overflow-y-auto px-modal py-card text-ui text-ink-muted">
+          {description}
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
+          <button
+            onClick={onClose}
+            className="ui-btn"
           >
             {cancelText}
           </button>
 
           <button
             onClick={onConfirm}
-            className={`px-4 py-2 rounded-lg text-text-white ${danger
-              ? "bg-action-primary hover:bg-action-danger"
-              : "bg-action-success"
+            className={`ui-btn ${danger
+              ? "ui-btn-danger"
+              : "ui-btn-add"
               }`}
           >
             {confirmText}
@@ -121,20 +131,20 @@ const UserManagement = ({ token, clientId, screenIds = [] }) => {
   const loginClientId = useMemo(() => getLoginClientId(token), [token]);
   const isSuperAdmin = screenIds?.includes("super_admin_v1");
   return (
-    <div className="min-h-screen bg-bg-primary">
+    <div className="ui-page">
       {/* Content */}
-      <div className="max-w-7xl mx-auto p-4">
-        {activeView === 'list' && (
-          <UsersList
-            clientId={clientId}isSuperAdminScreen={isSuperAdmin}
-            token={token}
-            onAddNew={() => setActiveView('add')}
-            onEdit={(user) => {
-              setSelectedUser(user);
-              setActiveView('add');
-            }}
-          />
-        )}
+      <div className="mx-auto">
+        <UsersList
+          clientId={clientId}
+          isSuperAdminScreen={isSuperAdmin}
+          token={token}
+          onAddNew={() => setActiveView('add')}
+          onEdit={(user) => {
+            setSelectedUser(user);
+            setActiveView('add');
+          }}
+        />
+
         {activeView === 'add' && (
           <AddUserForm
             isEdit={!!selectedUser}
@@ -157,7 +167,7 @@ const UserManagement = ({ token, clientId, screenIds = [] }) => {
 };
 
 // Users List Component
-const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
+const UsersList = ({ onAddNew, clientId, token, onEdit, isSuperAdminScreen }) => {
 
   const [users, setUsers] = useState([]);
   const [filterRole, setFilterRole] = useState("all");
@@ -165,7 +175,6 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
   const [roles, setRoles] = useState([]);
   const [changeRoleValue, setChangeRoleValue] = useState("");
   const [isChangeRoleConfirmOpen, setIsChangeRoleConfirmOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const itemsPerPage = 10;
   const permissions = usePermissions(token, clientId);
 
@@ -326,17 +335,8 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
       filtered = filtered.filter((u) => u.role === "admin");
     }
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((u) =>
-        u.username?.toLowerCase().includes(query) ||
-        u.name?.toLowerCase().includes(query) ||
-        u.email?.toLowerCase().includes(query)
-      );
-    }
-
     return filtered;
-  }, [users, filterRole, searchQuery, loggedInUserId]);
+  }, [users, filterRole, loggedInUserId]);
 
   const confirmChangeRole = async () => {
     try {
@@ -415,7 +415,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
           type="checkbox"
           checked={selectionModel.length === filteredUsers.length && filteredUsers.length > 0}
           onChange={toggleSelectAll}
-          className="w-4 h-4 rounded border-border-default text-action-primary cursor-pointer"
+          className="w-4 h-4 rounded accent-brand cursor-pointer"
         />
       ),
       cellRenderer: (params) => (
@@ -423,7 +423,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
           type="checkbox"
           checked={selectionModel.includes(params.data.id)}
           onChange={() => toggleSelection(params.data.id)}
-          className="w-4 h-4 rounded border-border-default text-text-primary focus:ring-action-primary cursor-pointer"
+          className="w-4 h-4 rounded accent-brand cursor-pointer"
         />
       ),
     },
@@ -433,12 +433,12 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
       minWidth: 220,
       cellRenderer: (params) => (
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-bg-tertiary flex items-center justify-center text-action-primary font-semibold">
+          <div className="w-9 h-9 rounded-full bg-brand-light border border-brand-line flex items-center justify-center text-brand-dark font-bold">
             {params.data.username?.[0]?.toUpperCase() || "U"}
           </div>
           <div>
-            <div className="font-medium text-text-primary text-sm">{params.data.username || "(no username)"}</div>
-            <div className="text-xs text-text-secondary">{params.data.name || "-"}</div>
+            <div className="font-bold text-ink text-ui">{params.data.username || "(no username)"}</div>
+            <div className="text-ui-sm text-ink-muted">{params.data.name || "-"}</div>
           </div>
         </div>
       ),
@@ -448,7 +448,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
       field: 'email',
       minWidth: 200,
       cellRenderer: (params) => (
-        <a href={`mailto:${params.value}`} className="text-text-secondary hover:text-action-danger text-sm hover:underline">
+        <a href={`mailto:${params.value}`} className="text-ink-muted hover:text-brand-dark text-ui hover:underline">
           {params.value}
         </a>
       ),
@@ -458,14 +458,14 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
       field: 'phone',
       minWidth: 140,
       valueGetter: (params) => params.data?.phone || "-",
-      cellRenderer: (params) => <span className="text-text-secondary text-sm">{params.value}</span>,
+      cellRenderer: (params) => <span className="text-ink-soft text-ui">{params.value}</span>,
     },
     {
       headerName: 'Role',
       field: 'role',
       minWidth: 140,
       cellRenderer: (params) => (
-        <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-bulkActionsHover-updateHover text-text-white">
+        <span className="text-brand-dark text-ui font-bold">
           {params.value}
         </span>
       ),
@@ -481,14 +481,14 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
         <div className="flex gap-3">
           <button
             onClick={() => onEdit(params.data)}
-            className="text-action-primary hover:text-action-danger"
+            className="text-brand-dark hover:text-brand"
             title="Edit user"
           >
             <Edit size={16} />
           </button>
           <button
             onClick={() => setDeleteUserId(params.data.id)}
-            className="text-red-600 hover:text-red-800"
+            className="text-ink-muted hover:text-brand-dark"
           >
             <Trash2 size={16} />
           </button>
@@ -500,65 +500,48 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
   return (
     <div className="space-y-2">
       {/* Header Section */}
-      <div className="bg-bg-primary rounded-lg shadow-sm p-2">
-        <div className="bg-bg-primary rounded-lg shadow-sm p-4 space-y-4">
+      <div className="ui-panel">
+        <div className="space-y-3 mb-item">
 
           {/* TOP ROW */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 
             {/* Title */}
-            <div>
-              <h2 className="text-xl sm:text-2xl font-semibold text-text-primary">
+            {/* <div>
+              <h2 className="text-page-title text-brand-dark">
                 Users Management
               </h2>
-              <p className="text-text-secondary text-xs sm:text-sm">
+              <p className="text-ink-muted text-ui">
                 Manage user accounts and permissions
               </p>
-            </div>
+            </div> */}
 
             {/* Primary action only on mobile */}
             {/* Mobile actions → 2 per row */}
             <div className="grid grid-cols-2 gap-2 sm:hidden">
 
-              <button
-                onClick={onAddNew}
-                className="flex items-center justify-center gap-2
-             px-3 py-2.5 rounded-lg
-             bg-action-primary text-text-white w-full"
-              >
-                <Plus size={16} />
-                User
-              </button>
               {isSuperAdminScreen && (
                 <>
-              <button
-                onClick={() => setShowAddRole(true)}
-                className="flex items-center justify-center gap-2
-             px-3 py-2.5 rounded-lg
-             border border-border-default
-             bg-bg-primary text-text-primary w-full"
-              >
-                <Plus size={16} />
-                Role
-              </button>
+                  <button
+                    onClick={() => setShowAddRole(true)}
+                    className="ui-btn ui-btn-update w-full"
+                  >
+                    <Plus size={16} />
+                    Role
+                  </button>
 
-              <button
-                onClick={() => setShowDeleteRole(true)}
-                className="flex items-center justify-center gap-2
-             px-3 py-2.5 rounded-lg
-             border border-red-200 text-red-600 w-full"
-              >
-                <Trash2 size={16} />
-                Delete
-              </button>
-             </> )}
-              {isSuperAdminScreen && (     
+                  <button
+                    onClick={() => setShowDeleteRole(true)}
+                    className="ui-btn ui-btn-delete w-full"
+                  >
+                    <Trash2 size={16} />
+                    Delete
+                  </button>
+                </>)}
+              {isSuperAdminScreen && (
                 <button
                   onClick={navigator}
-                  className="flex items-center justify-center gap-2
-    px-3 py-2.5 rounded-lg
-    border border-border-default
-    bg-bg-primary text-text-primary w-full"
+                  className="ui-btn ui-btn-config w-full"
                 >
                   <FaUserShield />
                   Config
@@ -568,37 +551,35 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
 
             {/* Desktop / Tablet actions */}
             <div className="hidden sm:flex flex-wrap items-center gap-2">
-              <button
+              {/* <button
                 onClick={onAddNew}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg
-                 bg-action-primary text-text-white"
+                className="ui-btn ui-btn-add"
               >
                 <Plus size={16} />
                 Add User
-              </button>
+              </button> */}
               {isSuperAdminScreen && (
                 <>
-              <button
-                onClick={() => setShowAddRole(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border"
-              >
-                <Plus size={16} />
-                Add Role
-              </button>
+                  <button
+                    onClick={() => setShowAddRole(true)}
+                    className="ui-btn ui-btn-update"
+                  >
+                    <Plus size={16} />
+                    Add Role
+                  </button>
 
-              <button
-                onClick={() => setShowDeleteRole(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg
-                 border text-red-600"
-              >
-                <Trash2 size={16} />
-                Delete Role
-              </button> </>)}
+                  <button
+                    onClick={() => setShowDeleteRole(true)}
+                    className="ui-btn ui-btn-delete"
+                  >
+                    <Trash2 size={16} />
+                    Delete Role
+                  </button> </>)}
 
               {isSuperAdminScreen && (
                 <button
                   onClick={navigator}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg border"
+                  className="ui-btn ui-btn-config"
                 >
                   <FaUserShield />
                   Role Config
@@ -606,38 +587,29 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
               )}
             </div>
           </div>
-
-          {/* SEARCH */}
-          <div className="relative">
-            <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
-              size={18}
-            />
-            <input
-              type="text"
-              placeholder="Search users..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-              }}
-              className="w-full pl-10 pr-3 py-2.5 rounded-lg border
-               border-border-default text-sm"
-            />
-          </div>
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto rounded-lg border-default border-border-default">
-          <div className="overflow-x-auto rounded-lg border-default border-border-default">
-          <AgGridTable
-            columnDefs={userColumnDefs}
-            rowData={filteredUsers}
-            domLayout="normal"
-            height={600}
-            pagination={true}
-            paginationPageSize={itemsPerPage}
-          />
-        </div>
+        <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-panel border border-line">
+            <AgGridTable
+              columnDefs={userColumnDefs}
+              rowData={filteredUsers}
+              domLayout="normal"
+              height={600}
+              pagination={true}
+              paginationPageSize={itemsPerPage}
+              toolbarRight={
+                <button
+                  onClick={onAddNew}
+                  className="ui-btn ui-btn-add"
+                >
+                  <Plus size={16} />
+                  Add User
+                </button>
+              }
+            />
+          </div>
         </div>
         {/* Add Role Modal */}
         <ConfirmModal
@@ -649,7 +621,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
               placeholder="Enter role name (e.g. cashier)"
               value={newRoleName}
               onChange={(e) => setNewRoleName(e.target.value.toLowerCase())}
-              className="w-full mt-3 px-3 py-2 border rounded-lg"
+              className={FIELD}
             />
           }
           confirmText="Create Role"
@@ -674,7 +646,7 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
             <select
               value={deleteRoleName}
               onChange={(e) => setDeleteRoleName(e.target.value)}
-              className="w-full mt-3 px-3 py-2 border rounded-lg"
+              className={FIELD}
             >
               <option value="">Select role to delete</option>
               {/* ✅ FIX: roles is now array of strings */}
@@ -719,10 +691,10 @@ const UsersList = ({ onAddNew, clientId, token, onEdit,isSuperAdminScreen}) => {
 
         {filteredUsers.length === 0 && (
           <div className="text-center py-12">
-            <div className="text-text-secondary mb-2">
+            <div className="text-brand-soft mb-2">
               <FaUser className="text-5xl mx-auto" />
             </div>
-            <p className="text-text-primary">No users found</p>
+            <p className="text-ui text-ink-muted">No users found</p>
           </div>
         )}
       </div>
@@ -756,7 +728,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
         lastName: editUser.last_name || "",
         dob: editUser.dob || "",
         phone: editUser.phone || "",
-        password: "",confirmPassword: "",
+        password: "", confirmPassword: "",
         role: editUser.role || "",
       });
     }
@@ -839,205 +811,219 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
     } catch (error) {
       console.error(`Failed to ${isEdit ? 'update' : 'add'} user:`, error);
       const backendMessage = error.response?.data?.detail;
-    setErrorMessage(
-      backendMessage || `Failed to ${isEdit ? "update" : "add"} user. Please try again.`
-    );
+      setErrorMessage(
+        backendMessage || `Failed to ${isEdit ? "update" : "add"} user. Please try again.`
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="bg-bg-primary rounded-lg shadow-card p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold text-text-primary">
-          {isEdit ? "Edit User" : "Add New User"}
-        </h2>
-        <p className="text-text-secondary text-sm mt-1">
-          {isEdit ? "Update user account details and role assignment" : "Create a new user account with role assignment"}
-        </p>
+    <>
+      <div className="ui-backdrop font-sans">
+        <div className="ui-modal max-w-3xl max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col p-0" role="dialog" aria-modal="true">
+          <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+            <div>
+              <h2 className="text-panel-title text-brand-dark">
+                {isEdit ? "Edit User" : "Add New User"}
+              </h2>
+              <p className="text-ink-muted text-ui mt-1">
+                {isEdit ? "Update user account details and role assignment" : "Create a new user account with role assignment"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onCancel}
+              aria-label="Close"
+              className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-y-auto px-modal py-card">
+              {/* Username */}
+              <div>
+                <label className={LABEL}>
+                  <FaUser className="text-brand text-ui-sm" />
+                  Username <span className="text-state-occupied">*</span>
+                </label>
+                <input
+                  name="username"
+                  type="text"
+                  disabled={isEdit}
+                  value={formData.username}
+                  onChange={handleChange}
+                  required
+                  className={FIELD}
+                  placeholder="Enter username"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className={LABEL}>
+                  <FaEnvelope className="text-brand text-ui-sm" />
+                  Email <span className="text-state-occupied">*</span>
+                </label>
+                <input
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className={FIELD}
+                  placeholder="Enter email"
+                />
+              </div>
+
+              {/* First Name */}
+              <div>
+                <label className={LABEL}>
+                  <FaUser className="text-brand text-ui-sm" />
+                  First Name
+                </label>
+                <input
+                  name="firstName"
+                  type="text"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  className={FIELD}
+                  placeholder="Enter first name"
+                />
+              </div>
+
+              {/* Last Name */}
+              <div>
+                <label className={LABEL}>
+                  <FaUser className="text-brand text-ui-sm" />
+                  Last Name
+                </label>
+                <input
+                  name="lastName"
+                  type="text"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  className={FIELD}
+                  placeholder="Enter last name"
+                />
+              </div>
+
+              {/* Date of Birth */}
+              <div>
+                <label className={LABEL}>
+                  <FaCalendar className="text-brand text-ui-sm" />
+                  Date of Birth
+                </label>
+                <input
+                  name="dob"
+                  type="date"
+                  value={formData.dob}
+                  onChange={handleChange}
+                  className={FIELD}
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className={LABEL}>
+                  <FaPhone className="text-brand text-ui-sm" />
+                  Phone
+                </label>
+                <input
+                  name="phone"
+                  type="text"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className={FIELD}
+                  placeholder="Enter phone number"
+                />
+              </div>
+
+              {/* Password - Only show for new users */}
+              {/* Password */}
+              <div>
+                <label className={LABEL}>
+                  <FaLock className="text-brand text-ui-sm" />
+                  {isEdit ? "New Password" : "Password"} {!isEdit && <span className="text-state-occupied">*</span>}
+                </label>
+                <input
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required={!isEdit}
+                  className={FIELD}
+                  placeholder={isEdit ? "Leave blank to keep current password" : "Enter password"}
+                />
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label className={LABEL}>
+                  <FaLock className="text-brand text-ui-sm" />
+                  Confirm Password {!isEdit && <span className="text-state-occupied">*</span>}
+                </label>
+                <input
+                  name="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  required={!isEdit || !!formData.password}
+                  className={FIELD}
+                  placeholder={isEdit ? "Confirm new password" : "Re-enter password"}
+                />
+              </div>
+
+
+              {/* Role */}
+              <div>
+                <label className={LABEL}>
+                  <FaUserShield className="text-brand text-ui-sm" />
+                  Role <span className="text-state-occupied">*</span>
+                </label>
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  required
+                  className={FIELD}
+                >
+                  <option value="">Select Role</option>
+                  {roles.map((roleName) => (
+                    <option key={roleName} value={roleName}>
+                      {roleName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3 px-modal py-item border-t border-line bg-canvas shrink-0">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="ui-btn flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="ui-btn ui-btn-add flex-1"
+              >
+                {loading
+                  ? (isEdit ? "Updating User..." : "Adding User...")
+                  : (isEdit ? "Update User" : "Add New User")
+                }
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Username */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaUser className="text-action-danger text-xs" />
-              Username <span className="text-action-danger">*</span>
-            </label>
-            <input
-              name="username"
-              type="text"
-              disabled={isEdit}
-              value={formData.username}
-              onChange={handleChange}
-              required
-              className={`w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary ${isEdit ? 'bg-gray-100 cursor-not-allowed' : ''
-                }`}
-              placeholder="Enter username"
-            />
-          </div>
-
-          {/* Email */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaEnvelope className="text-action-danger text-xs" />
-              Email <span className="text-action-danger">*</span>
-            </label>
-            <input
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
-              placeholder="Enter email"
-            />
-          </div>
-
-          {/* First Name */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaUser className="text-action-danger text-xs" />
-              First Name
-            </label>
-            <input
-              name="firstName"
-              type="text"
-              value={formData.firstName}
-              onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
-              placeholder="Enter first name"
-            />
-          </div>
-
-          {/* Last Name */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaUser className="text-action-danger text-xs" />
-              Last Name
-            </label>
-            <input
-              name="lastName"
-              type="text"
-              value={formData.lastName}
-              onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
-              placeholder="Enter last name"
-            />
-          </div>
-
-          {/* Date of Birth */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaCalendar className="text-action-danger text-xs" />
-              Date of Birth
-            </label>
-            <input
-              name="dob"
-              type="date"
-              value={formData.dob}
-              onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary"
-            />
-          </div>
-
-          {/* Phone */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaPhone className="text-action-danger text-xs" />
-              Phone
-            </label>
-            <input
-              name="phone"
-              type="text"
-              value={formData.phone}
-              onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-gray-400"
-              placeholder="Enter phone number"
-            />
-          </div>
-
-          {/* Password - Only show for new users */}
-          {/* Password */}
-<div>
-  <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-    <FaLock className="text-action-danger text-xs" />
-    {isEdit ? "New Password" : "Password"} {!isEdit && <span className="text-action-danger">*</span>}
-  </label>
-  <input
-    name="password"
-    type="password"
-    value={formData.password}
-    onChange={handleChange}
-    required={!isEdit}
-    className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
-    placeholder={isEdit ? "Leave blank to keep current password" : "Enter password"}
-  />
-</div>
-
-{/* Confirm Password */}
-<div>
-  <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-    <FaLock className="text-action-danger text-xs" />
-    Confirm Password {!isEdit && <span className="text-action-danger">*</span>}
-  </label>
-  <input
-    name="confirmPassword"
-    type="password"
-    value={formData.confirmPassword}
-    onChange={handleChange}
-    required={!isEdit || !!formData.password}
-    className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary placeholder-text-secondary"
-    placeholder={isEdit ? "Confirm new password" : "Re-enter password"}
-  />
-</div>
-
-
-          {/* Role */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-text-primary mb-1.5">
-              <FaUserShield className="text-action-danger text-xs" />
-              Role <span className="text-action-danger">*</span>
-            </label>
-            <select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-2.5 rounded-lg border border-border-default focus:border-action-success focus:outline-none transition-colors text-text-primary"
-            >
-              <option value="">Select Role</option>
-              {roles.map((roleName) => (
-                <option key={roleName} value={roleName}>
-                  {roleName}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Buttons */}
-        <div className="flex gap-3 pt-4 border-t-default border-border-default">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="flex-1 px-4 py-2.5 rounded-lg border border-border-default text-text-primary hover:bg-bg-tertiary transition-colors font-medium"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 px-4 py-2.5 rounded-lg bg-action-primary text-text-white hover:bg-action-danger hover:text-text-primary transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading
-              ? (isEdit ? "Updating User..." : "Adding User...")
-              : (isEdit ? "Update User" : "Add New User")
-            }
-          </button>
-        </div>
-      </form>
       <ConfirmModal
         open={!!errorMessage}
         title="Something went wrong"
@@ -1047,7 +1033,7 @@ const AddUserForm = ({ onCancel, onSave, clientId, token, editUser = null, isEdi
         onClose={() => setErrorMessage("")}
         onConfirm={() => setErrorMessage("")}
       />
-    </div>
+    </>
   );
 };
 
