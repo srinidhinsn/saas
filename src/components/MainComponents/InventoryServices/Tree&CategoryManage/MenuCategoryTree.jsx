@@ -921,66 +921,59 @@ const generateCategoryId = (name, parentName, existingCategories = [], parentId 
     return flatCategories.map((category) => {
       const isSelected = selectedCategoryId === category.id;
       const canEdit = !category.isVirtualRoot;
+      const showActions = isSelected && canEdit;
 
       return (
         <div
           key={category.id || category.name}
-          className="relative flex-shrink-0"
+          className={`
+            flex items-stretch flex-shrink-0
+            h-9 overflow-hidden
+            rounded-badge shadow-button
+            transition-colors
+            ${isSelected
+              ? 'bg-brand text-text-white shadow-seg-active'
+              : 'bg-surface border border-brand-line text-ink-soft'
+            }
+          `}
         >
           <button
-            onClick={() => {
-              onSelectCategory(category.id);
-              // if (category.children?.length) {
-              //   setSidebarCategories(category.children);
-              // }
-            }}
-
+            type="button"
+            onClick={() => onSelectCategory(category.id)}
             className={`
               flex items-center justify-between gap-2
-              px-3 py-2
-              rounded-full
-              font-semibold text-sm
-              transition-all shadow-sm
-              whitespace-nowrap
-              flex-shrink-0
-              w-[140px]
-              h-9
-              ${isSelected
-                ? 'bg-action-primary text-text-white shadow-md'
-                : 'bg-bg-primary  border-2 border-border-default hover:border-action-primary'
-              }
+              px-3 min-w-[96px] max-w-[160px]
+              font-semibold text-ui whitespace-nowrap
+              transition-colors
+              ${isSelected ? '' : 'hover:bg-brand-light'}
             `}
           >
             <span className="truncate">{category.name}</span>
             {category.showCount && (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-bold 
-                ${isSelected ? 'bg-white text-action-primary' : 'bg-bg-tertiary text-text-secondary'}`}>
+              <span className={`text-micro px-2 py-0.5 rounded-badge font-bold
+                ${isSelected ? 'bg-white text-brand-dark' : 'bg-brand-light text-brand-dark'}`}>
                 {category.count}
               </span>
             )}
           </button>
 
-          {canEdit && (
-            <div className="absolute -top-1 -right-1 flex gap-1 z-10">
+          {showActions && (
+            <div className="flex items-stretch border-l border-white/25">
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEdit(category);
-                }}
-                className="w-6 h-6 rounded-full bg-action-primary text-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform"
-                aria-label="Edit category"
+                type="button"
+                onClick={() => handleEdit(category)}
+                className="grid place-items-center w-9 hover:bg-white/15 active:bg-white/25 transition-colors"
+                aria-label={`Edit ${category.name}`}
               >
-                <Edit size={12} />
+                <Edit size={14} />
               </button>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(category);
-                }}
-                className="w-6 h-6 rounded-full bg-action-danger text-white shadow-lg flex items-center justify-center hover:scale-110 transition-transform"
-                aria-label="Delete category"
+                type="button"
+                onClick={() => handleDelete(category)}
+                className="grid place-items-center w-9 border-l border-white/25 hover:bg-white/15 active:bg-white/25 transition-colors"
+                aria-label={`Delete ${category.name}`}
               >
-                <Trash2 size={12} />
+                <Trash2 size={14} />
               </button>
             </div>
           )}
@@ -1063,47 +1056,58 @@ const generateCategoryId = (name, parentName, existingCategories = [], parentId 
       );
     });
 
+  const label = "block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted";
+  const field =
+    "w-full h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink " +
+    "outline-none placeholder:text-ink-faint transition-colors " +
+    "focus:border-brand-ring focus:shadow-focus-ring";
+  const area =
+    "w-full px-item py-2 rounded-button-sm border border-brand-line bg-surface text-ui text-ink " +
+    "outline-none placeholder:text-ink-faint transition-colors resize-none " +
+    "focus:border-brand-ring focus:shadow-focus-ring";
+ 
+
 
   return (
     <>
-      <div className="hidden lg:block rounded-xl p-4 h-[88.5vh] overflow-auto bg-bg-primary border border-border-default shadow-sm">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-border-default">
-          <h3 className="text-lg font-bold text-text-primary">Categories</h3>
+      <div className="hidden lg:block ui-panel !mb-0 h-[88.5vh] overflow-auto">
+        <div className="flex items-center justify-between mb-item pb-item-sm border-b border-line-divider">
+          <h3 className="text-panel-title text-brand-dark">Categories</h3>
           <button
             onClick={() => setShowAddModal(true)}
-            className="p-2 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity shadow-sm"
+            className="ui-btn ui-btn-add !h-7 !w-7 !px-0"
           >
-            <Plus size={18} />
+            <Plus size={16} />
           </button>
         </div>
         <div className="space-y-1.5">
-
+ 
           {categories && categories.length > 0 ? (
             renderTree(displayCategories)
-
+ 
           ) : (
-            <div className="px-3 py-8 text-center text-text-secondary text-sm">
+            <div className="px-3 py-8 text-center text-ink-muted text-ui">
               No categories available
             </div>
           )}
         </div>
       </div>
-
+ 
       {/* Mobile: Horizontal Scrollable List */}
       <div className="lg:hidden mb-4">
         <div className="flex items-center justify-between mb-3 px-2">
-          <h3 className="text-base font-semibold text-text-primary">
+          <h3 className="text-panel-title text-brand-dark">
             Categories
           </h3>
           <button
             onClick={() => setShowAddModal(true)}
-            className="p-1.5 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity shadow-md flex-shrink-0"
+            className="ui-btn ui-btn-add !h-7 !w-7 !px-0 flex-shrink-0"
             title="Add new category"
           >
-            <Plus size={16} />
+            <Plus size={14} />
           </button>
         </div>
-
+ 
         <div
           className="
     relative
@@ -1123,28 +1127,28 @@ const generateCategoryId = (name, parentName, existingCategories = [], parentId 
               // renderMobileCategories(categories)
               renderMobileCategories(displayCategories)
             ) : (
-              <div className="text-text-secondary text-sm py-2">
+              <div className="text-ink-muted text-ui py-2">
                 No categories
               </div>
             )}
           </div>
         </div>
       </div>
-
+ 
       {/* Add Modal */}
       {showAddModal && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="rounded-xl max-w-md w-full p-6 bg-bg-primary shadow-2xl border border-border-default">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-text-primary">Add New Category</h3>
-              <button onClick={closeAddModal} className="text-text-secondary hover:text-text-primary transition-colors">
-                <X size={24} />
+        <div className="ui-backdrop font-sans !z-[9999]">
+          <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Add new category">
+            <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+              <h3 className="text-panel-title text-brand-dark">Add New Category</h3>
+              <button onClick={closeAddModal} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
+                <X size={16} />
               </button>
             </div>
-
-            <div className="space-y-4">
+ 
+            <div className="flex-1 overflow-y-auto px-modal py-card space-y-4">
               <div>
-                <label className="block text-sm font-semibold mb-2 text-text-primary">
+                <label className={label}>
                   Category Name *
                 </label>
                 <input
@@ -1152,58 +1156,58 @@ const generateCategoryId = (name, parentName, existingCategories = [], parentId 
                   value={newCategoryName}
                   onChange={handleNewCategoryNameChange}
                   placeholder="Enter category name"
-                  className="w-full px-4 py-2.5 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  className={field}
                   autoFocus
                 />
               </div>
-
+ 
               <div>
-                <label className="block text-sm font-semibold mb-2 text-text-primary">
+                <label className={label}>
                   Description (optional)
                 </label>
                 <textarea
                   value={newCategoryDescription}
                   onChange={handleNewCategoryDescriptionChange}
                   placeholder="Enter description"
-                  className="w-full px-4 py-2.5 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary resize-none"
+                  className={area}
                   rows="3"
                 />
               </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={closeAddModal}
-                  className="flex-1 px-4 py-2.5 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddCategory}
-                  className="flex-1 px-4 py-2.5 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity font-semibold shadow-md"
-                >
-                  Add Category
-                </button>
-              </div>
+            </div>
+ 
+            <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
+              <button
+                onClick={closeAddModal}
+                className="ui-btn"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddCategory}
+                className="ui-btn ui-btn-add"
+              >
+                Add Category
+              </button>
             </div>
           </div>
         </div>,
         document.body
       )}
-
+ 
       {/* Edit Modal */}
       {showEditModal && editingCategory && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="rounded-xl max-w-md w-full p-6 bg-bg-primary shadow-2xl border border-border-default">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-text-primary">Edit Category</h3>
-              <button onClick={closeEditModal} className="text-text-secondary hover:text-text-primary transition-colors">
-                <X size={24} />
+        <div className="ui-backdrop font-sans !z-[9999]">
+          <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Edit category">
+            <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+              <h3 className="text-panel-title text-brand-dark">Edit Category</h3>
+              <button onClick={closeEditModal} aria-label="Close" className="grid place-items-center h-7 w-7 shrink-0 rounded-button-sm border border-brand-line bg-surface text-ink-muted hover:bg-brand-soft hover:text-brand-dark transition-colors">
+                <X size={16} />
               </button>
             </div>
-
-            <div className="space-y-4">
+ 
+            <div className="flex-1 overflow-y-auto px-modal py-card space-y-4">
               <div>
-                <label className="block text-sm font-semibold mb-2 text-text-primary">
+                <label className={label}>
                   Category Name *
                 </label>
                 <input
@@ -1211,25 +1215,25 @@ const generateCategoryId = (name, parentName, existingCategories = [], parentId 
                   value={editName}
                   onChange={handleEditNameChange}
                   placeholder="Enter category name"
-                  className="w-full px-4 py-2.5 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  className={field}
                 />
               </div>
-
+ 
               <div>
-                <label className="block text-sm font-semibold mb-2 text-text-primary">
+                <label className={label}>
                   Description
                 </label>
                 <textarea
                   value={editDescription}
                   onChange={handleEditDescriptionChange}
                   placeholder="Enter description"
-                  className="w-full px-4 py-2.5 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary resize-none"
+                  className={area}
                   rows="3"
                 />
               </div>
-
+ 
               <div>
-                <label className="block text-sm font-semibold mb-2 text-text-primary">
+                <label className={label}>
                   Add New Subcategory (optional)
                 </label>
                 <input
@@ -1237,50 +1241,54 @@ const generateCategoryId = (name, parentName, existingCategories = [], parentId 
                   value={editNewSubcategoryName}
                   onChange={handleEditNewSubcategoryNameChange}
                   placeholder="New subcategory name"
-                  className="w-full px-4 py-2.5 rounded-lg bg-bg-tertiary border border-border-default text-text-primary focus:outline-none focus:ring-2 focus:ring-action-primary"
+                  className={field}
                 />
               </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={closeEditModal}
-                  className="flex-1 px-4 py-2.5 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleEditCategory}
-                  className="flex-1 px-4 py-2.5 rounded-lg bg-action-primary text-white hover:opacity-90 transition-opacity font-semibold shadow-md"
-                >
-                  Save Changes
-                </button>
-              </div>
+            </div>
+ 
+            <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
+              <button
+                onClick={closeEditModal}
+                className="ui-btn"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditCategory}
+                className="ui-btn ui-btn-add"
+              >
+                Save Changes
+              </button>
             </div>
           </div>
         </div>,
         document.body
       )}
-
+ 
       {/* Delete Modal */}
       {showDeleteModal && deleteTarget && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="rounded-xl max-w-md w-full p-6 bg-bg-primary shadow-2xl border border-border-default">
-            <h3 className="text-xl font-bold mb-4 text-text-primary">Confirm Delete</h3>
-            <p className="mb-6 text-text-secondary">
-              Are you sure you want to delete <strong className="text-text-primary">{deleteTarget?.name}</strong>?
-              This action cannot be undone.
-            </p>
-
-            <div className="flex gap-3">
+        <div className="ui-backdrop font-sans !z-[9999]">
+          <div className="flex flex-col w-full max-w-modal max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in" role="dialog" aria-modal="true" aria-label="Confirm delete">
+            <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+              <h3 className="text-panel-title text-brand-dark">Confirm Delete</h3>
+            </div>
+            <div className="px-modal py-card">
+              <p className="text-ui text-ink-muted">
+                Are you sure you want to delete <strong className="text-brand-dark">{deleteTarget?.name}</strong>?
+                This action cannot be undone.
+              </p>
+            </div>
+ 
+            <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
               <button
                 onClick={closeDeleteModal}
-                className="flex-1 px-4 py-2.5 rounded-lg bg-bg-tertiary text-text-primary border border-border-default hover:bg-bg-secondary transition-colors font-medium"
+                className="ui-btn"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteCategory}
-                className="flex-1 px-4 py-2.5 rounded-lg bg-action-danger text-white hover:opacity-90 transition-opacity font-semibold shadow-md"
+                className="ui-btn ui-btn-danger"
               >
                 Delete
               </button>

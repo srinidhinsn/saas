@@ -1,444 +1,27 @@
-import React, { useEffect, useState, useRef} from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from 'axios';
 import { toast } from "react-toastify";
 import Modal from "react-modal";
 import {
-  X, Trash2, Filter, ShoppingBag,
-  Users, Package, Truck, Eye, AlertTriangle,
+  Users, Package, Truck, Store,
+  Eye, Printer, Trash2, Check,
+  CalendarDays, ChevronDown, Search, X,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
-
+import { menuCache } from '../../utils/Menu-utils/menuCache';
 Modal.setAppElement("#root");
+import AgGridTable from '../../utils/AgGridTable';
+import InvoiceModal from '../BillingServices/InvoiceModal';
+import { useInvoiceModal, fetchBillingDocumentsMap } from '../../utils/BillingUtils';
+import {
+  CancelOrderConfirmModal,
+  OldItemDeleteModal,
+  OrderItemsViewModal,
+  getInitialOrderMode,
+  hasInvoiceBeenGenerated,
+  OrderRowActions
+} from '../../utils/BillingUtils';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SimpleDeleteConfirm
-// ─────────────────────────────────────────────────────────────────────────────
-
-const ORDER_CANCEL_REASONS = [
-  'Customer changed mind',
-  'Customer left without paying',
-  'Duplicate order',
-  'Test / mistake order',
-  'Payment issue',
-  'Kitchen unable to fulfill',
-  'Other',
-];
-
-const CANCELLATION_REASONS = [
-  'Customer changed mind',
-  'Wrong item ordered',
-  'Duplicate entry',
-  'Item out of stock',
-  'Customer left',
-  'Order placed by mistake',
-  'Allergy concern',
-  'Other',
-];
-
-const WASTAGE_REASONS = [
-  'Plate returned by customer',
-  'Quality issue / not fresh',
-  'Preparation error',
-  'Spilled / dropped',
-  'Overcooked / undercooked',
-  'Customer complaint',
-  'Expired ingredient used',
-  'Other',
-];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CancelOrderConfirmModal — mirrors TakeOrder
-// ─────────────────────────────────────────────────────────────────────────────
-
-const CancelOrderConfirmModal = ({ isOpen, onClose, onConfirm }) => {
-  const [reason, setReason] = useState('');
-  const [customReason, setCustomReason] = useState('');
-
-  useEffect(() => {
-    if (isOpen) { setReason(''); setCustomReason(''); }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const effectiveReason = reason === 'Other' ? customReason : reason;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-bold text-red-600">Cancel Order</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          <p className="text-sm text-gray-600">
-            The order will be marked as <span className="font-semibold text-red-600">cancelled</span> and kept for records. Select a reason:
-          </p>
-          <div className="grid grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1">
-            {ORDER_CANCEL_REASONS.map(r => (
-              <button
-                key={r}
-                onClick={() => setReason(r)}
-                className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
-                  ${reason === r ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
-              >{r}</button>
-            ))}
-          </div>
-          {reason === 'Other' && (
-            <input
-              value={customReason}
-              onChange={e => setCustomReason(e.target.value)}
-              placeholder="Describe the reason…"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
-            />
-          )}
-        </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Go Back</button>
-          <button
-            disabled={!reason || (reason === 'Other' && !customReason.trim())}
-            onClick={() => { onConfirm(effectiveReason); onClose(); }}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${reason && !(reason === 'Other' && !customReason.trim()) ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-300 cursor-not-allowed'}`}
-          >Cancel Order</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// OldItemDeleteModal — mirrors TakeOrder exactly
-// ─────────────────────────────────────────────────────────────────────────────
-
-const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemoveAll }) => {
-  const [reason, setReason] = useState('');
-  const [customReason, setCustomReason] = useState('');
-  const [removeQty, setRemoveQty] = useState(1);
-
-  const isServed = item?.status === 'served';
-  const transactionType = isServed ? 'WASTAGE' : 'ITEM_CANCELLED';
-  const reasonList = isServed ? WASTAGE_REASONS : CANCELLATION_REASONS;
-  const typeLabel = isServed ? 'Wastage' : 'Cancellation';
-  const typeColor = isServed ? 'text-red-600' : 'text-orange-600';
-  const typeBg = isServed ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200';
-  const buttonColor = isServed ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600';
-
-  useEffect(() => {
-    if (isOpen) { setReason(''); setCustomReason(''); setRemoveQty(1); }
-  }, [isOpen]);
-
-  if (!isOpen || !item) return null;
-
-  const maxQty = item.quantity || 1;
-  const isRemoveAll = removeQty >= maxQty;
-  const effectiveReason = reason === 'Other' ? customReason : reason;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="rounded-lg w-full max-w-sm bg-white shadow-xl">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className={`text-lg font-bold ${typeColor}`}>Remove Item</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={20} /></button>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          <div>
-            <p className="text-sm text-gray-700 font-semibold">{item.item_name || item.name}</p>
-            <p className="text-sm text-gray-500 mt-0.5">Ordered quantity: <span className="font-semibold">{maxQty}</span></p>
-          </div>
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-semibold ${typeBg} ${typeColor}`}>
-            <span className="w-2 h-2 rounded-full bg-current inline-block" />
-            {typeLabel} — {isServed ? 'Item was already served. Stock will be reversed.' : 'Item not yet served. No stock deduction.'}
-          </div>
-          {maxQty > 1 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-600 mb-2">How many to remove?</p>
-              <div className="flex items-center gap-3">
-                <button onClick={() => setRemoveQty(q => Math.max(1, q - 1))} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold">−</button>
-                <span className="w-10 text-center text-lg font-bold text-gray-800">{removeQty}</span>
-                <button onClick={() => setRemoveQty(q => Math.min(maxQty, q + 1))} className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-300 hover:bg-gray-100 text-lg font-bold">+</button>
-                <span className="text-xs text-gray-400 ml-1">of {maxQty}</span>
-                <button onClick={() => setRemoveQty(maxQty)} className="ml-auto text-xs text-red-500 underline font-semibold">Remove all</button>
-              </div>
-              <div className="mt-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-red-400 rounded-full transition-all" style={{ width: `${(removeQty / maxQty) * 100}%` }} />
-              </div>
-            </div>
-          )}
-          <div>
-            <p className="text-xs font-semibold text-gray-600 mb-2">Reason</p>
-            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
-              {reasonList.map(r => (
-                <button
-                  key={r}
-                  onClick={() => setReason(r)}
-                  className={`px-2 py-2 rounded-lg text-xs font-medium border text-left transition
-                    ${reason === r
-                      ? isServed ? 'bg-red-600 text-white border-red-600' : 'bg-orange-500 text-white border-orange-500'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
-                >{r}</button>
-              ))}
-            </div>
-            {reason === 'Other' && (
-              <input
-                value={customReason}
-                onChange={e => setCustomReason(e.target.value)}
-                placeholder="Describe the reason…"
-                className="mt-2 w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-red-400"
-              />
-            )}
-          </div>
-        </div>
-        <div className="px-6 py-4 flex gap-3 bg-gray-50 rounded-b-lg">
-          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">Cancel</button>
-          <button
-            disabled={!reason || (reason === 'Other' && !customReason.trim())}
-            onClick={() => {
-              if (isRemoveAll) onRemoveAll(transactionType, effectiveReason);
-              else onRemoveOne(transactionType, effectiveReason, removeQty);
-            }}
-            className={`flex-1 py-2.5 rounded-lg font-medium text-sm text-white transition
-              ${reason && !(reason === 'Other' && !customReason.trim()) ? buttonColor : 'bg-gray-300 cursor-not-allowed'}`}
-          >{isRemoveAll ? `Remove All (${maxQty})` : `Remove ${removeQty}`}</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LineItemsModal — add-on selection
-// ─────────────────────────────────────────────────────────────────────────────
-
-const LineItemsModal = ({
-  isOpen,
-  onClose,
-  mainItem,
-  lineItems,
-  onAddMainOnly,
-  onAddWithAddons,
-}) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg">
-      <div className="rounded-lg w-full max-w-lg bg-bg-primary shadow-card border border-border-default">
-        <div className="px-6 py-4 border-b border-border-default flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-text-primary">{mainItem?.name}</h3>
-          <button
-            onClick={onClose}
-            className="text-text-secondary hover:text-gray-700 transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-        <div className="px-6 py-5">
-          <p className="text-sm mb-4 text-text-secondary">Add-ons for this item:</p>
-          <div className="space-y-2">
-            {lineItems.map((li, idx) => (
-              <div
-                key={li.id}
-                className="flex justify-between items-center px-4 py-3 rounded-lg bg-bg-tertiary border border-border-default"
-              >
-                <span className="text-sm font-medium text-text-primary">
-                  {idx + 1}. {li.name}
-                </span>
-                <span className="text-sm font-bold text-action-primary">₹{li.unit_price}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="px-6 py-4 rounded-b-lg flex gap-3 bg-bg-primary border-t border-border-default">
-          <button
-            onClick={onClose}
-            className="bg-bg-tertiary text-text-primary border border-border-default px-4 py-2.5 rounded-lg font-medium text-sm"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onAddMainOnly}
-            className="flex-1 bg-action-primary text-text-white px-4 py-2.5 rounded-lg font-medium text-sm"
-          >
-            Main Only
-          </button>
-          <button
-            onClick={onAddWithAddons}
-            className="flex-1 bg-action-success text-text-white px-4 py-2.5 rounded-lg font-medium text-sm"
-          >
-            With Add-ons
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// OrderItemsViewModal — read-only view of all items for an order
-// ─────────────────────────────────────────────────────────────────────────────
-
-const OrderItemsViewModal = ({ isOpen, onClose, order, inventoryMap, onRequestDeleteItem,getOrderTotal }) => {
-  if (!isOpen || !order) return null;
-
-  const getItemStatusStyle = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'pending': return 'bg-orange-100 text-orange-700';
-      case 'preparing': return 'bg-blue-100 text-blue-700';
-      case 'ready': return 'bg-green-100 text-green-700';
-      case 'served': return 'bg-gray-100 text-gray-600';
-      default: return 'bg-bg-tertiary text-text-secondary';
-    }
-  };
-
-  const grandTotal = getOrderTotal(order);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg"
-      onClick={onClose}
-    >
-      <div
-        className="rounded-xl w-full max-w-2xl max-h-[88vh] flex flex-col bg-bg-primary shadow-card border border-border-default"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Modal header */}
-        <div className="px-6 py-4 border-b border-border-default bg-action-primary rounded-t-xl flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-text-white">
-              Order #{order.id}
-            </h2>
-            <p className="text-sm text-text-white/70 mt-0.5">
-              {order._fixedOrderMode === 'takeaway'
-                ? order.customer_name || 'Takeaway'
-                : order._tableName || order.table || order.table_id}
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-xs text-text-white/60 uppercase font-semibold tracking-wide">
-                Grand Total
-              </p>
-              <p className="text-2xl font-bold text-text-white">
-                ₹{grandTotal.toFixed(2)}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg hover:bg-white/10 text-text-white transition-colors"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-
-        {/* Items table */}
-        <div className="flex-1 overflow-y-auto">
-          <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-bg-tertiary border-b border-border-default z-10">
-              <tr>
-                <th className="text-left px-5 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  #
-                </th>
-                <th className="text-left px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Item
-                </th>
-                <th className="text-center px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Qty
-                </th>
-                <th className="text-right px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Unit Price
-                </th>
-                <th className="text-right px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="text-center px-4 py-3 text-text-secondary font-semibold text-xs uppercase tracking-wider">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-             {order.items.map((item, idx) => {
-                const unitPrice =
-                  item.unit_price ??
-                  item.price ??
-                  inventoryMap[item.item_id]?.unit_price ??
-                  0;
-                const lineTotal = unitPrice * (item.quantity || 1);
-
-                const isServedItem = item.status?.toLowerCase() === 'served';
-                return (
-                  <tr key={item.id || idx} className="hover:bg-bg-tertiary/50 transition-colors">
-                    <td className="px-5 py-3 text-text-secondary text-xs">{idx + 1}</td>
-                    <td className="px-4 py-3 font-medium text-text-primary">{item.item_name || 'Unnamed Item'}</td>
-                    <td className="px-4 py-3 text-center font-semibold text-text-primary">{item.quantity || 1}</td>
-                    <td className="px-4 py-3 text-right text-text-secondary">₹{unitPrice.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right font-bold text-text-primary">₹{lineTotal.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getItemStatusStyle(item.status)}`}>{item.status || 'pending'}</span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => onRequestDeleteItem(item)}
-                        className={`p-1.5 rounded-lg transition-colors
-                          ${isServedItem
-                            ? 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white'
-                            : 'bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white'}`}
-                        title={isServedItem ? 'Delete served item (records wastage)' : 'Delete item'}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-border-default bg-bg-tertiary rounded-b-xl flex justify-between items-center">
-          <span className="text-sm font-medium text-text-secondary">
-            {order.items.length} item{order.items.length !== 1 ? 's' : ''}
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-text-secondary">Grand Total:</span>
-            <span className="text-xl font-bold text-action-primary">₹{grandTotal.toFixed(2)}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Status badge
-// ─────────────────────────────────────────────────────────────────────────────
-
-const StatusBadge = ({ status }) => {
-  const styles = {
-    pending: 'bg-orange-100 text-orange-700 border-orange-200',
-    preparing: 'bg-blue-100 text-blue-700 border-blue-200',
-    ready: 'bg-green-100 text-green-700 border-green-200',
-    served: 'bg-gray-100 text-gray-600 border-gray-200',
-  };
-  const s = status?.toLowerCase();
-  return (
-    <span
-      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border
-        ${styles[s] || 'bg-bg-tertiary text-text-secondary border-border-default'}`}
-    >
-      {status || '—'}
-    </span>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper
-// ─────────────────────────────────────────────────────────────────────────────
-
-const getInitialOrderMode = (order, tablesMap = {}) => {
-  const tableName = tablesMap[order.table_id] || tablesMap[String(order.table_id)] || '';
-  if (tableName.toLowerCase().includes('takeaway')) return 'takeaway';
-  return 'dinein';
-};
 const normaliseItem = (item) => {
   if (item.quantity == null) {
     console.warn(`Item ${item.item_id} has no quantity`);
@@ -449,12 +32,63 @@ const normaliseItem = (item) => {
     unit_price: item.unit_price ?? item.price ?? 0,
   };
 };
+
+
+// Sorts Order # numerically (1, 2, 3, … 10) instead of as text; ties fall back to the DB id
+const orderNoComparator = (a, b, nodeA, nodeB) => {
+  const na = parseFloat(String(a ?? '').replace(/[^0-9.]/g, ''));
+  const nb = parseFloat(String(b ?? '').replace(/[^0-9.]/g, ''));
+  if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+  const t = String(a ?? '').localeCompare(String(b ?? ''), undefined, { numeric: true });
+  if (t !== 0) return t;
+  return (Number(nodeA?.data?.id) || 0) - (Number(nodeB?.data?.id) || 0);
+};
+
+const formatLocalDate = (d) => d.toLocaleDateString('en-CA');
+
+// Order-status colours — same map as the KDS card edge and the Order floor legend
+// (status-* tokens for pending / preparing / ready / served)
+const ORDER_STATUS_BAR = {
+  pending:   { dot: 'bg-status-pending' },
+  preparing: { dot: 'bg-status-preparing' },
+  ready:     { dot: 'bg-status-ready' },
+  served:    { dot: 'bg-status-served' },
+  cancelled: { dot: 'bg-ink-faint' },
+  draft:     { dot: 'bg-line-strong' },
+};
+
+// Resolve the order mode from the order's own fields first (walk-in / delivery /
+// takeaway / dine-in), then fall back to the original table-based detection
+const resolveOrderMode = (order, tablesMap) => {
+  const raw = String(order?.order_type || order?.service_type || order?.type || '')
+    .toLowerCase().replace(/[^a-z]/g, '');
+  if (raw.includes('walk')) return 'walkin';
+  if (raw.includes('deliver')) return 'delivery';
+  if (raw.includes('take') || raw.includes('pick')) return 'takeaway';
+  if (raw.includes('dine')) return 'dinein';
+  return getInitialOrderMode(order, tablesMap);
+};
+
+// Day / week (Mon–today) / month / year ranges, ending today
+const getPeriodRange = (period) => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === 'week') start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  else if (period === 'month') start.setDate(1);
+  else if (period === 'year') { start.setMonth(0); start.setDate(1); }
+  return { from: formatLocalDate(start), to: formatLocalDate(now) };
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
 
 const OrderSummaryVisible = ({ clientId, token }) => {
   const navigate = useNavigate();
+  const hasFetchedStaticRef = useRef(false);
+  const hasFetchedOrdersRef = useRef(false);
+  const inventoryMapRef = useRef({});
+  const tablesMapRef = useRef({});
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [orders, setOrders] = useState([]);
@@ -465,15 +99,26 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [tables, setTables] = useState([]);
 
   // ── Singular filter state ─────────────────────────────────────────────────
-  const todayDate = new Date().toISOString().split('T')[0];
-  const [datePreset, setDatePreset] = useState('today');
-  const [customFrom, setCustomFrom] = useState(todayDate);
-  const [customTo, setCustomTo] = useState(todayDate);
-  const customFromRef = useRef(null);
-  const customToRef = useRef(null);
+  const [period, setPeriod] = useState('day');
+  const [searchText, setSearchText] = useState('');
   const [filterMode, setFilterMode] = useState(0);
   // Single order-mode selection — NOT multi-select
   const [selectedOrderMode, setSelectedOrderMode] = useState('all');
+
+  // ── Fit-to-viewport: page never scrolls, only the table does ──────────────
+  const rootRef = useRef(null);
+  const [availHeight, setAvailHeight] = useState(null);
+
+  useEffect(() => {
+    const measure = () => {
+      if (!rootRef.current) return;
+      const top = rootRef.current.getBoundingClientRect().top + window.scrollY;
+      setAvailHeight(Math.max(window.innerHeight - top, 420));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [loading]);
 
   // ── View modal ────────────────────────────────────────────────────────────
   const [viewOrder, setViewOrder] = useState(null);
@@ -496,10 +141,15 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const [selectedMainItem, setSelectedMainItem] = useState(null);
   const [lineItemsDetails, setLineItemsDetails] = useState([]);
   const [pendingOrderId, setPendingOrderId] = useState(null);
+  const [billingDocMap, setBillingDocMap] = useState({});
 
- // ─────────────────────────────────────────────────────────────────────────
- // localStorage helpers (preserved exactly from original)
- // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // localStorage helpers (preserved exactly from original)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    tablesMapRef.current = tablesMap;
+  }, [tablesMap]);
 
   const generateSlug = name => name.toLowerCase().replace(/[\s]+/g, '-');
 
@@ -622,42 +272,30 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     return `${tableSlug}_${timeLabel}_${itemsCount}_${orderId}_${seq}`;
   };
 
+  const { invoiceModalOpen, invoiceOrderData, openInvoiceForOrder, closeInvoiceModal } =
+    useInvoiceModal({ clientId, token, inventoryMap });
+
   // ─────────────────────────────────────────────────────────────────────────
   // Fetch helpers
   // ─────────────────────────────────────────────────────────────────────────
 
-  const fetchTables = async () => {
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setTables(res.data?.data || []);
-      const map = {};
-      (res.data?.data || []).forEach(t => (map[t.id] = t.name));
-      setTablesMap(map);
-    } catch (e) {
-      console.error('fetchTables', e);
-    }
-  };
-
   useEffect(() => {
-    if (clientId) fetchTables();
-  }, [clientId]);
+    if (!clientId || !token) return;
+    if (hasFetchedStaticRef.current) return;
+    hasFetchedStaticRef.current = true;
 
-  useEffect(() => {
-    axios
-      .get(
-        `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu/read`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
-      .then(res => {
-        setAllInventoryItems(res.data.data || []);
-        const map = {};
-        (res.data.data || []).forEach(i => (map[i.id] = i));
-        setInventoryMap(map);
-      })
-      .catch(() => { });
+    const fetchStaticData = async () => {
+      const { list: tableList, map: tableMap } = await menuCache.fetchTables(clientId, token);
+      setTables(tableList);
+      setTablesMap(tableMap);
+
+      const { list: menuList, map: menuMap } = await menuCache.fetchMenuItems(clientId, token);
+      setAllInventoryItems(menuList);
+      setInventoryMap(menuMap);
+      inventoryMapRef.current = menuMap;
+    };
+
+    fetchStaticData();
   }, [clientId, token]);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -703,7 +341,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       clearNewItemsStorage(order.id);
       return {
         ...order,
-        _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMap),
+        _fixedOrderMode: order._fixedOrderMode ?? resolveOrderMode(order, tablesMapRef.current),
       };
     }
 
@@ -792,7 +430,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       if (!si || !si.unique_key) return;
       if (backendUniqueKeys.has(String(si.unique_key))) return;
       if (!si.batch_timestamp || !si.item_id) return;
-      const itemInfo = inventoryMap[si.item_id];
+      const itemInfo = inventoryMapRef.current[si.item_id];
       if (!itemInfo) return;
       pushToBatch(si.batch_timestamp, {
         item_id: si.item_id,
@@ -846,7 +484,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
 
     return {
       ...order,
-      _fixedOrderMode: order._fixedOrderMode ?? getInitialOrderMode(order, tablesMap),
+      _fixedOrderMode: order._fixedOrderMode ?? resolveOrderMode(order, tablesMapRef.current),
       items: deduped.map(normaliseItem),
       has_new_items: batchItemsMap.size > 0,
     };
@@ -857,15 +495,23 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!token || !clientId) return;
+    if (hasFetchedOrdersRef.current) return;
+    hasFetchedOrdersRef.current = true;
+
     const fetchOrders = async () => {
       if (!token || !clientId) { setLoading(false); return; }
       try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const allOrders = res.data?.data || [];
+        const [ordersRes, billingMap] = await Promise.all([
+          axios.get(
+            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          ),
+          fetchBillingDocumentsMap({ clientId, token }),
+        ]);
+        const allOrders = ordersRes.data?.data || [];
         setOrders(allOrders.map(processOrder));
+        setBillingDocMap(billingMap);
       } catch (err) {
         toast.error('Failed to fetch orders');
         console.error(err);
@@ -877,7 +523,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     fetchOrders();
     const interval = setInterval(fetchOrders, 10000);
     return () => clearInterval(interval);
-  }, [clientId, token, inventoryMap]);
+  }, [clientId, token]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Actions (preserved from original)
@@ -910,7 +556,13 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       }
       setOrders(prev => prev.filter(o => o.id !== orderId));
       toast.success('Order cancelled and table freed.');
-      fetchTables();
+      // The original called an undefined `fetchTables()` here, which threw after a
+      // successful cancel and showed "Failed to cancel order". Refresh via menuCache.
+      try {
+        const { list, map } = await menuCache.fetchTables(clientId, token);
+        setTables(list);
+        setTablesMap(map);
+      } catch (e) { console.error('refresh tables failed', e); }
     } catch { toast.error('Failed to cancel order'); }
   };
   // ── REQ: Item delete — now matches TakeOrder (reason + qty + transaction) ──
@@ -995,333 +647,9 @@ const OrderSummaryVisible = ({ clientId, token }) => {
     } catch { toast.error('Failed to update order status.'); }
   };
 
-  const handleGenerateBill = (order) => {
-    navigate(`/saas/${clientId}/billing`, {
-      state: { orderId: order.id, tableId: order.table_id, clientId },
-    });
+  const handlePrintBill = async (orderId) => {
+    await openInvoiceForOrder(orderId);
   };
-
-  // ── Add item / batch helpers (preserved from original) ────────────────────
-
-  const handleItemSelection = (orderId, selectedItem) => {
-    if (
-      selectedItem.line_item_id &&
-      Array.isArray(selectedItem.line_item_id) &&
-      selectedItem.line_item_id.length > 0
-    ) {
-      const lineItems = selectedItem.line_item_id
-        .map(id => allInventoryItems.find(i => i.id === id))
-        .filter(Boolean);
-      setSelectedMainItem(selectedItem);
-      setLineItemsDetails(lineItems);
-      setPendingOrderId(orderId);
-      setLineItemsModalOpen(true);
-    } else {
-      addItemToOrder(orderId, selectedItem);
-    }
-    setItemSearchQuery('');
-  };
-
-  const handleAddMainItemWithLineItems = () => {
-    if (!selectedMainItem || !pendingOrderId) return;
-    let batchTimestamp = currentBatchTimestamp;
-    if (!batchTimestamp) {
-      batchTimestamp = Date.now();
-      setCurrentBatchTimestamp(batchTimestamp);
-      localStorage.setItem(
-        `order_${pendingOrderId}_batch_${batchTimestamp}`,
-        JSON.stringify({ timestamp: batchTimestamp, started_at: Date.now() })
-      );
-    }
-    addItemToOrderWithBatch(pendingOrderId, selectedMainItem, batchTimestamp, true);
-    lineItemsDetails.forEach(li =>
-      addItemToOrderWithBatch(pendingOrderId, li, batchTimestamp, false)
-    );
-    setLineItemsModalOpen(false);
-    setSelectedMainItem(null);
-    setLineItemsDetails([]);
-    setPendingOrderId(null);
-  };
-
-  const handleAddMainItemOnly = () => {
-    if (!selectedMainItem || !pendingOrderId) return;
-    addItemToOrder(pendingOrderId, selectedMainItem);
-    setLineItemsModalOpen(false);
-    setSelectedMainItem(null);
-    setLineItemsDetails([]);
-    setPendingOrderId(null);
-  };
-
-  const updateItemQuantity = (orderId, itemIdentifier, newQty) => {
-    setOrders(prev => prev.map(o => {
-      if (o.id !== orderId) return o;
-      if (newQty <= 0) {
-        handleRequestDeleteItem(item, orderId);
-        return;
-      }
-      const updatedItems = o.items.map(item => { const itemKey = item.id || item.frontend_unique_key; if (itemKey === itemIdentifier) return { ...item,quantity: newQty }; return item; });
-      const newTotal = updatedItems.reduce((s, it) => s + ((inventoryMap[it.item_id]?.unit_price || it.unit_price || it.price || 0) * (it.quantity || 1)), 0);
-      return { ...o, items: updatedItems, total_price: newTotal };
-    }));
-    if (selectedOrder?.id === orderId) setSelectedOrder(prev => ({ ...prev, items: prev.items.map(item => { const itemKey = item.id || item.frontend_unique_key; if (itemKey === itemIdentifier) return { ...item, quantity: newQty > 0 ? newQty : 1 }; return item; }) }));
-  };
-
-  const addItemToOrderWithBatch = (orderId, selectedItem, forcedBatchTimestamp, isMainItem = false) => {
-    let batchKey = `order_${orderId}_batch_${forcedBatchTimestamp}`;
-    let batchMeta = null;
-    try {
-      const raw = localStorage.getItem(batchKey);
-      if (raw) batchMeta = JSON.parse(raw);
-    } catch { /* ignore */ }
-
-    if (!batchMeta) {
-      const tableName = tablesMap?.[selectedOrder?.table_id] || (selectedOrder?.table || '');
-      const ensured = ensureBatchForOrder(orderId, tableName);
-      batchKey = ensured.storageKey;
-      batchMeta = ensured.meta;
-    }
-    if (!batchMeta) return;
-
-    try {
-      batchMeta.added_count = (batchMeta.added_count || 0) + 1;
-      localStorage.setItem(batchKey, JSON.stringify(batchMeta));
-    } catch { /* ignore */ }
-
-    const uniqueKey = generateFrontendKeyFromBatch(orderId, batchMeta);
-
-    const existingItemInBatch = selectedOrder?.items.find(
-      item =>
-        item.is_new_item &&
-        String(item.item_id) === String(selectedItem.id) &&
-        Number(item.batch_timestamp) === Number(batchMeta.timestamp)
-    );
-
-    if (existingItemInBatch) {
-      const idOrKey = existingItemInBatch.id || existingItemInBatch.frontend_unique_key;
-      updateItemQuantity(orderId, idOrKey, (existingItemInBatch.quantity || 1) + 1);
-      try {
-        const sk = `order_${orderId}_new_item_${existingItemInBatch.frontend_unique_key || existingItemInBatch.id || uniqueKey}`;
-        const raw = JSON.parse(localStorage.getItem(sk) || '{}');
-        raw.quantity = (raw.quantity || existingItemInBatch.quantity || 1) + 1;
-        localStorage.setItem(sk, JSON.stringify(raw));
-      } catch { /* best-effort */ }
-      return;
-    }
-
-    const newItem = {
-      item_id: selectedItem.id,
-      item_name: selectedItem.name,
-      quantity: 1,
-      price: selectedItem.unit_price,
-      status: 'pending',
-      note: '',
-      slug: selectedItem.slug || generateSlug(selectedItem.name),
-      added_at_frontend: Date.now() + Math.random(),
-      frontend_unique_key: uniqueKey,
-      is_new_item: true,
-      unit_price: selectedItem.unit_price || 0,
-      line_total: (selectedItem.unit_price || 0) * 1,
-      batch_timestamp: batchMeta.timestamp,
-      id: uniqueKey,
-      image: selectedItem.image,
-      is_line_item: !isMainItem,
-    };
-
-    try {
-      localStorage.setItem(
-        `order_${orderId}_new_item_${uniqueKey}`,
-        JSON.stringify({
-          item_id: newItem.item_id,
-          unique_key: uniqueKey,
-          added_at: newItem.added_at_frontend,
-          batch_timestamp: newItem.batch_timestamp,
-          quantity: newItem.quantity,
-          is_line_item: newItem.is_line_item,
-        })
-      );
-    } catch { /* ignore */ }
-
-    const rebuildOrder = (o) => {
-      if (o.id !== orderId) return o;
-      const batches = getBatchesFromStorage(orderId);
-      const oldItems = o.items.filter(i => !i.is_new_item);
-      const newItemsByBatch = new Map();
-      batches.forEach(b => newItemsByBatch.set(b.timestamp, []));
-      o.items.forEach(item => {
-        if (item.is_new_item && item.batch_timestamp) {
-          if (!newItemsByBatch.has(item.batch_timestamp)) newItemsByBatch.set(item.batch_timestamp, []);
-          newItemsByBatch.get(item.batch_timestamp).push(item);
-        }
-      });
-      if (!newItemsByBatch.has(batchMeta.timestamp)) newItemsByBatch.set(batchMeta.timestamp, []);
-      newItemsByBatch.get(batchMeta.timestamp).push(newItem);
-      const combined = [...oldItems];
-      Array.from(newItemsByBatch.keys()).sort((a, b) => a - b).forEach(ts => {
-        const batch = (newItemsByBatch.get(ts) || []).map(it => ({ ...it }));
-        if (batch.length > 0) { batch[0] = { ...batch[0], _isBatchStart: true }; combined.push(...batch); }
-      });
-
-      const seen = new Set(); const deduped = [];
-      for (const it of combined) {
-        const k = it.frontend_unique_key
-          ? String(it.frontend_unique_key)
-          : `${it.item_id}_${it.batch_timestamp || ''}_${it.unit_price || it.price || 0}`;
-        if (seen.has(k)) {
-          const ex = deduped.find(x =>
-            (x.frontend_unique_key ? String(x.frontend_unique_key) : `${x.item_id}_${x.batch_timestamp || ''}_${x.unit_price || x.price || 0}`) === k
-          );
-          if (ex) { ex.quantity = (ex.quantity || 1) + (it.quantity || 1); ex.line_total = (ex.unit_price || ex.price || 0) * ex.quantity; }
-          continue;
-        }
-        seen.add(k); deduped.push(it);
-      }
-      return { ...o, items: deduped, has_new_items: true };
-    };
-
-    setOrders(prev => prev.map(rebuildOrder));
-    if (selectedOrder?.id === orderId) setSelectedOrder(rebuildOrder);
-  };
-
-  const addItemToOrder = (orderId, selectedItem) => {
-    const tableName = tablesMap?.[selectedOrder?.table_id] || (selectedOrder?.table || '');
-    const { storageKey, meta } = ensureBatchForOrder(orderId, tableName);
-    if (!meta) return;
-    try {
-      meta.added_count = (meta.added_count || 0) + 1;
-      localStorage.setItem(storageKey, JSON.stringify(meta));
-    } catch { /* ignore */ }
-    addItemToOrderWithBatch(orderId, selectedItem, meta.timestamp, true);
-  };
-
-  const updateOrderItems = async (orderId, updatedItemsWithStatuses) => {
-    const newItemsToSave = updatedItemsWithStatuses.filter(item => item.is_new_item);
-    if (newItemsToSave.length > 0 && currentBatchTimestamp) {
-      localStorage.setItem(
-        `order_${orderId}_batch_${currentBatchTimestamp}`,
-        JSON.stringify({ timestamp: currentBatchTimestamp, started_at: Date.now() })
-      );
-      newItemsToSave.forEach(item => {
-        const sk = `order_${orderId}_new_item_${item.frontend_unique_key}`;
-        localStorage.setItem(sk, JSON.stringify({
-          item_id: item.item_id,
-          unique_key: item.frontend_unique_key,
-          added_at: item.added_at_frontend,
-          batch_timestamp: item.batch_timestamp || currentBatchTimestamp,
-          quantity: item.quantity || 1,
-          is_line_item: item.is_line_item || false,
-        }));
-      });
-    }
-    const cleanedItems = updatedItemsWithStatuses
-      .filter(item => typeof item.id === 'number' || item.is_new_item)
-      .map(item => {
-        const inv = inventoryMap[item.item_id || item.inventory_id];
-        const unitPrice = item.unit_price ?? item.price ?? inv?.unit_price ?? 0;
-        return {
-          item_id: item.item_id || item.inventory_id,
-          item_name: item.item_name || item.name,
-          quantity: item.quantity || 1,
-          status: item.status || 'pending',
-          note: item.note || '',
-          slug: item.slug || '',
-          price: unitPrice,
-          unit_price: unitPrice,
-          line_total: unitPrice * (item.quantity || 1),
-          client_id: clientId,
-          order_id: orderId,
-          frontend_unique_key: item.frontend_unique_key || null,
-        };
-      });
-    const totalPrice = cleanedItems.reduce((s, i) => s + i.price * i.quantity, 0);
-    try {
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/order_items/update?order_id=${orderId}`,
-        cleanedItems,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      await axios.post(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-        { id: orderId, total_price: totalPrice },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setCurrentBatchTimestamp(null);
-      setEditOrderId(null);
-      setItemSearchQuery('');
-      toast.success('Items saved successfully!');
-
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const allOrders = res.data?.data || [];
-      const fresh = allOrders.find(o => o.id === orderId);
-      if (!fresh) return;
-      const processed = processOrder(fresh);
-      setOrders(prev => prev.map(o => (o.id === orderId ? processed : o)));
-      if (selectedOrder?.id === orderId) setSelectedOrder(processed);
-      clearNewItemsStorage(orderId);
-      setCurrentBatchTimestamp(null);
-    } catch (err) {
-      console.error('Save error', err);
-      toast.error('Failed to update items or total.');
-    }
-  };
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Singular filtering
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const getDateRange = () => {
-    const now = new Date();
-    const toStr = (d) => d.toISOString().split('T')[0];
-    const today = toStr(now);
-    const subtractDays = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return toStr(d); };
-    const subtractMonths = (n) => { const d = new Date(now); d.setMonth(d.getMonth() - n); return toStr(d); };
-    switch (datePreset) {
-      case 'today': return { from: today, to: today };
-      case '1w': return { from: subtractDays(7), to: today };
-      case '15d': return { from: subtractDays(15), to: today };
-      case '1m': return { from: subtractMonths(1), to: today };
-      case '3m': return { from: subtractMonths(3), to: today };
-      case '6m': return { from: subtractMonths(6), to: today };
-      case 'custom': return { from: customFrom, to: customTo };
-      default: return { from: today, to: today };
-    }
-  };
-
-  const { from, to } = getDateRange();
-  let filteredOrders = orders.filter(order => {
-    const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
-    return orderDate >= from && orderDate <= to;
-  });
-
-  // Single mode selection (not multi)
-  if (selectedOrderMode !== 'all') {
-    filteredOrders = filteredOrders.filter(o => o._fixedOrderMode === selectedOrderMode);
-  }
-
-  switch (filterMode) {
-    case 0:
-      filteredOrders = [...filteredOrders].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-      break;
-    case 1:
-      filteredOrders = [...filteredOrders].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      break;
-    case 2:
-      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'pending');
-      break;
-    case 3:
-      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'preparing');
-      break;
-    case 4:
-      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'ready');
-      break;
-    case 5:
-      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'served');
-      break;
-    default:
-      break;
-  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // Derived helpers
@@ -1335,289 +663,337 @@ const OrderSummaryVisible = ({ clientId, token }) => {
   const getOrderModeIcon = (mode) => {
     if (mode === 'takeaway') return <Package size={12} />;
     if (mode === 'delivery') return <Truck size={12} />;
+    if (mode === 'walkin') return <Store size={12} />;
     return <Users size={12} />;
   };
-  const getOrderModeLabel = (mode) => { if (mode === 'takeaway') return 'Takeaway'; if (mode === 'delivery') return 'Delivery'; return 'Dine In'; };
+  const getOrderModeLabel = (mode) => { if (mode === 'takeaway') return 'Takeaway'; if (mode === 'delivery') return 'Delivery'; if (mode === 'walkin') return 'Walk-in'; return 'Dine In'; };
+
+  // What the user sees as the order number (dinein_order_id), falling back to id
+  const getDisplayOrderId = (order) => order?.dinein_order_id ?? order?.id ?? '';
+
+  const getTableOrCustomer = (order) =>
+    order._fixedOrderMode === 'takeaway'
+      ? order.customer_name || 'Takeaway'
+      : tablesMap[order.table_id] || order.table || String(order.table_id);
+
+  const getBillingDoc = (order) => billingDocMap[order?.id?.toString()];
+
+  // paid | partial | unpaid | not billed
+  const getPaymentKey = (order) => {
+    const doc = getBillingDoc(order);
+    if (!doc) return 'not billed';
+    const ps = (doc.payment_status || '').toLowerCase();
+    if (ps === 'paid') return 'paid';
+    if (ps === 'partial' || (doc.status || '').toLowerCase() === 'partial') return 'partial';
+    return 'unpaid';
+  };
+
+  const openViewModal = (order) => {
+    setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) });
+    setShowViewModal(true);
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Date / mode / status filters (unchanged)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const { from, to } = getPeriodRange(period);
+  let filteredOrders = orders.filter(order => {
+    const orderDate = new Date(order.created_at).toLocaleDateString('en-CA');
+    return orderDate >= from && orderDate <= to;
+  });
+
+  // Single mode selection (not multi)
+  if (selectedOrderMode !== 'all') {
+    filteredOrders = filteredOrders.filter(o => o._fixedOrderMode === selectedOrderMode);
+  }
+
+  switch (filterMode) {
+    case 2:
+      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'pending');
+      break;
+    case 3:
+      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'preparing');
+      break;
+    case 4:
+      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'ready');
+      break;
+    case 5:
+      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'served');
+      break;
+    case 6:
+      filteredOrders = filteredOrders.filter(o => o.status?.toLowerCase() === 'cancelled');
+      break;
+    default:
+      break;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Search — every word typed must match somewhere in the row
+  // (order #, table/customer, mode, status, invoice #, payment, total, item names)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const searchWords = searchText
+    .toLowerCase()
+    .replace(/#/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const visibleOrders = searchWords.length === 0
+    ? filteredOrders
+    : filteredOrders.filter(order => {
+        const doc = getBillingDoc(order);
+        const haystack = [
+          getDisplayOrderId(order),
+          order.id,
+          getTableOrCustomer(order),
+          order.customer_name,
+          getOrderModeLabel(order._fixedOrderMode),
+          order._fixedOrderMode,
+          order.status,
+          doc?.document_number,
+          doc?.payment_status || 'not billed',
+          getOrderTotal(order).toFixed(2),
+          ...(order.items || []).map(i => i.item_name || i.name),
+        ]
+          .filter(v => v !== undefined && v !== null && v !== '')
+          .join(' ')
+          .toLowerCase();
+        return searchWords.every(w => haystack.includes(w));
+      });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Cell renderers (plain functions so grid cells don't remount every render)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const renderModePill = (mode) => (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-brand-light text-brand-dark border border-brand-200 whitespace-nowrap">
+      {getOrderModeIcon(mode)}{getOrderModeLabel(mode)}
+    </span>
+  );
+
+  // Lavender pill + status dot (same look as the item-status badge on the Order page)
+ const renderStatusPill = (status) => {
+    const cfg = ORDER_STATUS_BAR[String(status || '').toLowerCase()];
+    return (
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-badge text-micro font-bold uppercase tracking-wide ${cfg?.dot || 'bg-line-strong'} text-white border border-transparent whitespace-nowrap`}>
+        {status || '—'}
+      </span>
+    );
+  };
+
+  const renderPaymentPill = (order) => {
+    const doc = getBillingDoc(order);
+    const key = getPaymentKey(order);
+    if (!doc) {
+      return <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary whitespace-nowrap">NOT BILLED</span>;
+    }
+    return (
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-badge text-micro font-bold ${
+        key === 'paid' ? 'bg-state-vacant-bg text-state-vacant'
+          : key === 'partial' ? 'bg-state-reserved-bg text-state-reserved'
+            : 'bg-state-occupied-bg text-state-occupied'
+      }`}>
+        {doc.payment_status?.toUpperCase() ?? 'UNKNOWN'}
+      </span>
+    );
+  };
+
+  // Icons on top, "Mark As Served" pill stacked underneath (only when status = ready)
+  const renderActionButtons = (order) => {
+    if (!order) return null;
+    const canServe = order.status?.toLowerCase() === 'ready';
+    return (
+      <div className="inline-flex flex-col items-stretch gap-1.5 w-[132px] leading-none">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => openViewModal(order)}
+            title="View items"
+            className="p-1.5 rounded-lg bg-brand-light text-brand-dark hover:bg-brand-dark hover:text-text-white transition-colors"
+          >
+            <Eye size={15} />
+          </button>
+          <button
+            onClick={() => handlePrintBill(order.id)}
+            title="Print bill"
+            className="p-1.5 rounded-lg bg-success-soft text-success hover:bg-success hover:text-text-white transition-colors"
+          >
+            <Printer size={15} />
+          </button>
+          <button
+            onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+            title="Cancel order"
+            className="p-1.5 rounded-lg bg-state-occupied-bg text-state-occupied hover:bg-state-occupied hover:text-text-white transition-colors"
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
+        {canServe && (
+          <button
+            onClick={() => handleStatusChange(order.id, 'served')}
+            style={{ height: 28, lineHeight: 1 }}
+            className="w-full inline-flex items-center justify-center gap-1.5 px-2 rounded-lg text-[11px] font-semibold whitespace-nowrap
+                       bg-success-soft text-success border border-success-line
+                       hover:bg-success hover:text-text-white hover:border-success
+                       active:scale-[0.98] transition-all"
+          >
+            <Check size={13} strokeWidth={3} className="shrink-0" />
+            <span style={{ lineHeight: 1 }}>Mark As Served</span>
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Grid columns (AG Grid → per-column filters, sorting, Columns menu, Export)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const orderColumnDefs = [
+    {
+      headerName: 'Order #',
+      colId: 'dinein_order_id',
+      minWidth: 140,
+      comparator: orderNoComparator,
+      sortingOrder: ['asc', 'desc', null],
+      initialSort: 'asc',
+      valueGetter: (params) => (params.data ? getDisplayOrderId(params.data) : ''),
+      cellRenderer: (params) => (
+        <div className="flex items-center gap-1.5">
+          <span className="font-bold text-brand-dark">#{params.value}</span>
+          {params.data?.has_new_items && <span className="text-[9px] font-bold text-text-white bg-brand px-1.5 py-0.5 rounded-full uppercase">New</span>}
+        </div>
+      ),
+    },
+    {
+      headerName: 'Table / Customer',
+      field: 'table_id',
+      minWidth: 160,
+      valueGetter: (params) => (params.data ? getTableOrCustomer(params.data) : ''),
+    },
+    {
+      headerName: 'Mode',
+      field: '_fixedOrderMode',
+      minWidth: 140,
+      valueGetter: (params) => getOrderModeLabel(params.data?._fixedOrderMode),
+      cellRenderer: (params) => renderModePill(params.data?._fixedOrderMode),
+    },
+    {
+      headerName: 'Items',
+      field: 'items',
+      minWidth: 100,
+      valueGetter: (params) => params.data?.items?.length || 0,
+    },
+    {
+      headerName: 'Total Price',
+      field: 'total_price',
+      minWidth: 140,
+      valueGetter: (params) => getOrderTotal(params.data || {}),
+      valueFormatter: (params) => `₹${(params.value || 0).toFixed(2)}`,
+    },
+    {
+      headerName: 'Status',
+      field: 'status',
+      minWidth: 130,
+      cellRenderer: (params) => renderStatusPill(params.value),
+    },
+    {
+      headerName: 'Invoice #',
+      colId: 'invoice_number',
+      minWidth: 140,
+      sortable: false,
+      valueGetter: (params) => getBillingDoc(params.data)?.document_number || '',
+      cellRenderer: (params) => (
+        <span className="text-sm font-medium text-ink-soft">{params.value || '—'}</span>
+      ),
+    },
+    {
+      headerName: 'Payment Status',
+      colId: 'payment_status',
+      minWidth: 160,
+      sortable: false,
+      valueGetter: (params) => (params.data ? (getBillingDoc(params.data)?.payment_status || 'Not billed') : ''),
+      cellRenderer: (params) => renderPaymentPill(params.data),
+    },
+    {
+  headerName: 'Actions',
+  colId: 'actions',
+  minWidth: 240,
+  sortable: false,
+  filter: false,
+  floatingFilter: false,
+  cellRenderer: (params) => (
+    <OrderRowActions
+      order={params.data}
+      invoiceGenerated={hasInvoiceBeenGenerated(params.data, billingDocMap)}
+      onView={(order) => {
+        setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) });
+        setShowViewModal(true);
+      }}
+      onPrint={(order) => handlePrintBill(order.id)}
+      onCancel={(order) => setCancelOrderModal({ isOpen: true, orderId: order.id })}
+      onMarkServed={(order) => handleStatusChange(order.id, 'served')}
+    />
+  ),
+},
+  ];
 
   // ─────────────────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-bg-primary overflow-x-hidden">
-      <div className="mx-auto px-2 sm:px-4 py-3">
-        <div className="bg-action-primary rounded-2xl shadow-xl px-3 sm:px-6 py-5 mb-6 overflow-hidden">
-          {/* ── Filter bar ── */}
-          <div className="flex flex-col xl:flex-row gap-4 xl:gap-8 xl:items-center rounded-xl p-2 sm:p-3">
-
-            {/* Order mode — singular selection */}
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 sm:gap-4 w-full xl:w-auto">
-              {[
-                { value: 'all', label: 'All', icon: <Filter size={20} /> },
-                { value: 'dinein', label: 'Dine In', icon: <Users size={20} /> },
-                { value: 'takeaway', label: 'Takeaway', icon: <Package size={20} /> },
-                { value: 'delivery', label: 'Delivery', icon: <Truck size={20} /> },
-              ].map(({ value, label, icon }) => (
-                <button
-                  key={value}
-                  onClick={() => setSelectedOrderMode(value)}
-                  className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg font-bold text-sm sm:text-base transition-all whitespace-nowrap
-                  ${selectedOrderMode === value
-                      ? 'bg-action-primary text-text-white shadow-sm'
-                      : 'bg-bg-primary text-text-secondary hover:text-text-primary border border-border-default'}`}
-                >
-                  {icon}
-                  <span>{label}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="hidden xl:block w-px h-6 bg-border-default mx-1" />
-
-            <div className="flex flex-col sm:flex-row gap-3 sm:items-center w-full xl:w-auto">
-
-              {/* Status filter */}
-              <div className="relative w-full sm:w-auto">
-                <Filter
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
-                  size={15}
-                />
-                <select
-                  value={filterMode}
-                  onChange={e => setFilterMode(Number(e.target.value))}
-                  className="w-full sm:w-auto pl-9 pr-4 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-                >
-                  <option value={0}>All Status</option>
-                  <option value={2}>Pending</option>
-                  <option value={3}>Preparing</option>
-                  <option value={4}>Ready</option>
-                  <option value={5}>Served</option>
-                </select>
-              </div>
-
-              {/* Single dropdown — "Custom" triggers hidden date inputs */}
-              <div className="relative flex items-center gap-2">
-                <select
-                  value={datePreset}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setDatePreset(val);
-                    if (val === 'custom') {
-                      // open the from-date picker immediately
-                      setTimeout(() => customFromRef.current?.showPicker?.(), 50);
-                    }
-                  }}
-                  className="pl-3 pr-8 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm appearance-none cursor-pointer"
-                >
-                  <option value="today">Today</option>
-                  <option value="1w">Last 1 Week</option>
-                  <option value="15d">Last 15 Days</option>
-                  <option value="1m">Last 1 Month</option>
-                  <option value="3m">Last 3 Months</option>
-                  <option value="6m">Last 6 Months</option>
-                  <option value="custom">Custom Range</option>
-                </select>
-
-                {/* Hidden date pickers — only mount when custom is selected */}
-                {datePreset === 'custom' && (
-                  <>
-                    <input
-                      ref={customFromRef}
-                      type="date"
-                      value={customFrom}
-                      max={customTo}
-                      onChange={e => {
-                        setCustomFrom(e.target.value);
-                        // after picking from-date, auto-open the to-date picker
-                        setTimeout(() => customToRef.current?.showPicker?.(), 50);
-                      }}
-                      className="px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-                    />
-                    <span className="text-text-secondary text-xs font-medium">→</span>
-                    <input
-                      ref={customToRef}
-                      type="date"
-                      value={customTo}
-                      min={customFrom}
-                      max={todayDate}
-                      onChange={e => setCustomTo(e.target.value)}
-                      className="px-3 py-2 rounded-lg bg-bg-primary border border-border-default text-text-primary text-sm"
-                    />
-                  </>
-                )}
-              </div>
-
-              <div className="text-sm font-semibold text-text-secondary whitespace-nowrap xl:ml-auto">
-                {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
-              </div>
-
-            </div>
-          </div>
-        </div>
+    <div
+      ref={rootRef}
+      className="bg-canvas overflow-hidden flex flex-col"
+      style={{ height: availHeight ? `${availHeight}px` : '100vh' }}
+    >
+      <div className="mx-auto w-full max-w-[1600px] flex-1 min-h-0 px-3 sm:px-5 py-3 sm:py-4">
 
         {loading ? (
-          <div className="flex items-center justify-center py-24"><div className="w-8 h-8 border-2 border-action-primary border-t-transparent rounded-full animate-spin" /></div>
-        ) : filteredOrders.length === 0 ? (
-          <div className="rounded-xl p-16 text-center bg-bg-primary border border-border-default shadow-card"><ShoppingBag size={40} className="mx-auto mb-3 text-text-secondary opacity-40" /><p className="text-text-secondary text-base font-medium">No orders found</p></div>
+          <div className="flex items-center justify-center py-24">
+            <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+          </div>
         ) : (
-          <div className="rounded-xl overflow-hidden border border-border-default shadow-card bg-bg-primary">
-            <div className="w-full overflow-x-auto">
-              <table className="min-w-[1100px] w-full">
-              <thead className="bg-bg-tertiary border-b border-border-default">
-                <tr>
-                  {['Order #', 'Table / Customer', 'Mode', 'Items', 'Total Price', 'Status', 'Actions'].map(h => (
-                    <th key={h} className="px-6 py-4 text-left text-xs font-bold text-text-primary uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-default">
-                {filteredOrders.map((order, rowIdx) => {
-                  const status = order.status?.toLowerCase();
-                  const orderTotal = getOrderTotal(order);
-                  return (
-                    <tr key={order.id} className={`hover:bg-bg-tertiary transition-colors ${rowIdx % 2 === 0 ? 'bg-bg-primary' : 'bg-bg-tertiary'}`}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-action-primary">#{order.id}</span>
-                          {order.has_new_items && <span className="text-[9px] font-bold text-text-white bg-action-primary px-1.5 py-0.5 rounded-full uppercase">New</span>}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">{order._fixedOrderMode === 'takeaway' ? order.customer_name || 'Takeaway' : tablesMap[order.table_id] || order.table || String(order.table_id)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary border border-border-default">{getOrderModeIcon(order._fixedOrderMode)}{getOrderModeLabel(order._fixedOrderMode)}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">{order.items.length}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">₹{orderTotal.toFixed(2)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap"><StatusBadge status={order.status} /></td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-4 flex-wrap">
-                          <button
-                            onClick={() => { setViewOrder({ ...order, _tableName: tablesMap[order.table_id] || order.table || String(order.table_id) }); setShowViewModal(true); }}
-                            className="p-1.5 rounded-lg bg-action-primary/10 text-action-primary hover:bg-action-primary hover:text-text-white transition-colors" title="View items"
-                          ><Eye size={15} /></button>
-                          {status === 'ready' && (
-                            <button onClick={() => handleStatusChange(order.id, 'served')} className="px-2.5 py-1 rounded-lg bg-action-success text-text-white text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark As Served</button>
-                          )}
-                          {status === 'served' && (
-                            <button onClick={() => handleGenerateBill(order)} className="px-2.5 py-1 rounded-lg bg-green-700 text-text-white text-xs font-semibold hover:bg-green-800 transition-colors whitespace-nowrap">Generate Bill</button>
-                          )}
-                          {/* REQ: trash now opens CancelOrderConfirmModal */}
-                          <button
-                            onClick={() => setCancelOrderModal({ isOpen: true, orderId: order.id })}
-                            className="p-1.5 rounded-lg bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white transition-colors" title="Cancel order"
-                          ><Trash2 size={15} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className={`orders-purple-grid h-full min-h-0 flex flex-col bg-surface rounded-xl border border-line shadow-panel p-3 sm:p-4`}>
+
+            {/* Grid — only this area scrolls (rows scroll, header stays) */}
+            <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-line">
+              <AgGridTable
+                columnDefs={orderColumnDefs}
+                rowData={visibleOrders}
+                domLayout="normal"
+                height="100%"
+                rowHeight={72}
+                exportFileName="orders"
+                toolbarLeft={
+                  <div className="flex items-center justify-center gap-x-3 gap-y-1 text-micro text-ink-muted">
+            {Object.entries(ORDER_STATUS_BAR).map(([status, s]) => (
+              <span key={status} className="inline-flex items-center gap-1 capitalize">
+                <span className={`h-2 w-2 rounded-badge ${s.dot}`} />
+                {status}
+              </span>
+            ))}
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-badge bg-state-reserved" /> Draft
+            </span>
+          </div>
+                }
+                overlayNoRowsTemplate={`<div class="p-6 text-sm font-medium text-ink-muted">${searchText ? 'No orders match your search' : 'No orders found'}</div>`}
+              />
             </div>
           </div>
         )}
       </div>
-
-      {/* Order detail / edit modal (unchanged structure, delete button now uses new handler) */}
-      {showOrderDetailModal && selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-color-modalsbg backdrop-blur-sm" onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}>
-          <div className="rounded-xl w-full max-w-3xl max-h-[90vh] flex flex-col bg-bg-primary shadow-card border border-border-default" onClick={e => e.stopPropagation()}>
-            <div className="px-4 sm:px-6 py-4 border-b border-border-default bg-bg-tertiary rounded-t-xl">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-lg sm:text-xl font-bold text-text-primary">{tablesMap[selectedOrder.table_id] || selectedOrder.table || selectedOrder.table_id}</h3>
-                  <span className="text-2xl font-extrabold text-text-primary">{selectedOrder.items.length} items</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right bg-action-primary/10 px-4 py-2 rounded-xl border border-action-primary/20">
-                    <div className="text-xs font-semibold text-text-secondary uppercase">Total</div>
-                    <div className="text-xl font-bold text-action-primary">₹{getOrderTotal(selectedOrder).toFixed(2)}</div>
-                  </div>
-                  <button className="p-2 rounded-xl hover:bg-bg-tertiary" onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}><X size={20} /></button>
-                </div>
-              </div>
-            </div>
-            <div className="lg:hidden border-b border-border-default bg-bg-tertiary">
-              <div className="flex">
-                <button className={`flex-1 py-3 text-sm font-semibold ${activeTab === 'items' ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary' : 'text-text-secondary'}`} onClick={() => setActiveTab('items')}>Items</button>
-                <button className={`flex-1 py-3 text-sm font-semibold ${activeTab === 'available' ? 'text-action-primary border-b-2 border-action-primary bg-bg-primary' : 'text-text-secondary'}`} onClick={() => setActiveTab('available')}>Add Items</button>
-              </div>
-            </div>
-            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-              <div className={`w-full lg:w-2/5 border-r border-border-default bg-bg-tertiary flex flex-col ${activeTab === 'available' ? 'block' : 'hidden lg:flex'}`}>
-                <div className="p-4 border-b border-border-default bg-bg-primary shrink-0">
-                  <input type="text" className="w-full px-4 py-2 rounded-xl border border-border-default bg-bg-primary text-text-primary" placeholder="Search items..." value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} />
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                  {(itemSearchResults.length > 0 ? itemSearchResults : allInventoryItems).map(item => (
-                    <div key={item.id} className="p-3 rounded-xl bg-bg-primary border border-border-default cursor-pointer hover:border-action-primary transition-colors" onClick={() => { handleItemSelection(selectedOrder.id, item); setActiveTab('items'); }}>
-                      <div className="font-semibold text-text-primary">{item.name}</div>
-                      <div className="text-sm font-bold text-action-primary">₹{item.unit_price}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className={`w-full lg:w-3/5 bg-bg-primary ${activeTab === 'items' ? 'block' : 'hidden lg:block'}`}>
-                <div className="p-4 space-y-2 overflow-y-auto max-h-[calc(90vh-200px)]">
-                  {selectedOrder.items.map((item, idx) => {
-                    const prev = selectedOrder.items[idx - 1];
-                    const showDivider = item._isBatchStart || (item.is_new_item && (!prev || (prev.batch_timestamp || null) !== (item.batch_timestamp || null)));
-                    const isServedItem = item.status?.toLowerCase() === 'served';
-                    return (
-                      <div key={item.id || idx}>
-                        {showDivider && (
-                          <div className="flex items-center my-4">
-                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
-                            <span className="px-3 py-1.5 text-action-primary bg-action-primary/10 text-xs font-bold rounded-full mx-3 border border-action-primary/30">New Items</span>
-                            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-action-primary to-transparent" />
-                          </div>
-                        )}
-                        <div className={`flex items-center justify-between p-3 rounded-xl border ${isServedItem ? 'bg-gray-50 border-gray-200' : 'bg-bg-tertiary border-border-default'}`}>
-                          <div>
-                            <div className="font-semibold text-sm text-text-primary">{item.item_name || item.item_id}</div>
-                            {isServedItem && <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">served</span>}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {!isServedItem && (
-                              <>
-                                <button onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, Math.max(1, item.quantity - 1))} className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary">−</button>
-                                <span className="px-3 font-bold text-text-primary">{item.quantity}</span>
-                                <button onClick={() => updateItemQuantity(selectedOrder.id, item.id || item.frontend_unique_key, item.quantity + 1)} className="px-3 py-1 rounded-lg border border-border-default bg-bg-primary text-text-primary">+</button>
-                              </>
-                            )}
-                            {/* REQ: now opens OldItemDeleteModal with reason + qty */}
-                            <button
-                              className={`p-2 rounded-lg transition-colors ${isServedItem ? 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white' : 'bg-action-danger/10 text-action-danger hover:bg-action-danger hover:text-text-white'}`}
-                              title={isServedItem ? 'Delete served item (records wastage)' : 'Delete item'}
-                              onClick={() => handleRequestDeleteItem(item, selectedOrder.id)}
-                            ><Trash2 size={16} /></button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className="p-4 border-t border-border-default bg-bg-tertiary flex gap-3 rounded-b-xl">
-              <button className="flex-1 bg-action-primary text-text-white py-3 rounded-xl font-semibold" onClick={() => { updateOrderItems(selectedOrder.id, selectedOrder.items); setShowOrderDetailModal(false); setEditOrderId(null); }}>Save Changes</button>
-              <button className="flex-1 bg-bg-primary border border-border-default py-3 rounded-xl font-semibold text-text-primary" onClick={() => { setShowOrderDetailModal(false); setEditOrderId(null); setActiveTab('items'); }}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modals */}
       <OrderItemsViewModal
         isOpen={showViewModal}
         onClose={() => { setShowViewModal(false); setViewOrder(null); }}
         order={viewOrder}
-        inventoryMap={inventoryMap}
         onRequestDeleteItem={(item) => handleRequestDeleteItem(item, viewOrder?.id)}
         getOrderTotal={getOrderTotal}
       />
-
-      <LineItemsModal isOpen={lineItemsModalOpen} onClose={() => setLineItemsModalOpen(false)} mainItem={selectedMainItem} lineItems={lineItemsDetails} onAddMainOnly={handleAddMainItemOnly} onAddWithAddons={handleAddMainItemWithLineItems} />
 
       {/* REQ: Cancel order — now requires reason (matches TakeOrder) */}
       <CancelOrderConfirmModal
@@ -1635,14 +1011,40 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         onRemoveAll={handleItemRemoveAll}
       />
 
+      {invoiceModalOpen && invoiceOrderData && (
+        <InvoiceModal
+          clientId={clientId}
+          token={token}
+          selectedOrder={invoiceOrderData}
+          tablesMap={tables.reduce((m, t) => { m[t.id] = t; return m; }, {})}
+          inventoryMap={inventoryMap}
+          onClose={async () => {
+            closeInvoiceModal();
+            setBillingDocMap(await fetchBillingDocumentsMap({ clientId, token }));
+          }}
+          onSave={async (id) => {
+            console.log('Invoice saved:', id);
+            setBillingDocMap(await fetchBillingDocumentsMap({ clientId, token }));
+          }}
+        />
+      )}
+
       <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: var(--color-bg-tertiary); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-action-primary); }
+        /* Fill the available height: toolbar stays put, grid rows scroll inside */
+        .orders-purple-grid .ag-modern-wrapper {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        }
+        .orders-purple-grid .ag-modern-wrapper > .ag-modern-grid {
+          flex: 1 1 0;
+          min-height: 0;
+          height: auto !important;
+        }
       `}</style>
-      </div>
-      );
+    </div>
+  );
 };
 
-      export default OrderSummaryVisible;
+export default OrderSummaryVisible;

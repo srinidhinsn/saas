@@ -1,6 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
+import AgGridTable from '../../utils/AgGridTable';
+
+const FIELD =
+  "w-full h-control px-item rounded-button-sm border border-brand-line bg-surface text-ui text-ink " +
+  "outline-none placeholder:text-ink-faint transition-colors " +
+  "focus:border-brand-ring focus:shadow-focus-ring disabled:opacity-50 disabled:cursor-not-allowed";
+const AREA =
+  "w-full px-item py-2 rounded-button-sm border border-brand-line bg-surface text-ui text-ink " +
+  "outline-none placeholder:text-ink-faint transition-colors " +
+  "focus:border-brand-ring focus:shadow-focus-ring";
+const LABEL =
+  "block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted";
+const DIALOG =
+  "flex flex-col w-full max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line " +
+  "border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in";
 
 const API_CONFIG = {
   baseMenu: (clientId) => `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/menu`,
@@ -165,19 +180,13 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
   const fetchUnits = async () => {
     try {
       const res = await axios.get(
-        `${API_CONFIG.baseMenu(clientId)}/read_category?client_id=${clientId}&category_id=units`,
+        `${API_CONFIG.baseInventory(clientId)}/item-types?client_id=${clientId}&category_id=units`,
         getAuthHeaders(token)
       );
-      const data = res.data?.data || [];
-      const unitsNode = Array.isArray(data) ? data.find((d) => d.id === "units") : data;
-      const subCats = unitsNode?.subCategories || [];
-      // subCategories may be objects {id, name, ...} or plain strings
-      const unitList = subCats.map((u) => (typeof u === "string" ? u : u.id));
+      const unitList = res.data?.data || [];
       setUnits(unitList);
     } catch (err) {
       console.error("fetchUnits failed:", err);
-      // Fallback to standard units if API fails
-      setUnits(["g", "kg", "ml", "litre", "pcs"]);
     }
   };
 
@@ -524,7 +533,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
       );
       setIsAddStockModalOpen(false);
       setAddStockForm({ stock_item_id: null, stock_name: "", quantity: "", unit: "", remarks: "" });
-      await fetchStocks();
+      await Promise.all([fetchStocks(), fetchMenuItems(), fetchMenuAvailability()]);
     } catch (err) {
       console.error("submitAddStock failed:", err);
       setError(err.response?.data?.detail || "Failed to add stock quantity");
@@ -572,7 +581,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
         transaction_type: "RETURN",
         remarks: "",
       });
-      await fetchStocks();
+      await Promise.all([fetchStocks(), fetchMenuItems(), fetchMenuAvailability()]);
     } catch (err) {
       console.error("submitDeductStock failed:", err);
       setError(err.response?.data?.detail || "Failed to deduct stock quantity");
@@ -746,66 +755,59 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
     };
   }, [activeTab, stocks, enhancedStocks, menuItems, inventoryCategories, recipe]);
 
-
   return (
-    <div className="min-h-screen bg-gray-50/50 py-6 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-8xl mx-auto w-full">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-          <div className="flex gap-3">
-            <p className="text-3xl font-bold xl mt-2 text-base text-gray-600">
+    <div className="ui-page">
+      <div className="mx-auto w-full">
+        <div className="ui-panel flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex gap-3 items-center">
+            <p className="text-ui text-ink-muted">
               Manage stock items, recipes, and menu availability
             </p>
-
+ 
             <button
-              className="flex items-center gap-2 px-4 py-2 bg-action-primary hover:bg-action-primary text-text-white rounded-lg font-medium text-sm transition-all shadow-sm"
+              className="ui-btn ui-btn-add"
               onClick={openInventoryModal}
             >
               + Add Inventory
             </button>
           </div>
-
-          <div className="flex gap-3 flex-wrap">
-
+ 
+          <div className="ui-tabs">
+ 
             {/* Dynamic Inventory Tabs */}
             {inventoryCategories.map((category) => (
               <button
                 key={category.id}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === category.id
-                  ? 'bg-action-primary text-text-white shadow-sm'
-                  : 'bg-bg-tertiary text-text-secondary  hover:text-gray-900 border border-gray-300'
-                  }`}
+                className={`ui-tab ${activeTab === category.id ? 'ui-tab-active' : ''}`}
                 onClick={() => setActiveTab(category.id)}
               >
                 {category.name}
               </button>
             ))}
-
+ 
             <button
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === "recipe"
-                ? 'bg-action-primary text-text-white shadow-sm'
-                : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border-default'
-                }`}
+              className={`ui-tab ${activeTab === "recipe" ? 'ui-tab-active' : ''}`}
               onClick={() => setActiveTab("recipe")}
             >
               Recipe
             </button>
           </div>
         </div>
-
+ 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center justify-between text-base">
+          <div className="mb-stack px-4 py-2 bg-state-occupied-bg border border-state-occupied/30 text-state-occupied rounded-button-sm flex items-center justify-between text-ui">
             <span>{error}</span>
             <button
               onClick={() => setError("")}
-              className="text-action-primary hover:text-action-primary font-medium text-2xl"
+              className="text-state-occupied font-bold text-body"
             >
               ×
             </button>
           </div>
         )}
-
-        <div className="grid lg:grid-cols-12 gap-6">
-          <main className="lg:col-span-9 space-y-6 min-w-0">
+ 
+        <div className="grid lg:grid-cols-12 gap-tiles">
+          <main className="lg:col-span-9 min-w-0">
             {/* Dynamic Inventory Category Tabs */}
             {inventoryCategories.some(cat => cat.id === activeTab) && activeTab !== "menu" && (
               <InventoryCategoryTab
@@ -822,19 +824,23 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                 onDeduct={openDeductModal}
               />
             )}
-
-
+ 
+ 
             {/* Menu Availability Tab */}
             {activeTab === "menu" && (
               <MenuAvailabilityTab
                 menuItems={menuItems}
                 loading={loading}
                 onUpdateAvailability={updateMenuAvailability}
+                onAddQty={openAddStockModal}
+                onDeduct={openDeductModal} 
                 allCategories={allCategories}
                 units={units}
+                searchQuery={menuSearchQuery}
+                onSearchChange={setMenuSearchQuery}
               />
             )}
-
+ 
             {activeTab === "recipe" && (
               <RecipeTab
                 menuItems={menuItems}
@@ -851,15 +857,15 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
               />
             )}
           </main>
-
-          <aside className="lg:col-span-3 space-y-6 min-w-0">
+ 
+          <aside className="lg:col-span-3 min-w-0">
             {inventoryCategories.some(cat => cat.id === activeTab) && (
-              <div className="bg-bg-primary rounded-xl border border-gray-100 shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Filters</h3>
-                <div className="space-y-4">
+              <div className="ui-card p-panel">
+                <h3 className="text-panel-title text-brand-dark mb-item">Filters</h3>
+                <div className="space-y-3">
                   <div>
                     <select
-                      className="w-full px-4 py-3 text-base border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                      className={FIELD}
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
                     >
@@ -869,46 +875,46 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
                       ))}
                     </select>
                   </div>
-
-                  <div className="pt-2">
+ 
+                  <div className="pt-1">
                     <label className="flex items-center gap-3 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={lowStockOnly}
                         onChange={(e) => setLowStockOnly(e.target.checked)}
-                        className="h-5 w-5 text-action-primary focus:ring-action-primary border-gray-300 rounded"
+                        className="h-4 w-4 accent-brand rounded cursor-pointer"
                       />
-                      <span className="text-base text-gray-700 font-medium">Low stock only</span>
+                      <span className="text-ui font-semibold text-ink">Low stock only</span>
                     </label>
                   </div>
                 </div>
               </div>
             )}
-
-            <div className="bg-bg-primary rounded-xl border border-gray-100 shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+ 
+            <div className="ui-card p-panel">
+              <h3 className="text-panel-title text-brand-dark mb-item">
                 {getCurrentInventoryOverview.inventoryName ? `${getCurrentInventoryOverview.inventoryName} Overview` : 'Overview'}
               </h3>
-              <div className="space-y-4 text-base">
+              <div className="space-y-3 text-ui">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Stock items</span>
-                  <span className="font-semibold text-gray-900">{getCurrentInventoryOverview.stockCount}</span>
+                  <span className="text-ink-muted">Stock items</span>
+                  <span className="font-bold text-brand-dark">{getCurrentInventoryOverview.stockCount}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Low stock</span>
-                  <span className="font-semibold text-amber-600">
+                  <span className="text-ink-muted">Low stock</span>
+                  <span className="font-bold text-state-reserved">
                     {getCurrentInventoryOverview.lowStockCount}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Menu items</span>
-                  <span className="font-semibold text-gray-900">{getCurrentInventoryOverview.menuCount}</span>
+                  <span className="text-ink-muted">Menu items</span>
+                  <span className="font-bold text-brand-dark">{getCurrentInventoryOverview.menuCount}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Inventories</span>
-                  <span className="font-semibold text-purple-600">{getCurrentInventoryOverview.inventoryCount}</span>
+                  <span className="text-ink-muted">Inventories</span>
+                  <span className="font-bold text-brand-dark">{getCurrentInventoryOverview.inventoryCount}</span>
                 </div>
-                <div className="text-sm text-gray-500 pt-3 border-t border-gray-100">
+                <div className="text-ui-sm text-ink-muted pt-2.5 border-t border-line-soft">
                   Last refresh: {new Date().toLocaleTimeString()}
                 </div>
               </div>
@@ -916,7 +922,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
           </aside>
         </div>
       </div>
-
+ 
       {isStockModalOpen && (
         <StockModal
           isOpen={isStockModalOpen}
@@ -942,7 +948,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
           }}
         />
       )}
-
+ 
       {isInventoryModalOpen && (
         <InventoryModal
           isOpen={isInventoryModalOpen}
@@ -960,7 +966,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
           }}
         />
       )}
-
+ 
       {isAddStockModalOpen && (
         <AddStockModal
           isOpen={isAddStockModalOpen}
@@ -974,7 +980,7 @@ export default function StockRecipeManager({ clientId: propClientId, token: prop
           }}
         />
       )}
-
+ 
       {isDeductModalOpen && (
         <DeductStockModal
           isOpen={isDeductModalOpen}
@@ -1021,113 +1027,131 @@ function InventoryCategoryTab({
 
   if (!category) return null;
 
-  return (
-    <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
-      <div className="bg-action-primary p-6 border-b border-gray-100 flex items-center justify-between">
-        <div className="flex-1">
-          <h2 className="text-2xl font-bold text-white">{category.name}</h2>
-          {category.description && (
-            <p className="text-sm text-purple-100 mt-2">{category.description}</p>
+  const stockColumnDefs = [
+    {
+      headerName: 'Item',
+      field: 'name',
+      minWidth: 220,
+      sortable: true,
+      cellRenderer: (params) => (
+        <div>
+          <div className="font-bold text-ink text-ui">{params.data.name}</div>
+          {params.data.description && (
+            <div className="text-ui-sm text-ink-muted">{params.data.description}</div>
           )}
         </div>
-        <div className="flex-1 max-w-md ml-4">
-          <input
-            type="text"
-            placeholder="Search stocks..."
-            className="w-full px-4 py-3 text-base border border-purple-300 rounded-lg focus:ring-2 focus:ring-white focus:border-white"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
+      ),
+    },
+    {
+      headerName: 'Category',
+      colId: 'category',
+      minWidth: 150,
+      sortable: true,
+      valueGetter: (params) => getCategoryName(params.data?.category_id),
+      cellRenderer: (params) => <span className="text-ui text-ink-soft">{params.value}</span>,
+    },
+    {
+      headerName: 'Availability',
+      field: 'effectiveAvailability',
+      minWidth: 140,
+      sortable: true,
+      cellRenderer: (params) => (
+        <span className={`inline-flex px-2.5 py-1 text-micro font-bold rounded-badge ${
+          params.data.status === "out" ? "bg-state-occupied-bg text-state-occupied" :
+          params.data.status === "low" ? "bg-state-reserved-bg text-state-reserved" :
+          "bg-state-vacant-bg text-state-vacant"
+        }`}>
+          {params.value}
+        </span>
+      ),
+    },
+    {
+      headerName: 'Unit',
+      field: 'unit',
+      minWidth: 100,
+      sortable: true,
+      valueGetter: (params) => params.data?.unit || "—",
+      cellRenderer: (params) => <span className="text-ui text-ink-soft">{params.value}</span>,
+    },
+    {
+      headerName: 'Price',
+      field: 'unit_price',
+      minWidth: 120,
+      sortable: true,
+      valueGetter: (params) => Number(params.data?.unit_price) || 0,
+      cellRenderer: (params) => (
+        <span className="text-ui font-bold text-brand-dark">₹{params.value.toFixed(2)}</span>
+      ),
+    },
+    {
+      headerName: 'Actions',
+      colId: 'actions',
+      minWidth: 380,
+      sortable: false,
+      filter: false,
+      floatingFilter: false,
+      cellRenderer: (params) => (
+        <div className="flex items-center justify-end gap-2 w-full">
+          <button
+            onClick={() => onAddQty(params.data)}
+            className="ui-btn ui-btn-update !h-7"
+          >
+            + Add Qty
+          </button>
+          <button
+            onClick={() => onDeduct(params.data)}
+            className="ui-btn ui-btn-delete !h-7"
+          >
+            Deduct
+          </button>
+          <button
+            onClick={() => onEdit(params.data)}
+            className="ui-btn !h-7"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => onDelete(params.data.id)}
+            className="ui-btn ui-btn-delete !h-7"
+          >
+            Delete
+          </button>
         </div>
-        <button
-          onClick={onAddNew}
-          className="ml-4 px-6 py-3 bg-action-primary border border-black-600 hover:bg-action-primary  text-text-white rounded-lg text-base font-semibold transition-colors"
-        >
-          + Add Stock
-        </button>
-      </div>
+      ),
+    },
+  ];
 
-      <div className="overflow-x-auto rounded-lg border-default border-border-default max-h-[600px] overflow-y-auto">
-        <table className="w-full min-w-[700px]">
-          <thead className="bg-gray-50 sticky top-0">
-            <tr>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Item</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Category</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Availability</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Unit</th>
-              <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">Price</th>
-              <th className="px-6 py-4 text-right text-sm font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-bg-primary divide-y divide-gray-200">
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500 text-base">Loading...</td>
-              </tr>
-            ) : stocks.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500 text-base">
-                  No stock items found. Click "Add Stock" to create one.
-                </td>
-              </tr>
-            ) : (
-              stocks.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-semibold text-gray-900 text-base">{item.name}</div>
-                    {item.description && (
-                      <div className="text-sm text-gray-500">{item.description}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-gray-600"> {getCategoryName(item.category_id)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-3 py-1.5 text-sm font-semibold rounded-full ${item.status === "out" ? "bg-red-100 text-red-800" :
-                      item.status === "low" ? "bg-amber-100 text-amber-800" :
-                        "bg-green-100 text-green-800"
-                      }`}>
-                      {item.effectiveAvailability}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base text-gray-600">{item.unit || "—"}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-base font-medium text-gray-700">
-                    ₹{(Number(item.unit_price) || 0).toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="flex justify-end gap-4">
-                      <button
-                        onClick={() => onAddQty(item)}
-                        className="text-green-700 hover:text-green-900 border border-green-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
-                      >
-                        + Add Qty
-                      </button>
-                      <button
-                        onClick={() => onDeduct(item)}
-                        className="text-red-700 hover:text-red-900 border border-red-300 px-4 py-2 rounded-lg font-medium text-sm transition-all"
-                      >
-                        Deduct
-                      </button>
-                      <button
-                        onClick={() => onEdit(item)}
-                        className="text-action-primary hover:text-action-primary mr-4 border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => onDelete(item.id)}
-                        className="text-action-primary hover:text-action-primary border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+   
+  return (
+  <div className="ui-panel !p-0 overflow-hidden">
+    {loading ? (
+      <div className="px-6 py-12 text-center text-ink-muted text-ui">Loading...</div>
+    ) : stocks.length === 0 ? (
+      <div className="px-6 py-12 text-center text-ink-muted text-ui">
+        No stock items found. Click "Add Stock" to create one.
       </div>
-    </div>
-  );
+    ) : (
+      <AgGridTable
+        columnDefs={stockColumnDefs}
+        rowData={stocks}
+        domLayout="normal"
+        height={600}
+        exportFileName="inventory_stock"
+        gridOptions={{ getRowId: (params) => String(params.data.id) }}
+        toolbarRight={
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <button
+              onClick={onAddNew}
+              className="ui-btn ui-btn-add whitespace-nowrap"
+            >
+              + Add Stock
+            </button>
+          </div>
+        }
+      />
+    )}
+  </div>
+);
 }
 
 function RecipeTab({
@@ -1143,13 +1167,80 @@ function RecipeTab({
   onDeleteIngredient,
   units,
 }) {
+  const ingredientColumnDefs = [
+    {
+      headerName: 'Ingredient',
+      colId: 'ingredient',
+      minWidth: 180,
+      sortable: true,
+      cellRenderer: (params) => {
+        const stockItem = stocks.find((s) => Number(s.id) === Number(params.data.stock_item_id));
+        return <span className="font-bold text-ink text-ui">{stockItem?.name || `Item #${params.data.stock_item_id}`}</span>;
+      },
+    },
+    {
+      headerName: 'Qty',
+      field: 'quantity_required',
+      minWidth: 120,
+      sortable: true,
+      cellRenderer: (params) => (
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={params.data.quantity_required}
+          onChange={(e) => onUpdateIngredient(params.node.rowIndex, "quantity_required", e.target.value)}
+          className="w-24 h-7 px-2 rounded-button-sm border border-brand-line bg-surface text-ui text-ink outline-none focus:border-brand-ring focus:shadow-focus-ring"
+        />
+      ),
+    },
+    {
+      headerName: 'Unit',
+      field: 'unit',
+      minWidth: 140,
+      sortable: true,
+      cellRenderer: (params) => (
+        <select
+          value={params.data.unit || ""}
+          onChange={(e) => onUpdateIngredient(params.node.rowIndex, "unit", e.target.value)}
+          className="w-28 h-7 px-2 rounded-button-sm border border-brand-line bg-surface text-ui text-ink outline-none focus:border-brand-ring focus:shadow-focus-ring"
+        >
+          <option value="">Unit</option>
+          {units.map((u) => (
+            <option key={u} value={u}>{u}</option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      headerName: 'Actions',
+      colId: 'actions',
+      minWidth: 100,
+      sortable: false,
+      filter: false,
+      floatingFilter: false,
+      cellRenderer: (params) => (
+        <div className="flex justify-end w-full">
+          <button
+            onClick={() => onDeleteIngredient(params.node.rowIndex)}
+            className="text-brand-dark hover:underline text-ui font-semibold"
+          >
+            Remove
+          </button>
+        </div>
+      ),
+    },
+  ];
+ 
+
+  
   return (
-    <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
-      <div className="bg-action-primary p-3 grid md:grid-cols-2 lg:grid-cols-3 rounded-xl gap-4 mb-2">
+    <div className="ui-panel !p-0 overflow-hidden">
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 p-panel border-b border-line-divider bg-brand-tint">
         <div className="lg:col-span-2">
-          <label className="block text-sm font-medium text-text-white mb-1">Menu Item</label>
+          <label className={LABEL}>Menu Item</label>
           <select
-            className="w-full px-4 py-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+            className={FIELD}
             value={selectedMenuId || ""}
             onChange={(e) => onSelectMenu(e.target.value)}
           >
@@ -1159,86 +1250,41 @@ function RecipeTab({
             ))}
           </select>
         </div>
-
+ 
         <div>
-          <label className="block text-sm font-medium text-text-white mb-1">Ingredients</label>
-          <div className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-lg font-medium text-gray-900">
+          <label className={LABEL}>Ingredients</label>
+          <div className="h-control px-item flex items-center rounded-button-sm border border-brand-line bg-surface text-body font-bold text-brand-dark">
             {recipe.length}
           </div>
         </div>
       </div>
-
+ 
+      <div className="p-panel">
       {selectedMenuId ? (
         <>
-          <div className="overflow-x-auto rounded-lg border-default border-border-default mb-6">
-            <table className="w-full min-w-[500px] divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ingredient</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-bg-primary divide-y divide-gray-200">
-                {recipe.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-gray-500">No ingredients added yet</td>
-                  </tr>
-                ) : (
-                  recipe.map((ing, index) => {
-                    const stockItem = stocks.find((s) => Number(s.id) === Number(ing.stock_item_id));
-                    return (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 font-medium text-gray-900">
-                          {stockItem?.name || `Item #${ing.stock_item_id}`}
-                        </td>
-                        <td className="px-6 py-4">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={ing.quantity_required}
-                            onChange={(e) => onUpdateIngredient(index, "quantity_required", e.target.value)}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
-                          />
-                        </td>
-                        <td className="px-6 py-4">
-                          <select
-                            value={ing.unit || ""}
-                            onChange={(e) => onUpdateIngredient(index, "unit", e.target.value)}
-                            className="w-28 px-2 py-1 border border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500"
-                          >
-                            <option value="">Unit</option>
-                            {units.map((u) => (
-                              <option key={u} value={u}>{u}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => onDeleteIngredient(index)}
-                            className="text-action-primary hover:text-action-primary text-sm font-medium"
-                          >
-                            Remove
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+          <div className="overflow-x-auto mb-item">
+            {recipe.length === 0 ? (
+              <div className="px-6 py-12 text-center text-ink-muted text-ui">No ingredients added yet</div>
+            ) : (
+              <AgGridTable
+                columnDefs={ingredientColumnDefs}
+                rowData={recipe}
+                domLayout="normal"
+                height={400}
+                exportFileName="recipe_ingredients"
+                gridOptions={{ getRowId: (params) => String(params.data.stock_item_id) }}
+              />
+            )}
           </div>
-
-          <div className="bg-gray-50 p-5 rounded-xl border border-gray-100">
-            <h4 className="text-base font-medium text-gray-800 mb-4">Add Ingredient</h4>
+ 
+          <div className="bg-brand-tint p-panel rounded-panel border border-brand-line">
+            <h4 className="text-panel-title text-brand-dark mb-item">Add Ingredient</h4>
             <div className="grid md:grid-cols-4 gap-4 items-end">
               <div>
                 <select
                   value={newIngredient.stock_item_id}
                   onChange={(e) => setNewIngredient((prev) => ({ ...prev, stock_item_id: e.target.value }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  className={FIELD}
                 >
                   <option value="">Select ingredient</option>
                   {stocks.map((s) => (
@@ -1246,7 +1292,7 @@ function RecipeTab({
                   ))}
                 </select>
               </div>
-
+ 
               <div>
                 <input
                   type="number"
@@ -1255,15 +1301,15 @@ function RecipeTab({
                   placeholder="Quantity"
                   value={newIngredient.quantity_required}
                   onChange={(e) => setNewIngredient((prev) => ({ ...prev, quantity_required: e.target.value }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  className={FIELD}
                 />
               </div>
-
+ 
               <div>
                 <select
                   value={newIngredient.unit}
                   onChange={(e) => setNewIngredient((prev) => ({ ...prev, unit: e.target.value }))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                  className={FIELD}
                 >
                   <option value="">Select unit</option>
                   {units.map((u) => (
@@ -1271,17 +1317,17 @@ function RecipeTab({
                   ))}
                 </select>
               </div>
-
+ 
               <div className="flex gap-3">
                 <button
                   onClick={onAddIngredient}
-                  className="flex-1 py-2 px-4 bg-action-primary hover:bg-action-primary text-text-white rounded-lg transition-colors"
+                  className="ui-btn ui-btn-add flex-1"
                 >
                   Add
                 </button>
                 <button
                   onClick={() => setNewIngredient({ stock_item_id: "", quantity_required: "", unit: "" })}
-                  className="flex-1 py-2 px-4 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
+                  className="ui-btn flex-1"
                 >
                   Clear
                 </button>
@@ -1290,15 +1336,16 @@ function RecipeTab({
           </div>
         </>
       ) : (
-        <div className="py-16 text-center text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+        <div className="py-16 text-center text-ink-muted text-ui bg-canvas rounded-panel border border-dashed border-line-strong">
           Select a menu item to manage its recipe
         </div>
       )}
+      </div>
     </div>
   );
 }
 
-function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCategories, units }) {
+function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, onAddQty, onDeduct, allCategories, units, searchQuery, onSearchChange }) {
   const [editingItem, setEditingItem] = useState(null);
   const [editForm, setEditForm] = useState({ availability: "", unit: "" });
 
@@ -1328,117 +1375,148 @@ function MenuAvailabilityTab({ menuItems, loading, onUpdateAvailability, allCate
     return category?.name || categoryId;
   };
 
-  return (
-    <div className="bg-bg-primary rounded-xl shadow border border-gray-100">
-      <div className="bg-action-primary p-5 border-b border-gray-100">
-        <h2 className="text-lg font-semibold text-text-white">Menu Availability</h2>
-        <p className="text-sm text-text-white mt-1">Manage availability and units for menu items</p>
-      </div>
+  const [sortBy, setSortBy] = useState("name_asc");
 
+  const filteredItems = useMemo(() => {
+    let result = menuItems;
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((item) =>
+        `${item.name} ${item.description || ""} ${getCategoryName(item.category_id)}`
+          .toLowerCase()
+          .includes(q)
+      );
+    }
+
+    return result;
+  }, [menuItems, searchQuery, allCategories]);
+
+  const menuColumnDefs = [
+    {
+      headerName: 'Menu Item',
+      field: 'name',
+      minWidth: 220,
+      sortable: true,
+      cellRenderer: (params) => (
+        <div>
+          <div className="font-bold text-ink text-ui">{params.data.name}</div>
+          {params.data.description && (
+            <div className="text-ui-sm text-ink-muted">{params.data.description}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      headerName: 'Category',
+      colId: 'category',
+      minWidth: 150,
+      sortable: true,
+      valueGetter: (params) => getCategoryName(params.data?.category_id),
+      cellRenderer: (params) => <span className="text-ui text-ink-soft">{params.value}</span>,
+    },
+    {
+      headerName: 'Availability',
+      field: 'availability',
+      minWidth: 140,
+      sortable: true,
+      cellRenderer: (params) =>
+        editingItem === params.data.id ? (
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={editForm.availability}
+            onChange={(e) => setEditForm((prev) => ({ ...prev, availability: e.target.value }))}
+            className="w-24 h-7 px-2 rounded-button-sm border border-brand-line bg-surface text-ui text-ink outline-none focus:border-brand-ring focus:shadow-focus-ring"
+            placeholder="0"
+          />
+        ) : (
+          <span className="text-ui text-ink-soft">{params.value || "—"}</span>
+        ),
+    },
+    {
+      headerName: 'Unit',
+      field: 'unit',
+      minWidth: 140,
+      sortable: true,
+      cellRenderer: (params) =>
+        editingItem === params.data.id ? (
+          <select
+            value={editForm.unit}
+            onChange={(e) => setEditForm((prev) => ({ ...prev, unit: e.target.value }))}
+            className="w-28 h-7 px-2 rounded-button-sm border border-brand-line bg-surface text-ui text-ink outline-none focus:border-brand-ring focus:shadow-focus-ring"
+          >
+            <option value="">Select unit</option>
+            {units.map((u) => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-ui text-ink-soft">{params.value || "—"}</span>
+        ),
+    },
+    {
+      headerName: 'Actions',
+      colId: 'actions',
+      minWidth: 260,
+      sortable: false,
+      filter: false,
+      floatingFilter: false,
+      cellRenderer: (params) =>
+        editingItem === params.data.id ? (
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button
+              onClick={() => handleSave(params.data.id)}
+              className="ui-btn ui-btn-add !h-7"
+            >
+              Save
+            </button>
+            <button
+              onClick={handleCancel}
+              className="ui-btn !h-7"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-end gap-2 w-full">
+            <button
+              onClick={() => onAddQty(params.data)}
+              className="ui-btn ui-btn-update !h-7"
+            >
+              + Add Qty
+            </button>
+            <button
+              onClick={() => onDeduct(params.data)}
+              className="ui-btn ui-btn-delete !h-7"
+            >
+              Deduct
+            </button>
+          </div>
+        ),
+    },
+  ];
+  
+  return (
+    <div className="ui-panel !p-0 overflow-hidden">
+ 
       {loading ? (
-        <div className="px-6 py-12 text-center text-gray-500">Loading menu items...</div>
-      ) : menuItems.length === 0 ? (
-        <div className="px-6 py-12 text-center text-gray-500">No menu items found</div>
+        <div className="px-6 py-12 text-center text-ink-muted text-ui">Loading menu items...</div>
+      ) : filteredItems.length === 0 ? (
+        <div className="px-6 py-12 text-center text-ink-muted text-ui">
+          {searchQuery ? "No menu items match your search" : "No menu items found"}
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border-default border-border-default">
-          <table className="w-full min-w-[700px] divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Menu Item
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Availability
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Unit
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-bg-primary divide-y divide-gray-200">
-              {menuItems.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{item.name}</div>
-                    {item.description && (
-                      <div className="text-sm text-gray-500">{item.description}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {getCategoryName(item.category_id)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingItem === item.id ? (
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={editForm.availability}
-                        onChange={(e) =>
-                          setEditForm((prev) => ({ ...prev, availability: e.target.value }))
-                        }
-                        className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        placeholder="0"
-                      />
-                    ) : (
-                      <span className="text-sm text-gray-900">
-                        {item.availability || "—"}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {editingItem === item.id ? (
-                      <select
-                        value={editForm.unit}
-                        onChange={(e) =>
-                          setEditForm((prev) => ({ ...prev, unit: e.target.value }))
-                        }
-                        className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      >
-                        <option value="">Select unit</option>
-                        {units.map((u) => (
-                          <option key={u} value={u}>{u}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="text-sm text-gray-900">{item.unit || "—"}</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {editingItem === item.id ? (
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => handleSave(item.id)}
-                          className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={handleCancel}
-                          className="px-3 py-1 border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleEdit(item)}
-                        className="text-action-primary hover:text-action-primary mr-4 border gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all"
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="overflow-x-auto">
+          <AgGridTable
+            columnDefs={menuColumnDefs}
+            rowData={filteredItems}
+            domLayout="normal"
+            height={600}
+            exportFileName="menu_availability"
+            gridOptions={{ getRowId: (params) => String(params.data.id) }}
+          />
         </div>
       )}
     </div>
@@ -1468,22 +1546,24 @@ function StockModal({
     }));
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-bg-primary rounded-2xl shadow-2xl max-w-lg w-full p-6">
-        <h3 className="text-xl font-semibold text-gray-900 mb-6">
-          {isEditing ? "Edit Stock Item" : "New Stock Item"}
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+   return (
+    <div className="ui-backdrop font-sans" onMouseDown={onClose}>
+      <div className={`${DIALOG} max-w-lg`} role="dialog" aria-modal="true" aria-label={isEditing ? "Edit stock item" : "New stock item"} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h3 className="text-panel-title text-brand-dark">
+            {isEditing ? "Edit Stock Item" : "New Stock Item"}
+          </h3>
+        </div>
+ 
+        <div className="flex-1 overflow-y-auto px-modal py-card">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Inventory *</label>
+            <label className={LABEL}>Inventory *</label>
             <select
               required
               value={form.inventory_id}
               onChange={(e) => handleInventoryChange(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={FIELD}
             >
               <option value="">Select Inventory</option>
               {inventoryCategories.map((inv) => (
@@ -1491,24 +1571,24 @@ function StockModal({
               ))}
             </select>
           </div>
-
+ 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+            <label className={LABEL}>Name *</label>
             <input
               required
               value={form.name}
               onChange={(e) => onChange((prev) => ({ ...prev, name: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={FIELD}
             />
           </div>
-
+ 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <label className={LABEL}>Category</label>
             <input
               list="categories"
               value={form.category}
               onChange={(e) => onChange((prev) => ({ ...prev, category: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={FIELD}
               placeholder="Auto-filled from inventory"
             />
             <datalist id="categories">
@@ -1516,29 +1596,29 @@ function StockModal({
                 <option key={cat} value={cat} />
               ))}
             </datalist>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-ui-sm text-ink-muted mt-1">
               Defaults to inventory name, can be customized
             </p>
           </div>
-
+ 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Availability</label>
+            <label className={LABEL}>Availability</label>
             <input
               type="number"
               step="0.01"
               min="0"
               value={form.availability}
               onChange={(e) => onChange((prev) => ({ ...prev, availability: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={FIELD}
             />
           </div>
-
+ 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+            <label className={LABEL}>Unit</label>
             <select
               value={form.unit}
               onChange={(e) => onChange((prev) => ({ ...prev, unit: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={FIELD}
             >
               <option value="">Select unit</option>
               {units.map((u) => (
@@ -1546,41 +1626,42 @@ function StockModal({
               ))}
             </select>
           </div>
-
+ 
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Unit Price (₹)</label>
+            <label className={LABEL}>Unit Price (₹)</label>
             <input
               type="number"
               step="0.01"
               min="0"
               value={form.unit_price}
               onChange={(e) => onChange((prev) => ({ ...prev, unit_price: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={FIELD}
             />
           </div>
-
+ 
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className={LABEL}>Description</label>
             <textarea
               value={form.description}
               onChange={(e) => onChange((prev) => ({ ...prev, description: e.target.value }))}
               rows={2}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={AREA}
             />
           </div>
         </div>
-
-        <div className="mt-8 flex justify-end gap-4">
+        </div>
+ 
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={onSave}
-            className="px-6 py-2.5 bg-action-primary text-text-white rounded-lg transition-colors"
+            className="ui-btn ui-btn-add"
           >
             {isEditing ? "Update" : "Create"}
           </button>
@@ -1593,32 +1674,33 @@ function StockModal({
 function InventoryModal({ isOpen, form, onChange, onSave, onClose }) {
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-bg-primary rounded-2xl shadow-2xl max-w-lg w-full p-6">
-        <h3 className="text-xl font-semibold text-gray-900 mb-6">
-          Add Inventory Category
-        </h3>
-
-        <div className="space-y-5">
+   return (
+    <div className="ui-backdrop font-sans" onMouseDown={onClose}>
+      <div className={`${DIALOG} max-w-lg`} role="dialog" aria-modal="true" aria-label="Add inventory category" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-item px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h3 className="text-panel-title text-brand-dark">
+            Add Inventory Category
+          </h3>
+        </div>
+ 
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className={LABEL}>
               Category ID (optional)
             </label>
             <input
               value={form.id}
               onChange={(e) => onChange((prev) => ({ ...prev, id: e.target.value }))}
               placeholder="Auto-generated if left empty"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={FIELD}
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-ui-sm text-ink-muted mt-1">
               If empty, will use lowercase name with underscores
             </p>
           </div>
-
+ 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className={LABEL}>
               Category Name *
             </label>
             <input
@@ -1626,12 +1708,12 @@ function InventoryModal({ isOpen, form, onChange, onSave, onClose }) {
               value={form.name}
               onChange={(e) => onChange((prev) => ({ ...prev, name: e.target.value }))}
               placeholder="e.g., Beverages, Dairy, etc."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={FIELD}
             />
           </div>
-
+ 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className={LABEL}>
               Description
             </label>
             <textarea
@@ -1639,43 +1721,43 @@ function InventoryModal({ isOpen, form, onChange, onSave, onClose }) {
               onChange={(e) => onChange((prev) => ({ ...prev, description: e.target.value }))}
               rows={3}
               placeholder="Describe this inventory category..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={AREA}
             />
           </div>
-
+ 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className={LABEL}>
               Subcategories (optional)
             </label>
             <input
               value={form.subcategories}
               onChange={(e) => onChange((prev) => ({ ...prev, subcategories: e.target.value }))}
               placeholder="Comma-separated subcategory IDs"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={FIELD}
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-ui-sm text-ink-muted mt-1">
               e.g., soft_drinks,juices,water
             </p>
           </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              <strong>Note:</strong> This will create a subcategory under the existing "inventory" category.
+ 
+          <div className="bg-brand-tint border border-brand-line rounded-panel p-3">
+            <p className="text-ui text-ink-soft">
+              <strong className="text-brand-dark">Note:</strong> This will create a subcategory under the existing "inventory" category.
             </p>
           </div>
         </div>
-
-        <div className="mt-8 flex justify-end gap-4">
+ 
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={onSave}
-            className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+            className="ui-btn ui-btn-add"
           >
             Create Category
           </button>
@@ -1689,53 +1771,54 @@ function InventoryModal({ isOpen, form, onChange, onSave, onClose }) {
 function AddStockModal({ isOpen, form, units, onChange, onSave, onClose }) {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-bg-primary rounded-2xl shadow-2xl max-w-md w-full p-6">
-        <h3 className="text-xl font-semibold text-gray-900 mb-1">Add Stock Quantity</h3>
-        <p className="text-sm text-gray-500 mb-6">
-          Adding stock to: <span className="font-medium text-gray-800">{form.stock_name}</span>
-        </p>
-        <div className="space-y-5">
+    <div className="ui-backdrop font-sans" onMouseDown={onClose}>
+      <div className={`${DIALOG} max-w-md`} role="dialog" aria-modal="true" aria-label="Add stock quantity" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h3 className="text-panel-title text-brand-dark">Add Stock Quantity</h3>
+          <p className="text-micro text-ink-muted mt-0.5">
+            Adding stock to: <span className="font-bold text-ink-soft">{form.stock_name}</span>
+          </p>
+        </div>
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity to Add *</label>
+            <label className={LABEL}>Quantity to Add *</label>
             <input
               type="number" step="0.01" min="0.01" autoFocus
               value={form.quantity}
               onChange={(e) => onChange(prev => ({ ...prev, quantity: e.target.value }))}
               placeholder="e.g. 50"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={FIELD}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+            <label className={LABEL}>Unit</label>
             <select
               value={form.unit}
               onChange={(e) => onChange(prev => ({ ...prev, unit: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={FIELD}
             >
               <option value="">Select unit</option>
               {units.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Remarks (optional)</label>
+            <label className={LABEL}>Remarks (optional)</label>
             <input
               type="text"
               value={form.remarks}
               onChange={(e) => onChange(prev => ({ ...prev, remarks: e.target.value }))}
               placeholder="e.g. Weekly restock, Supplier batch #42"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className={FIELD}
             />
           </div>
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+          <div className="bg-state-reserved-bg border border-state-reserved/30 rounded-panel p-3 text-ui text-ink-soft">
             This records an <strong>IN transaction</strong> and updates the live stock level.
             It will <em>not</em> create a duplicate item.
           </div>
         </div>
-        <div className="mt-8 flex justify-end gap-4">
-          <button type="button" onClick={onClose} className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
-          <button onClick={onSave} className="px-6 py-2.5 bg-action-primary text-text-white rounded-lg transition-colors">Add Stock</button>
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
+          <button type="button" onClick={onClose} className="ui-btn">Cancel</button>
+          <button onClick={onSave} className="ui-btn ui-btn-add">Add Stock</button>
         </div>
       </div>
     </div>
@@ -1745,19 +1828,20 @@ function AddStockModal({ isOpen, form, units, onChange, onSave, onClose }) {
 function DeductStockModal({ isOpen, form, units, onChange, onSave, onClose }) {
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-bg-primary rounded-2xl shadow-2xl max-w-md w-full p-6">
-        <h3 className="text-xl font-semibold text-gray-900 mb-1">Deduct Stock</h3>
-        <p className="text-sm text-gray-500 mb-6">
-          Deducting from:{" "}
-          <span className="font-medium text-gray-800">{form.stock_name}</span>
-        </p>
-
-        <div className="space-y-5">
+   return (
+    <div className="ui-backdrop font-sans" onMouseDown={onClose}>
+      <div className={`${DIALOG} max-w-md`} role="dialog" aria-modal="true" aria-label="Deduct stock" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="px-modal py-item bg-brand-light border-b border-brand-line shrink-0">
+          <h3 className="text-panel-title text-brand-dark">Deduct Stock</h3>
+          <p className="text-micro text-ink-muted mt-0.5">
+            Deducting from:{" "}
+            <span className="font-bold text-ink-soft">{form.stock_name}</span>
+          </p>
+        </div>
+ 
+        <div className="flex-1 overflow-y-auto px-modal py-card space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className={LABEL}>
               Quantity to Deduct *
             </label>
             <input
@@ -1768,16 +1852,16 @@ function DeductStockModal({ isOpen, form, units, onChange, onSave, onClose }) {
               value={form.quantity}
               onChange={(e) => onChange((prev) => ({ ...prev, quantity: e.target.value }))}
               placeholder="e.g. 10"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400"
+              className={FIELD}
             />
           </div>
-
+ 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+            <label className={LABEL}>Unit</label>
             <select
               value={form.unit}
               onChange={(e) => onChange((prev) => ({ ...prev, unit: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400"
+              className={FIELD}
             >
               <option value="">Select unit</option>
               {units.map((u) => (
@@ -1785,23 +1869,23 @@ function DeductStockModal({ isOpen, form, units, onChange, onSave, onClose }) {
               ))}
             </select>
           </div>
-
+ 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className={LABEL}>
               Transaction Type *
             </label>
             <select
               value={form.transaction_type}
               onChange={(e) => onChange((prev) => ({ ...prev, transaction_type: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400"
+              className={FIELD}
             >
               <option value="RETURN">Return</option>
               <option value="CANCELLATION">Cancellation</option>
             </select>
           </div>
-
+ 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className={LABEL}>
               Reason
             </label>
             <input
@@ -1809,27 +1893,27 @@ function DeductStockModal({ isOpen, form, units, onChange, onSave, onClose }) {
               value={form.remarks}
               onChange={(e) => onChange((prev) => ({ ...prev, remarks: e.target.value }))}
               placeholder="e.g. Customer returned item, Order cancelled"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 focus:border-red-400"
+              className={FIELD}
             />
           </div>
-
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+ 
+          <div className="bg-state-occupied-bg border border-state-occupied/30 rounded-panel p-3 text-ui text-state-occupied">
             This records an <strong>OUT transaction</strong> and reduces the live
             stock level. This action cannot be undone automatically.
           </div>
         </div>
-
-        <div className="mt-8 flex justify-end gap-4">
+ 
+        <div className="flex flex-wrap justify-end gap-item-sm px-modal py-item bg-canvas border-t border-line shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="ui-btn"
           >
             Cancel
           </button>
           <button
             onClick={onSave}
-            className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+            className="ui-btn ui-btn-danger"
           >
             Deduct Stock
           </button>

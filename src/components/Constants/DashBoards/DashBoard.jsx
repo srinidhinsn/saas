@@ -1,1228 +1,688 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { RiMoneyRupeeCircleLine } from "react-icons/ri";
-import { FaHamburger } from "react-icons/fa";
-import { PiHamburgerThin } from "react-icons/pi";
-import { MdOutlineSoupKitchen } from "react-icons/md";
-import { TbToolsKitchen3 } from "react-icons/tb";
-import { GoPackageDependents } from "react-icons/go";
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  LineChart, Line, Legend,
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import resolveConfig from "tailwindcss/resolveConfig";
-import tailwindConfig from "../../../../tailwind.config";
+import { menuCache } from '../../utils/Menu-utils/menuCache';
+import { getMenuConfig } from '../../utils/menuConfigResolver';
 
-const fullConfig = resolveConfig(tailwindConfig);
-const ACTION_PRIMARY = fullConfig.theme.colors.action?.primary || "#f97316";
+// ─── Config ───────────────────────────────────────────────────────────────────
+const PURPLE_LIGHT = '#9B62E1';
+const COST_COLOR = '#9B62E1';
+const PROFIT_COLOR = '#E07C49';
+const GST_RATE = 0.05; // used only when an invoice has no GST field
 
-const PIE_COLORS = ["#a855f7", "#f59e0b", "#10b981"];
-const ITEM_COLORS = ["#f97316", "#fb923c", "#fbbf24", "#34d399", "#60a5fa"];
-const DINEIN_COLOR = "#f97316";
-const TAKEAWAY_COLOR = "#8b5cf6";
+// Inventory API (your FastAPI router). Set VITE_API_INVENTORY_SERVICE_URL in .env.
+// If your gateway mounts the router differently, change this one line.
+const INVENTORY_BASE = (clientId) =>
+  `${import.meta.env.VITE_API_INVENTORY_SERVICE_URL}/${clientId}/inventory`;
+// User API (your users router). Set VITE_API_USER_SERVICE_URL in .env.
+// If the module segment differs in your gateway, change this one line.
+const USER_BASE = (clientId) =>
+  `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users`;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MENU_INVENTORY_ID = 'menu';   // menu rows live in the same table; skip them
+const LOW_STOCK_THRESHOLD = 10;     // used when an item has no min_stock / reorder_level
 
-const fmt = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
-const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+const OPEN_STATUSES = ['pending', 'preparing'];
+const DONE_STATUSES = ['served', 'completed', 'paid', 'delivered', 'closed'];
 
-// ─── Section heading ──────────────────────────────────────────────────────────
-function SectionHeading({ label, sub }) {
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const num = (v) => parseFloat(v) || 0;
+const inr = (n) => `₹${Math.round(num(n)).toLocaleString('en-IN')}`;
+const lower = (v) => String(v || '').toLowerCase();
+
+const getStartDate = (filter) => {
+  const now = new Date();
+  switch (filter) {
+    case 'Weekly': return new Date(now.setDate(now.getDate() - 7));
+    case 'Monthly': return new Date(now.setMonth(now.getMonth() - 1));
+    case 'Quarterly': return new Date(now.setMonth(now.getMonth() - 3));
+    case 'Half Yearly': return new Date(now.setMonth(now.getMonth() - 6));
+    case 'Yearly': return new Date(now.setFullYear(now.getFullYear() - 1));
+    default: return new Date(now.setHours(0, 0, 0, 0));
+  }
+};
+
+const normalizeService = (raw) => {
+  const s = lower(raw).replace(/[^a-z]/g, '');
+  if (s.includes('dine')) return 'Dine-in';
+  if (s.includes('walk')) return 'Walk-in';
+  if (s.includes('deliver')) return 'Delivery';
+  if (s.includes('take') || s.includes('pick')) return 'Takeaway';
+  return raw ? String(raw) : '';
+};
+
+const itemQty = (it) => parseInt(it.quantity, 10) || 1;
+const itemName = (it) => it.item_name || it.name || 'Unknown';
+
+// Same unit table as your backend _convert()
+const UNIT_BASE = { g: 1, kg: 1000, ml: 1, litre: 1000, pcs: 1 };
+const UNIT_GROUP = { g: 'w', kg: 'w', ml: 'v', litre: 'v', pcs: 'c' };
+const convertUnit = (qty, from, to) => {
+  const f = String(from || '').trim();
+  const t = String(to || '').trim();
+  if (!f || !t || f === t) return qty;
+  if (!UNIT_BASE[f] || !UNIT_BASE[t] || UNIT_GROUP[f] !== UNIT_GROUP[t]) return qty;
+  return (qty * UNIT_BASE[f]) / UNIT_BASE[t];
+};
+const itemLine = (it) =>
+  num(it.total_price) || num(it.price ?? it.unit_price) * itemQty(it);
+
+const invoiceGst = (inv) => {
+  const total = num(inv.total_amount);
+  const g = inv.tax_amount ?? inv.gst_amount ?? inv.total_tax ?? inv.tax;
+  return g !== undefined && g !== null && g !== ''
+    ? num(g)
+    : total - total / (1 + GST_RATE);
+};
+
+// ─── UI building blocks ───────────────────────────────────────────────────────
+// `fixed` cards keep a constant height; extra rows scroll inside the card
+function Card({ title, count, children, className = '', fixed = false }) {
   return (
-    <div className="flex items-center gap-3 mb-5">
-      <div className="w-1 h-7 rounded-full bg-action-primary shrink-0" />
-      <div>
-        <h2 className="text-[15px] font-bold text-gray-900 leading-tight">{label}</h2>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-      </div>
+    <section
+      className={`ui-panel !mb-0 ${
+        fixed ? 'flex flex-col h-[400px]' : ''
+      } ${className}`}
+    >
+      {title && (
+        <h2 className="text-panel-title text-brand-dark mb-item-sm shrink-0">
+          {title}
+          {count !== undefined && (
+            <span className="ml-1.5 font-normal text-ink-muted">({count})</span>
+          )}
+        </h2>
+      )}
+      {fixed ? <div className="flex-1 min-h-0 overflow-auto">{children}</div> : children}
+    </section>
+  );
+}
+
+function Kpi({ label, value }) {
+  return (
+    <div className="ui-metric">
+      <span className="ui-metric-label">{label}</span>
+      <strong className="ui-metric-value">{value}</strong>
     </div>
   );
 }
 
-// ─── Sales KPI card ───────────────────────────────────────────────────────────
-function SalesKPI({ icon, value, label, sub }) {
+// Shows `limit` rows with "Showing X of Y" + Show all
+function DataTable({ columns, rows, empty = 'No data available', limit = 10, minWidth }) {
+  const [all, setAll] = useState(false);
+  const visible = all ? rows : rows.slice(0, limit);
   return (
-    <div className="relative overflow-hidden bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-3">
-      <div className="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-orange-50 pointer-events-none" />
-      <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-action-primary text-xl relative z-10">
-        {icon}
+    <>
+      <div className="overflow-x-auto">
+        <table className="ui-table" style={minWidth ? { minWidth } : undefined}>
+          <thead>
+            <tr>
+              {columns.map((c) => (
+                <th key={c.key} className={c.right ? 'text-right' : ''}>
+                  {c.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {visible.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length} className="text-center text-ink-muted !py-4">
+                  {empty}
+                </td>
+              </tr>
+            ) : (
+              visible.map((r, i) => (
+                <tr key={i}>
+                  {columns.map((c) => (
+                    <td key={c.key} className={c.right ? 'text-right' : ''}>
+                      {c.render ? c.render(r) : r[c.key]}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
-      <div className="relative z-10">
-        <div className="text-[22px] font-extrabold text-gray-900 leading-none tracking-tight">{value}</div>
-        <div className="text-sm font-medium text-gray-600 mt-1">{label}</div>
-        {sub && <div className="text-xs text-gray-400 mt-0.5">{sub}</div>}
-      </div>
-    </div>
-  );
-}
-
-// ─── Ops stat card ────────────────────────────────────────────────────────────
-function OpsCard({ icon, value, label, bg, color }) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-[20px] shrink-0 ${bg} ${color}`}>
-        {icon}
-      </div>
-      <div>
-        <div className="text-xl font-bold text-gray-900">{value}</div>
-        <div className="text-xs text-gray-500 font-medium">{label}</div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Split KPI card ───────────────────────────────────────────────────────────
-function SplitKPI({ label, dinein, takeaway, icon, sub }) {
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-action-primary text-lg">{icon}</span>
-        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-orange-50 rounded-xl p-3">
-          <div className="text-[11px] font-bold text-orange-500 uppercase tracking-wider mb-1">Dine-in</div>
-          <div className="text-lg font-extrabold text-gray-900">{dinein}</div>
+      {rows.length > limit && (
+        <div className="flex items-center justify-between gap-3 pt-2.5 text-ui text-ink-muted">
+          <span>Showing {visible.length} of {rows.length} rows</span>
+          <button
+            onClick={() => setAll((v) => !v)}
+            className="ui-btn !h-7"
+          >
+            {all ? 'Show less' : `Show all ${rows.length}`}
+          </button>
         </div>
-        <div className="bg-purple-50 rounded-xl p-3">
-          <div className="text-[11px] font-bold text-purple-500 uppercase tracking-wider mb-1">Takeaway</div>
-          <div className="text-lg font-extrabold text-gray-900">{takeaway}</div>
-        </div>
-      </div>
-      {sub && <div className="text-xs text-gray-400 mt-2">{sub}</div>}
-    </div>
+      )}
+    </>
   );
 }
 
-// ─── Tooltip shell ────────────────────────────────────────────────────────────
-function TT({ children }) {
-  return (
-    <div style={{
-      background: "#fff", border: "1px solid #f3f4f6", borderRadius: 12,
-      padding: "8px 12px", fontSize: 12, boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-    }}>
-      {children}
-    </div>
-  );
-}
+const axisTick = { fontSize: 11, fill: '#4B5563' };
+const tooltipStyle = { borderRadius: 9, border: '1px solid #e1d4ee', fontSize: 12, color: '#374151', backgroundColor: '#fff' };
 
-function SalesTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <TT>
-      <p style={{ fontWeight: 600, color: "#374151", marginBottom: 2 }}>{label}</p>
-      <p style={{ color: ACTION_PRIMARY, fontWeight: 700 }}>{fmt(payload[0].value)}</p>
-    </TT>
-  );
-}
-
-function AreaTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <TT>
-      <p style={{ fontWeight: 600, color: "#374151", marginBottom: 2 }}>{label}</p>
-      <p style={{ color: "#8b5cf6", fontWeight: 700 }}>{payload[0].value} orders</p>
-    </TT>
-  );
-}
-
-function SplitLineTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <TT>
-      <p style={{ fontWeight: 600, color: "#374151", marginBottom: 4 }}>{label}</p>
-      {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color, fontWeight: 700, marginBottom: 2 }}>
-          {p.name}: {p.value}
-        </p>
-      ))}
-    </TT>
-  );
-}
-
-function RadarTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-  return (
-    <TT>
-      <p style={{ fontWeight: 600, color: "#374151", marginBottom: 2 }}>{d.fullName}</p>
-      <p style={{ color: ACTION_PRIMARY, fontWeight: 700 }}>{d.orders} orders</p>
-    </TT>
-  );
-}
-
-// ─── Transaction row ───────────────────────────────────────────────────────────
-function TxRow({ tx }) {
-  const isOut = tx.movement_type === "OUT";
-  const typeColors = {
-    ORDER_DEDUCTION: "bg-blue-100 text-blue-700",
-    STOCK_IN: "bg-green-100 text-green-700",
-    ADJUSTMENT: "bg-yellow-100 text-yellow-700",
-    WASTAGE: "bg-red-100 text-red-700",
-    ITEM_CANCELLED: "bg-orange-100 text-orange-700",
-    ORDER_CANCELLED: "bg-red-100 text-red-700",
-    item_cancelled: "bg-orange-100 text-orange-700",
-    wastage: "bg-red-100 text-red-700",
-  };
-  const typeKey = tx.transaction_type || tx.type || "";
-  const colorClass = typeColors[typeKey] || "bg-gray-100 text-gray-600";
-
-  return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
-      <div className={`w-2 h-2 rounded-full shrink-0 ${isOut ? "bg-red-400" : "bg-green-400"}`} />
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-semibold text-gray-800 truncate">
-          {tx.remarks || tx.item_name || typeKey || "Transaction"}
-        </div>
-        <div className="text-[10px] text-gray-400 mt-0.5">
-          {tx.created_at ? new Date(tx.created_at).toLocaleString() : "—"}
-        </div>
-      </div>
-      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${colorClass}`}>
-        {typeKey.replace(/_/g, " ")}
-      </span>
-      <span className={`text-sm font-bold shrink-0 ${isOut ? "text-red-500" : "text-green-600"}`}>
-        {isOut ? "−" : "+"}{Number(tx.quantity || 0).toFixed(1)}
-      </span>
-    </div>
-  );
-}
-
-// ─── Cancellation row ──────────────────────────────────────────────────────────
-function CancelRow({ order }) {
-  return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
-      <div className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-semibold text-gray-800">
-          Order #{order.dinein_order_id || order.id}
-        </div>
-        <div className="text-[10px] text-gray-400 mt-0.5">
-          {order.created_at ? new Date(order.created_at).toLocaleString() : "—"}
-          {order.table_id ? ` · Table ${order.table_id}` : ""}
-        </div>
-      </div>
-      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 shrink-0">
-        Cancelled
-      </span>
-      <span className="text-sm font-bold text-red-500 shrink-0">
-        {fmt(order.total_price || 0)}
-      </span>
-    </div>
-  );
-}
-
-// ─── 2hr Sales card ────────────────────────────────────────────────────────────
-function TwoHrSalesCard({
-  dineinSales,
-  takeawaySales,
-  salesDuration,
-  setSalesDuration
-}) {
-  const total = dineinSales + takeawaySales || 1;
-
-  return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <p className="card-title">Sales Record</p>
-          <p className="card-sub">Revenue based on selected timing</p>
-        </div>
-
-        <select
-          value={salesDuration}
-          onChange={(e) => setSalesDuration(Number(e.target.value))}
-          className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-semibold bg-white outline-none"
-        >
-          <option value={1}>Last 1 Hour</option>
-          <option value={2}>Last 2 Hours</option>
-          <option value={3}>Last 3 Hours</option>
-          <option value={4}>Last 4 Hours</option>
-          <option value={5}>Last 5 Hours</option>
-          <option value={6}>Last 6 Hours</option>
-          <option value={12}>Last 12 Hours</option>
-          <option value={24}>Last 24 Hours</option>
-        </select>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="bg-orange-50 rounded-xl p-4">
-          <div className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">
-            Dine-in
-          </div>
-
-          <div className="text-2xl font-extrabold text-gray-900">
-            {fmt(Math.round(dineinSales))}
-          </div>
-
-          <div className="text-xs text-gray-400 mt-1">
-            {pct(dineinSales, total)}% of total
-          </div>
-
-          <div className="prog-track mt-2">
-            <div
-              className="prog-fill"
-              style={{
-                width: `${pct(dineinSales, total)}%`,
-                background: DINEIN_COLOR
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="bg-purple-50 rounded-xl p-4">
-          <div className="text-[10px] font-bold text-purple-500 uppercase tracking-wider mb-1">
-            Takeaway
-          </div>
-
-          <div className="text-2xl font-extrabold text-gray-900">
-            {fmt(Math.round(takeawaySales))}
-          </div>
-
-          <div className="text-xs text-gray-400 mt-1">
-            {pct(takeawaySales, total)}% of total
-          </div>
-
-          <div className="prog-track mt-2">
-            <div
-              className="prog-fill"
-              style={{
-                width: `${pct(takeawaySales, total)}%`,
-                background: TAKEAWAY_COLOR
-              }}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between text-xs text-gray-500 border-t border-gray-50 pt-3">
-        <span>Total Revenue</span>
-
-        <span className="font-extrabold text-gray-900 text-base">
-          {fmt(Math.round(dineinSales + takeawaySales))}
-        </span>
-      </div>
-    </div>
-  );
-}
-function InventoryInsightRow({ tx }) {
-
-  const type = String(tx.transaction_type || "TRANSACTION");
-
-  // auto-format label from DB value
-  const formattedLabel = type
-    .replace(/_/g, " ")
-    .toLowerCase()
-    .replace(/\b\w/g, c => c.toUpperCase());
-
-  // dynamic color generation
-  const getTypeStyles = (value) => {
-
-    const v = value.toLowerCase();
-
-    if (v.includes("cancel")) {
-      return {
-        bg: "bg-red-100",
-        text: "text-red-700",
-        dot: "bg-red-500",
-      };
-    }
-
-    if (v.includes("wast")) {
-      return {
-        bg: "bg-yellow-100",
-        text: "text-yellow-700",
-        dot: "bg-yellow-500",
-      };
-    }
-
-    if (v.includes("stock") || v.includes("in")) {
-      return {
-        bg: "bg-green-100",
-        text: "text-green-700",
-        dot: "bg-green-500",
-      };
-    }
-
-    if (v.includes("deduction") || v.includes("order")) {
-      return {
-        bg: "bg-blue-100",
-        text: "text-blue-700",
-        dot: "bg-blue-500",
-      };
-    }
-
-    return {
-      bg: "bg-gray-100",
-      text: "text-gray-700",
-      dot: "bg-gray-400",
-    };
-  };
-
-  const styles = getTypeStyles(type);
-
-  return (
-    <div className="flex items-start gap-3 py-3 border-b border-gray-50 last:border-0">
-
-      <div className={`w-2.5 h-2.5 rounded-full mt-2 shrink-0 ${styles.dot}`} />
-
-      <div className="flex-1 min-w-0">
-
-        {/* header */}
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-
-          <div className="flex items-center gap-2 flex-wrap">
-
-            <span
-              className={`text-[10px] font-bold px-2 py-1 rounded-full ${styles.bg} ${styles.text}`}
-            >
-              {formattedLabel}
-            </span>
-
-            <span className="text-[10px] text-gray-400">
-              {tx.created_at
-                ? new Date(tx.created_at).toLocaleString()
-                : "—"}
-            </span>
-
-          </div>
-
-          <div className="text-xs font-bold text-gray-700">
-            {Number(tx.quantity || 0).toFixed(2)}
-            {tx.unit ? ` ${tx.unit}` : ""}
-          </div>
-
-        </div>
-
-        {/* item name */}
-        <div className="mt-1 text-xs font-semibold text-gray-800">
-          {tx.name || "Inventory Item"}
-        </div>
-
-        {/* remarks */}
-        {tx.remarks && (
-          <div className="mt-1 text-[11px] text-gray-500 break-words leading-relaxed">
-            {tx.remarks}
-          </div>
-        )}
-
-      </div>
-    </div>
-  );
-}
 // ─── Main ─────────────────────────────────────────────────────────────────────
 const DashBoardPage = () => {
   const { clientId } = useParams();
-  const token = localStorage.getItem("access_token");
+  const token = localStorage.getItem('access_token');
+  const { takeawayTableRoot } = getMenuConfig(clientId);
 
-  const [timeFilter, setTimeFilter] = useState("Daily");
-  const [totalOrders, setTotalOrders] = useState(0);
-  const [pendingOrders, setPendingOrders] = useState(0);
-  const [totalEarnings, setTotalEarnings] = useState(0);
-  const [preparingOrders, setPreparingOrders] = useState(0);
-  const [servedOrders, setServedOrders] = useState(0);
-  const [chartData, setChartData] = useState([]);
-  const [topItemsData, setTopItemsData] = useState([]);
+  const [timeFilter, setTimeFilter] = useState('Daily');
+  const [orders, setOrders] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [tables, setTables] = useState([]);
+  const [userMap, setUserMap] = useState({});         // user id → username
+  const [inventory, setInventory] = useState(null); // null = not available
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Split dine-in / takeaway state
-  const [dineinOrders, setDineinOrders] = useState(0);
-  const [takeawayOrders, setTakeawayOrders] = useState(0);
-  const [dineinSales, setDineinSales] = useState(0);
-  const [takeawaySales, setTakeawaySales] = useState(0);
-  const [dineinPending, setDineinPending] = useState(0);
-  const [dineinPreparing, setDineinPreparing] = useState(0);
-  const [dineinServed, setDineinServed] = useState(0);
-  const [takeawayPending, setTakeawayPending] = useState(0);
-  const [takeawayPreparing, setTakeawayPreparing] = useState(0);
-  const [takeawayServed, setTakeawayServed] = useState(0);
-  const [splitChartData, setSplitChartData] = useState([]);
-
-  // Insights split
-  const [topDineinItems, setTopDineinItems] = useState([]);
-  const [topTakeawayItems, setTopTakeawayItems] = useState([]);
-
-  // Timed sales
-  const [salesDuration, setSalesDuration] = useState(2);
-
-  const [twoHrDineinSales, setTwoHrDineinSales] = useState(0);
-  const [twoHrTakeawaySales, setTwoHrTakeawaySales] = useState(0);
-  // 2hr sales
-  // const [twoHrDineinSales, setTwoHrDineinSales]     = useState(0);
-  // const [twoHrTakeawaySales, setTwoHrTakeawaySales] = useState(0);
-
-  // Cancellations & transactions
-  const [cancelledOrders, setCancelledOrders] = useState([]);
-  const [inventoryInsights, setInventoryInsights] = useState([]); const [loadingTx, setLoadingTx] = useState(false);
-  const [txTab, setTxTab] = useState("cancellations"); // "cancellations" | "transactions"
-
-  // Takeaway table IDs (loaded once)
-  const [takeawayTableIds, setTakeawayTableIds] = useState(new Set());
-
-  const getStartDate = (filter) => {
-    const now = new Date();
-    switch (filter) {
-      case "Daily": return new Date(now.setHours(0, 0, 0, 0));
-      case "Weekly": return new Date(now.setDate(now.getDate() - 7));
-      case "Monthly": return new Date(now.setMonth(now.getMonth() - 1));
-      case "Quarterly": return new Date(now.setMonth(now.getMonth() - 3));
-      case "Half Yearly": return new Date(now.setMonth(now.getMonth() - 6));
-      case "Yearly": return new Date(now.setFullYear(now.getFullYear() - 1));
-      default: return new Date(now.setHours(0, 0, 0, 0));
-    }
-  };
-
-  // ── Fetch takeaway table IDs ──────────────────────────────────────────────
-  useEffect(() => {
+  // ── Fetch (same endpoints as before) ───────────────────────────────────────
+  const fetchAll = useCallback(async () => {
     if (!clientId || !token) return;
-    const run = async () => {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_TABLE_SERVICE_URL}/${clientId}/tables/read`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const takeawayRoots = (import.meta.env.VITE_EASYFOOD_TAKEAWAY_TABLE_DEFAULT_ROOT || "takeaway")
-          .split(",").map(v => v.trim().toLowerCase()).filter(Boolean);
-        const ids = new Set(
-          (res.data?.data || [])
-            .filter(t => takeawayRoots.some(r => (t.name || "").toLowerCase().startsWith(r)))
-            .map(t => String(t.id))
-        );
-        setTakeawayTableIds(ids);
-      } catch (e) {
-        console.error("Table fetch failed:", e);
-      }
-    };
-    run();
-  }, [clientId, token]);
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+      const [tablesData, ordersRes, billingRes] = await Promise.all([
+        menuCache.fetchTables(clientId, token),
+        axios.get(`${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`, { headers }),
+        axios.get(`${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`, {
+          headers,
+          params: { client_id: clientId },
+        }),
+      ]);
+      setTables(tablesData?.list || []);
+      setOrders(ordersRes.data?.data || []);
+      // Debug: shows which fields the order API returns (remove when done)
+      console.log('Order sample', (ordersRes.data?.data || [])[0]);
+      setInvoices(billingRes.data?.data || []);
+      setError('');
 
-  // ── Fetch top ordered items (split dine-in / takeaway) ───────────────────
-  useEffect(() => {
-    if (!clientId) return;
-    const run = async () => {
-      try {
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const allOrders = res.data?.data || [];
-        const dineinCounts = {};
-        const takeawayCounts = {};
+      if (import.meta.env.VITE_API_INVENTORY_SERVICE_URL) {
+        const base = INVENTORY_BASE(clientId);
 
-        allOrders.forEach(order => {
-          const isTakeaway = takeawayTableIds.has(String(order.table_id));
-          const counts = isTakeaway ? takeawayCounts : dineinCounts;
-          (order.items || []).forEach(item => {
-            const name = item.item_name || item.name || item.itemName || "Unknown";
-            const qty = parseInt(item.quantity, 10) || 1;
-            counts[name] = (counts[name] || 0) + qty;
+        // GET /read — same operation your Inventory page already has access to.
+        // Returns stock rows (availability, unit, unit_cost) and menu rows (recipe).
+        try {
+          const invRes = await axios.get(`${base}/read`, {
+            headers,
+            params: { client_id: clientId },
           });
-        });
-
-        const sortTop5 = (counts) =>
-          Object.entries(counts)
-            .map(([itemName, orders]) => ({ itemName, orders }))
-            .sort((a, b) => b.orders - a.orders)
-            .slice(0, 5);
-
-        setTopDineinItems(sortTop5(dineinCounts));
-        setTopTakeawayItems(sortTop5(takeawayCounts));
-
-        // combined for existing topItemsData
-        const combined = {};
-        [...Object.entries(dineinCounts), ...Object.entries(takeawayCounts)].forEach(([k, v]) => {
-          combined[k] = (combined[k] || 0) + v;
-        });
-        setTopItemsData(sortTop5(combined));
-      } catch (e) {
-        console.error("Top items fetch failed:", e);
-      }
-    };
-    run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clientId, takeawayTableIds]);
-
-  // ── Fetch stats + chart data ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!token || !clientId) return;
-    const run = async () => {
-      try {
-        const [ordersRes, billingRes] = await Promise.all([
-          axios.get(
-            `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          ),
-          axios.get(
-            `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/read_document`,
-            { headers: { Authorization: `Bearer ${token}` }, params: { client_id: clientId } }
-          ),
-        ]);
-
-        const allOrders = ordersRes.data?.data || [];
-        const allInvoices = billingRes.data?.data || [];
-        const startDate = getStartDate(timeFilter);
-
-        const filteredOrders = allOrders.filter(o => new Date(o.created_at) >= startDate);
-        const filteredInvoices = allInvoices.filter(inv =>
-          new Date(inv.document_date || inv.created_at) >= startDate
-        );
-
-        // ── Split dine-in vs takeaway ──────────────────────────────────────
-        const isDinein = (o) => !takeawayTableIds.has(String(o.table_id));
-        const isTakeaway = (o) => takeawayTableIds.has(String(o.table_id));
-
-        const dineinFiltered = filteredOrders.filter(isDinein);
-        const takeawayFiltered = filteredOrders.filter(isTakeaway);
-
-        setDineinOrders(dineinFiltered.length);
-        setTakeawayOrders(takeawayFiltered.length);
-
-        // Cancelled orders for records section
-        const cancelledFiltered = allOrders.filter(o =>
-          o.status?.toLowerCase() === "cancelled" &&
-          new Date(o.created_at) >= startDate
-        );
-        setCancelledOrders(cancelledFiltered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
-
-        // Ops stats split
-        setDineinPending(dineinFiltered.filter(o => o.status === "pending").length);
-        setDineinPreparing(dineinFiltered.filter(o => o.status === "preparing").length);
-        setDineinServed(dineinFiltered.filter(o => o.status === "served").length);
-        setTakeawayPending(takeawayFiltered.filter(o => o.status === "pending").length);
-        setTakeawayPreparing(takeawayFiltered.filter(o => o.status === "preparing").length);
-        setTakeawayServed(takeawayFiltered.filter(o => o.status === "served").length);
-
-        // Sales from invoices
-        const earnings = filteredInvoices
-          .filter(inv =>
-            inv.payment_status?.toLowerCase() === "paid" ||
-            inv.status?.toLowerCase() === "issued"
-          )
-          .reduce((sum, inv) => sum + (parseFloat(inv.total_amount) || 0), 0);
-
-        // Approximate split by summing order total_price
-        const dSales = dineinFiltered.reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
-        const tSales = takeawayFiltered.reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
-        const splitRatio = (dSales + tSales) > 0 ? dSales / (dSales + tSales) : 0.5;
-        setDineinSales(earnings * splitRatio);
-        setTakeawaySales(earnings * (1 - splitRatio));
-
-        setTotalOrders(filteredOrders.length);
-        setPendingOrders(filteredOrders.filter(o => o.status === "pending").length);
-        setTotalEarnings(Math.round(earnings));
-        setPreparingOrders(filteredOrders.filter(o => o.status === "preparing").length);
-        setServedOrders(filteredOrders.filter(o => o.status === "served").length);
-
-        // ── 2-hour sales ──────────────────────────────────────────────────
-        // ── Timed sales ──────────────────────────────────────────────────
-        const selectedTimeAgo = new Date(Date.now() - salesDuration * 60 * 60 * 1000);
-
-        const twoHrDinein = dineinFiltered
-          .filter(o => new Date(o.created_at) >= selectedTimeAgo)
-          .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
-
-        const twoHrTakeaway = takeawayFiltered
-          .filter(o => new Date(o.created_at) >= selectedTimeAgo)
-          .reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0);
-
-        setTwoHrDineinSales(twoHrDinein);
-        setTwoHrTakeawaySales(twoHrTakeaway);
-
-        // ── Build chart groups ────────────────────────────────────────────
-
-      const groups = {};
-
-      filteredOrders.forEach(order => {
-
-      const d = new Date(order.created_at);
-
-      let key = "";
-      if (timeFilter === "Daily") {
-
-         const hh = String(d.getHours()).padStart(2, "0");
-         const mm = String(d.getMinutes()).padStart(2, "0");
-         key = `${hh}:${mm}`;
+          setInventory(invRes.data?.data || []);
+        } catch (e) {
+          console.error('Inventory fetch failed:', e);
+          setInventory(null);
         }
-      if (!groups[key]) {
-         groups[key] = {
-             date: key,
-             sales: 0,
-             count: 0,
-             dinein: 0,
-             takeaway: 0,
-             sortTime: d.getTime(),
-            };
-          }
-
-        groups[key].sales += parseFloat(order.total_price) || 0;
-        groups[key].count += 1;
-
-      if (isTakeaway(order)) {
-        groups[key].takeaway += 1;
-      } else {
-        groups[key].dinein += 1;
       }
-    });
 
-// proper sorting
-    const sorted = Object.values(groups).sort(
-      (a, b) => a.sortTime - b.sortTime);
-
-    setChartData(sorted);
-    setSplitChartData(sorted);
-  } catch (e) {console.error("Stats fetch failed:", e);
-      }
-    };
-    run();
-  }, [clientId, timeFilter, token, takeawayTableIds, salesDuration]);
-
-  // ── Fetch transactions ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!clientId || !token) return;
-  
-    const run = async () => {
-      setLoadingTx(true);
-  
-      try {
-  
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/table`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        );
-  
-        const orders = res.data?.data || [];
-  
-        const insights = [];
-  
-        orders.forEach(order => {
-  
-          // cancelled orders
-          if (
-            String(order.status || "").toLowerCase() === "cancelled"
-          ) {
-            insights.push({
-              transaction_type: "ORDER_CANCELLED",
-              movement_type: "OUT",
-              quantity: order.total_price || 0,
-              unit: "₹",
-              name: `Order #${order.dinein_order_id || order.id}`,
-              remarks: "Customer cancelled order",
-              created_at: order.created_at,
-            });
-          }
-  
-          // cancelled items
-          (order.items || []).forEach(item => {
-  
-            if (
-              String(item.status || "").toLowerCase() === "cancelled"
-            ) {
-              insights.push({
-                transaction_type: "ITEM_CANCELLED",
-                movement_type: "OUT",
-                quantity: item.quantity || 0,
-                unit: "qty",
-                name: item.item_name,
-                remarks: "Item removed from order",
-                created_at: order.created_at,
-              });
-            }
-  
+      // Usernames for "Employee sales performance"
+      if (import.meta.env.VITE_API_USER_SERVICE_URL) {
+        const ubase = USER_BASE(clientId);
+        const map = {};
+        try {
+          // GET /persons → { persons: [{ id, username, first_name, ... }] }
+          const pr = await axios.get(`${ubase}/persons`, { headers, params: { client_id: clientId } });
+          (pr.data?.data?.persons || []).forEach((p) => {
+            const pid = p.id ?? p.user_id ?? p.person_id;
+            const fullName = [p.first_name, p.last_name].filter(Boolean).join(' ');
+            if (pid) map[String(pid)] = fullName || p.username;
           });
-  
-        });
-  
-        setInventoryInsights(
-          insights.sort(
-            (a, b) =>
-              new Date(b.created_at) - new Date(a.created_at)
-          )
-        );
-  
-      } catch (e) {
-        console.error("Insights fetch failed:", e);
-      } finally {
-        setLoadingTx(false);
+        } catch (e) {
+          console.error('Persons fetch failed:', e);
+        }
+        if (Object.keys(map).length === 0) {
+          try {
+            // GET /users → { users: [{ id, username, ... }] }
+            const ur = await axios.get(`${ubase}/users`, { headers, params: { client_id: clientId } });
+            (ur.data?.data?.users || []).forEach((u) => {
+              if (u.id) map[String(u.id)] = u.username;
+            });
+          } catch (e) {
+            console.error('Users fetch failed:', e);
+          }
+        }
+        setUserMap(map);
       }
-    };
-  
-    run();
-  
+    } catch (e) {
+      console.error('Dashboard fetch failed:', e);
+      setError('Could not load dashboard data.');
+    } finally {
+      setLoading(false);
+    }
   }, [clientId, token]);
 
-  // ── Derived ──────────────────────────────────────────────────────────────
-  const totalActive = preparingOrders + pendingOrders + servedOrders || 1;
-  const dineinActive = dineinPending + dineinPreparing + dineinServed || 1;
-  const takeawayActive = takeawayPending + takeawayPreparing + takeawayServed || 1;
+  useEffect(() => {
+    fetchAll();
+    const id = setInterval(fetchAll, 60000);
+    return () => clearInterval(id);
+  }, [fetchAll]);
 
-  const pieData = [
-    { name: "Preparing", value: preparingOrders },
-    { name: "Pending", value: pendingOrders },
-    { name: "Served", value: servedOrders },
+  // ── Derived data ───────────────────────────────────────────────────────────
+  const takeawayIds = useMemo(() => {
+    const roots = String(takeawayTableRoot || 'takeaway')
+      .split(',').map((v) => v.trim().toLowerCase()).filter(Boolean);
+    return new Set(
+      tables
+        .filter((t) => roots.some((r) => lower(t.name).startsWith(r)))
+        .map((t) => String(t.id))
+    );
+  }, [tables, takeawayTableRoot]);
+
+  const d = useMemo(() => {
+    const start = getStartDate(timeFilter);
+    const inRange = (dt) => new Date(dt) >= start;
+
+    const rangeOrders = orders.filter((o) => inRange(o.created_at) && lower(o.status) !== 'cancelled');
+    const completed = rangeOrders.filter((o) => DONE_STATUSES.includes(lower(o.status)));
+    const open = rangeOrders.filter((o) => OPEN_STATUSES.includes(lower(o.status)));
+
+    const rangeInvoices = invoices.filter((inv) => inRange(inv.document_date || inv.created_at));
+    const validInvoices = rangeInvoices.filter(
+      (inv) => lower(inv.payment_status) === 'paid' || lower(inv.status) === 'issued'
+    );
+    const paidInvoices = rangeInvoices.filter((inv) => lower(inv.payment_status) === 'paid');
+
+    const salesIncl = validInvoices.reduce((s, i) => s + num(i.total_amount), 0);
+    const gst = validInvoices.reduce((s, i) => s + invoiceGst(i), 0);
+    const salesExcl = salesIncl - gst;
+
+    // Estimated inventory cost = Σ sold portions × recipe cost
+    // recipe cost = Σ (quantity_required converted to stock unit × stock unit_cost)
+    const stockById = {};
+    const recipeById = {};
+    (inventory || []).forEach((r) => {
+      if (Array.isArray(r.recipe) && r.recipe.length) recipeById[String(r.id)] = r.recipe;
+      if (lower(r.inventory_id) !== MENU_INVENTORY_ID) stockById[String(r.id)] = r;
+    });
+    const recipeCost = {};
+    const costPerPortion = (menuId) => {
+      const k = String(menuId);
+      if (recipeCost[k] !== undefined) return recipeCost[k];
+      let c = 0;
+      (recipeById[k] || []).forEach((ing) => {
+        const st = stockById[String(ing.stock_item_id)];
+        if (!st) return;
+        c += convertUnit(num(ing.quantity_required), ing.unit, st.unit) * num(st.unit_cost);
+      });
+      recipeCost[k] = c;
+      return c;
+    };
+    const cost = completed.reduce(
+      (s, o) =>
+        s +
+        (o.items || []).reduce((a, it) => {
+          if (lower(it.status) === 'cancelled') return a;
+          const menuId = it.item_id ?? it.menu_item_id ?? it.inventory_id;
+          return a + itemQty(it) * costPerPortion(menuId);
+        }, 0),
+      0
+    );
+    const profit = salesExcl - cost;
+    const margin = salesExcl > 0 ? (profit / salesExcl) * 100 : 0;
+
+    // Plates
+    const platesPrepared = completed.reduce(
+      (s, o) => s + (o.items || []).reduce((a, it) => a + itemQty(it), 0), 0);
+    const platesRemaining = open.reduce(
+      (s, o) => s + (o.items || []).reduce((a, it) => a + itemQty(it), 0), 0);
+
+    // Sales over time (from invoices)
+    const groups = {};
+    validInvoices.forEach((inv) => {
+      const dt = new Date(inv.document_date || inv.created_at);
+      const key =
+        timeFilter === 'Daily'
+          ? `${String(dt.getHours()).padStart(2, '0')}:00`
+          : `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+      if (!groups[key]) groups[key] = { label: key, sales: 0, t: dt.getTime() };
+      groups[key].sales += num(inv.total_amount) - invoiceGst(inv);
+    });
+    const salesOverTime = Object.values(groups)
+      .sort((a, b) => a.t - b.t)
+      .map((g) => ({ ...g, sales: Math.round(g.sales) }));
+
+    // Service type
+    const serviceOf = (o) =>
+      normalizeService(o.order_type || o.service_type || o.type) ||
+      (takeawayIds.has(String(o.table_id)) ? 'Takeaway' : 'Dine-in');
+    const svc = {};
+    completed.forEach((o) => {
+      const k = serviceOf(o);
+      if (!svc[k]) svc[k] = { service: k, orders: 0, sales: 0 };
+      svc[k].orders += 1;
+      svc[k].sales += num(o.total_price);
+    });
+    const services = Object.values(svc).sort((a, b) => b.sales - a.sales);
+
+    // Menu items
+    const items = {};
+    rangeOrders.forEach((o) =>
+      (o.items || []).forEach((it) => {
+        if (lower(it.status) === 'cancelled') return;
+        const n = itemName(it);
+        if (!items[n]) items[n] = { name: n, portions: 0, sales: 0 };
+        items[n].portions += itemQty(it);
+        items[n].sales += itemLine(it);
+      })
+    );
+    const menuItems = Object.values(items).sort((a, b) => b.sales - a.sales).slice(0, 8);
+
+    // Employees
+    const emp = {};
+    completed.forEach((o) => {
+      // order.created_by holds the user id → resolve to username
+      // The person who took the order: created_by (or similar) holds their person/user id
+      const key = [o.created_by, o.handler_id, o.updated_by, o.user_id, o.waiter_id, o.employee_id, o.taken_by]
+        .find((v) => v !== undefined && v !== null && v !== '');
+      const raw = key === undefined ? '' : String(key);
+      const n = !raw
+        ? 'Unassigned'
+        : userMap[raw] ||
+          o.created_by_name ||
+          (UUID_RE.test(raw) ? `User ${raw.slice(0, 8)}` : raw); // may already be a name
+      if (!emp[n]) emp[n] = { name: n, orders: 0, sales: 0 };
+      emp[n].orders += 1;
+      emp[n].sales += num(o.total_price);
+    });
+    const employees = Object.values(emp).sort((a, b) => b.sales - a.sales);
+
+    // Dining area occupancy (live, dine-in tables only)
+    const activeTableIds = new Set(
+      orders
+        .filter((o) => ['pending', 'preparing', 'served'].includes(lower(o.status)))
+        .map((o) => String(o.table_id))
+    );
+    const areas = {};
+    tables
+      .filter((t) => !takeawayIds.has(String(t.id)))
+      .forEach((t) => {
+        const a = t.area || t.area_name || t.section || t.floor || t.location || t.table_group || 'General';
+        if (!areas[a]) areas[a] = { area: a, occupied: 0, vacant: 0 };
+        if (activeTableIds.has(String(t.id))) areas[a].occupied += 1;
+        else areas[a].vacant += 1;
+      });
+    const dining = Object.values(areas).map((a) => ({
+      ...a,
+      coverage: a.occupied + a.vacant ? (a.occupied / (a.occupied + a.vacant)) * 100 : 0,
+    }));
+    const totOcc = dining.reduce((s, a) => s + a.occupied, 0);
+    const totAll = dining.reduce((s, a) => s + a.occupied + a.vacant, 0);
+    const occupancy = totAll ? (totOcc / totAll) * 100 : 0;
+
+    // Items requiring preparation attention
+    const prep = {};
+    open.forEach((o) =>
+      (o.items || []).forEach((it) => {
+        if (lower(it.status) === 'cancelled') return;
+        const n = itemName(it);
+        if (!prep[n]) prep[n] = { name: n, plates: 0, orders: 0, oldest: Infinity };
+        prep[n].plates += itemQty(it);
+        prep[n].orders += 1;
+        prep[n].oldest = Math.min(prep[n].oldest, new Date(o.created_at).getTime());
+      })
+    );
+    const prepItems = Object.values(prep)
+      .map((p) => ({ ...p, waiting: Math.max(0, Math.round((Date.now() - p.oldest) / 60000)) }))
+      .sort((a, b) => b.plates - a.plates);
+
+    return {
+      rangeOrders, completed, open, validInvoices, paidInvoices, rangeInvoices,
+      salesIncl, gst, salesExcl, cost, profit, margin,
+      platesPrepared, platesRemaining, salesOverTime, services, menuItems,
+      employees, dining, occupancy, prepItems,
+    };
+  }, [orders, invoices, tables, takeawayIds, timeFilter, inventory, userMap]);
+
+  // Raw materials needing purchase
+  const lowStock = useMemo(() => {
+    if (!inventory) return [];
+    const seen = new Set(); // same item can repeat per zone
+    return inventory
+      .filter((r) => lower(r.inventory_id) !== MENU_INVENTORY_ID)
+      .filter((r) => {
+        const k = String(r.id);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      })
+      .map((r) => ({
+        name: r.name,
+        onHand: Number(num(r.availability).toFixed(2)),
+        unit: r.unit || '',
+        threshold: num(r.min_stock ?? r.reorder_level ?? r.threshold ?? LOW_STOCK_THRESHOLD),
+      }))
+      .filter((r) => r.onHand <= r.threshold)
+      .sort((a, b) => a.onHand - b.onHand);
+  }, [inventory]);
+
+  const rangeLabel = `${getStartDate(timeFilter).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  })} – Now`;
+
+  const donutData = [
+    { name: 'Estimated inventory cost', value: Math.max(Math.round(d.cost), 0) },
+    { name: 'Estimated gross profit', value: Math.max(Math.round(d.profit), 0) },
   ];
 
-  const radarData = topItemsData.map(it => ({
-    subject: it.itemName.length > 11 ? it.itemName.slice(0, 11) + "…" : it.itemName,
-    fullName: it.itemName,
-    orders: it.orders,
-  }));
-
-  const maxDineinItem = topDineinItems[0]?.orders || 1;
-  const maxTakeawayItem = topTakeawayItems[0]?.orders || 1;
-
-  const filterLabel = {
-    Daily: "today", Weekly: "this week", Monthly: "this month",
-    Quarterly: "this quarter", "Half Yearly": "last 6 months", Yearly: "this year",
-  }[timeFilter] || "";
-// ── Cancellation insights ─────────────────────────────
-const cancellationCount = cancelledOrders.length;
-
-const cancellationRate = totalOrders
-  ? ((cancellationCount / totalOrders) * 100).toFixed(1)
-  : 0;
-
-const cancellationLoss = cancelledOrders.reduce(
-  (sum, o) => sum + (parseFloat(o.total_price) || 0),
-  0
-);
-
-const latestCancellation =
-  cancelledOrders[0]?.dinein_order_id ||
-  cancelledOrders[0]?.id;
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        .dash-root * { font-family: 'Plus Jakarta Sans', sans-serif !important; }
-
-        @keyframes fadeUp {
-          from { opacity:0; transform:translateY(14px); }
-          to   { opacity:1; transform:translateY(0); }
-        }
-        .s1{animation:fadeUp .36s .03s both;}
-        .s2{animation:fadeUp .36s .09s both;}
-        .s3{animation:fadeUp .36s .15s both;}
-        .s4{animation:fadeUp .36s .22s both;}
-        .s5{animation:fadeUp .36s .28s both;}
-
-        .live-dot {
-          display:inline-block; width:7px; height:7px; border-radius:50%;
-          background:#10b981; box-shadow:0 0 0 0 rgba(16,185,129,.5);
-          animation:ring 1.8s ease-out infinite;
-        }
-        @keyframes ring {
-          0%  { box-shadow:0 0 0 0   rgba(16,185,129,.5); }
-          70% { box-shadow:0 0 0 7px rgba(16,185,129,0);  }
-          100%{ box-shadow:0 0 0 0   rgba(16,185,129,0);  }
-        }
-
-        .filter-strip {
-          display:inline-flex; border-radius:999px;
-          border:1px solid #e5e7eb; background:#f9fafb; padding:3px;
-          flex-wrap:wrap; gap:2px;
-        }
-        .filter-strip button {
-          padding:4px 12px; font-size:11px; font-weight:600; cursor:pointer;
-          border:none; border-radius:999px; color:#6b7280;
-          background:transparent; transition:all .15s;
-          white-space:nowrap;
-        }
-        .filter-strip button.active { background:#f97316; color:#fff; }
-
-        .prog-track { height:6px; border-radius:4px; background:#f3f4f6; overflow:hidden; flex:1; }
-        .prog-fill  { height:100%; border-radius:4px; transition:width .5s ease; }
-
-        .card {
-          background:#fff; border-radius:16px;
-          border:1px solid #f3f4f6;
-          box-shadow:0 1px 3px rgba(0,0,0,.05);
-          padding:20px;
-        }
-        .card-title { font-size:13px; font-weight:700; color:#111827; }
-        .card-sub   { font-size:11px; color:#9ca3af; margin-top:2px; margin-bottom:14px; }
-
-        .tab-btn { padding:6px 14px; font-size:12px; font-weight:600; border-radius:999px; border:none; cursor:pointer; transition:all .15s; }
-        .tab-btn.active { background:#f97316; color:#fff; }
-        .tab-btn:not(.active) { background:#f3f4f6; color:#6b7280; }
-        .tab-btn:not(.active):hover { background:#e5e7eb; }
-      `}</style>
-
-      <div className="dash-root bg-gray-50 min-h-[calc(100vh-64px)] p-5 lg:p-7">
-        <div className="max-w-7xl mx-auto space-y-8">
-
-          {/* ── Top bar ─────────────────────────────────────────── */}
-          <div className="s1 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="live-dot" />
-                <span className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Live</span>
-              </div>
-              <h1 className="text-2xl lg:text-3xl font-extrabold text-gray-900 tracking-tight leading-none">
-                Restaurant Dashboard
-              </h1>
-              <p className="text-sm text-gray-400 mt-1">
-                Showing data for&nbsp;
-                <span className="font-semibold text-gray-700">{filterLabel}</span>
-              </p>
+    <div className="ui-page">
+      <div className="mx-auto">
+        {/* Header + filter */}
+        <div className="ui-panel flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-state-vacant opacity-70" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-state-vacant" />
+              </span>
+              <span className="text-micro font-bold uppercase tracking-wider text-state-vacant">Live</span>
             </div>
-
-            <div className="filter-strip">
-              {["Daily", "Weekly", "Monthly", "Quarterly", "Half Yearly", "Yearly"].map(f => (
-                <button key={f} className={timeFilter === f ? "active" : ""} onClick={() => setTimeFilter(f)}>
-                  {f}
-                </button>
-              ))}
-            </div>
+            <h1 className="text-page-title text-brand-dark">
+              Dashboard
+            </h1>
+            <p className="text-ui text-ink-muted mt-1">
+              Showing <span className="font-semibold text-brand-dark">{timeFilter}</span> data · {rangeLabel}
+            </p>
           </div>
 
-          {/* ══════════════════════════════════════════════════
-               SECTION 1 — SALES
-          ══════════════════════════════════════════════════ */}
-          <section className="s2">
-            <SectionHeading label="Sales" sub="Revenue and earnings overview" />
-
-            {/* KPI row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-              <SalesKPI
-                icon={<RiMoneyRupeeCircleLine />}
-                value={fmt(totalEarnings)}
-                label="Total Earnings"
-                sub={`Revenue ${filterLabel}`}
-              />
-              <SalesKPI
-                icon={<FaHamburger />}
-                value={totalOrders}
-                label="Total Orders"
-                sub={`Orders ${filterLabel}`}
-              />
-              {/* Avg Order Value */}
-              <div className="card flex flex-col justify-between gap-3">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Avg Order Value</p>
-                <div>
-                  <div className="text-[22px] font-extrabold text-gray-900 tracking-tight">
-                    {totalOrders ? fmt(Math.round(totalEarnings / totalOrders)) : "₹0"}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-1">Per order</div>
-                </div>
-              </div>
-              {/* Served Rate */}
-              <div className="card flex flex-col justify-between gap-3">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Served Rate</p>
-                <div>
-                  <div className="text-[22px] font-extrabold text-gray-900 tracking-tight">
-                    {pct(servedOrders, totalOrders)}%
-                  </div>
-                  <div className="prog-track mt-2">
-                    <div
-                      className="prog-fill"
-                      style={{ width: `${pct(servedOrders, totalOrders)}%`, background: ACTION_PRIMARY }}
-                    />
-                  </div>
-                </div>
-              </div>
+          {/* Segmented time filter */}
+          <div className="w-full lg:w-auto overflow-x-auto">
+            <div className="ui-tabs">
+              {['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Half Yearly', 'Yearly'].map((f) => {
+                const active = timeFilter === f;
+                return (
+                  <button
+                    key={f}
+                    onClick={() => setTimeFilter(f)}
+                    className={`ui-tab whitespace-nowrap ${active ? 'ui-tab-active' : ''}`}
+                  >
+                    {f}
+                  </button>
+                );
+              })}
             </div>
-
-            {/* Sales charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              {/* Revenue — bar chart */}
-              <div className="card">
-                <p className="card-title">Revenue Trend</p>
-                <p className="card-sub">Sales value {filterLabel}</p>
-                <div style={{ height: 220 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} barSize={26}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
-                      <YAxis
-                        tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false}
-                        tickFormatter={v => v >= 1000 ? `₹${(v / 1000).toFixed(0)}k` : `₹${v}`}
-                      />
-                      <Tooltip content={<SalesTooltip />} cursor={{ fill: "#fff7ed", radius: 6 }} />
-                      <Bar dataKey="sales" fill={ACTION_PRIMARY} radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Order count — smooth area chart */}
-              <div className="card">
-                <p className="card-title">Order Volume</p>
-                <p className="card-sub">Count of orders {filterLabel}</p>
-                <div style={{ height: 220 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
-                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} allowDecimals={false} />
-                      <Tooltip content={<AreaTooltip />} />
-                      <Area
-                        type="monotone" dataKey="count"
-                        stroke="#8b5cf6" strokeWidth={2.5}
-                        fill="url(#areaGrad)"
-                        dot={{ r: 3, fill: "#8b5cf6", strokeWidth: 0 }}
-                        activeDot={{ r: 5, fill: "#8b5cf6" }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* ══════════════════════════════════════════════════
-               SECTION 2 — OPERATIONS  (with dine-in / takeaway split)
-          ══════════════════════════════════════════════════ */}
-          <section className="s3">
-            <SectionHeading label="Operations" sub="Live kitchen and order status — Dine-in vs Takeaway" />
-
-            {/* Split KPI row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
-              <SplitKPI
-                label="Orders"
-                icon={<FaHamburger />}
-                dinein={dineinOrders}
-                takeaway={takeawayOrders}
-                sub={`Total orders ${filterLabel}`}
-              />
-              <SplitKPI
-                label="Revenue (approx)"
-                icon={<RiMoneyRupeeCircleLine />}
-                dinein={fmt(Math.round(dineinSales))}
-                takeaway={fmt(Math.round(takeawaySales))}
-                sub="Based on order totals"
-              />
-              <SplitKPI
-                label="Served"
-                icon={<TbToolsKitchen3 />}
-                dinein={dineinServed}
-                takeaway={takeawayServed}
-                sub="Completed orders"
-              />
-            </div>
-
-            {/* Ops KPI row (overall) */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
-              <OpsCard icon={<MdOutlineSoupKitchen />} value={preparingOrders} label="Total Preparing"
-                bg="bg-purple-50" color="text-purple-500" />
-              <OpsCard icon={<PiHamburgerThin />} value={pendingOrders} label="Total Pending"
-                bg="bg-amber-50" color="text-amber-500" />
-              <OpsCard icon={<TbToolsKitchen3 />} value={servedOrders} label="Total Served"
-                bg="bg-emerald-50" color="text-emerald-500" />
-            </div>
-
-            {/* Ops charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-              {/* Split order volume line chart */}
-              <div className="card">
-                <p className="card-title">Dine-in vs Takeaway Orders</p>
-                <p className="card-sub">Order count split over time</p>
-                <div style={{ height: 220 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={splitChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} allowDecimals={false} />
-                      <Tooltip content={<SplitLineTooltip />} />
-                      <Legend
-                        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-                        formatter={(value) => value === "dinein" ? "Dine-in" : "Takeaway"}
-                      />
-                      <Line type="monotone" dataKey="dinein" stroke={DINEIN_COLOR} strokeWidth={2.5}
-                        dot={{ r: 3, fill: DINEIN_COLOR }} activeDot={{ r: 5 }} name="dinein" />
-                      <Line type="monotone" dataKey="takeaway" stroke={TAKEAWAY_COLOR} strokeWidth={2.5}
-                        dot={{ r: 3, fill: TAKEAWAY_COLOR }} activeDot={{ r: 5 }} name="takeaway" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Side-by-side kitchen load for dine-in and takeaway */}
-              <div className="card">
-                <p className="card-title">Kitchen Load Split</p>
-                <p className="card-sub">Status breakdown — Dine-in & Takeaway</p>
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Dine-in side */}
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
-                      <span className="text-xs font-bold text-orange-600">Dine-in</span>
-                    </div>
-                    <div className="space-y-3">
-                      {[
-                        { label: "Preparing", value: dineinPreparing, color: "#a855f7" },
-                        { label: "Pending", value: dineinPending, color: "#f59e0b" },
-                        { label: "Served", value: dineinServed, color: "#10b981" },
-                      ].map(({ label, value, color }) => (
-                        <div key={label}>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="font-medium text-gray-600">{label}</span>
-                            <span className="font-bold" style={{ color }}>{value} ({pct(value, dineinActive)}%)</span>
-                          </div>
-                          <div className="prog-track">
-                            <div className="prog-fill" style={{ width: `${pct(value, dineinActive)}%`, background: color }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Takeaway side */}
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
-                      <span className="text-xs font-bold text-purple-600">Takeaway</span>
-                    </div>
-                    <div className="space-y-3">
-                      {[
-                        { label: "Preparing", value: takeawayPreparing, color: "#a855f7" },
-                        { label: "Pending", value: takeawayPending, color: "#f59e0b" },
-                        { label: "Served", value: takeawayServed, color: "#10b981" },
-                      ].map(({ label, value, color }) => (
-                        <div key={label}>
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="font-medium text-gray-600">{label}</span>
-                            <span className="font-bold" style={{ color }}>{value} ({pct(value, takeawayActive)}%)</span>
-                          </div>
-                          <div className="prog-track">
-                            <div className="prog-fill" style={{ width: `${pct(value, takeawayActive)}%`, background: color }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pie donut below */}
-                <div className="mt-5 pt-4 border-t border-gray-50">
-                  <p className="text-xs font-bold text-gray-400 mb-2">Overall Status Distribution</p>
-                  <div className="flex items-center gap-4">
-                    <div style={{ height: 110, flex: 1 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={pieData} dataKey="value" nameKey="name"
-                            cx="50%" cy="50%" outerRadius={50} innerRadius={28} strokeWidth={2} stroke="#fff">
-                            {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i]} />)}
-                          </Pie>
-                          <Tooltip formatter={(v, n) => [v, n]}
-                            contentStyle={{ borderRadius: 10, border: "1px solid #f3f4f6", fontSize: 11 }} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="flex flex-col gap-2 shrink-0">
-                      {pieData.map((d, i) => (
-                        <div key={d.name} className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: PIE_COLORS[i] }} />
-                          <span className="text-xs text-gray-500 w-14">{d.name}</span>
-                          <span className="text-xs font-bold text-gray-800">{d.value}</span>
-                          <span className="text-[10px] text-gray-400">({pct(d.value, totalActive)}%)</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* ══════════════════════════════════════════════════
-               SECTION 3 — INSIGHTS  (split dine-in + takeaway top items)
-          ══════════════════════════════════════════════════ */}
-          <section className="s4">
-            <SectionHeading label="Insights" sub="Most ordered items — Dine-in & Takeaway" />
-
-            {/* Split top items */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-
-              {/* Dine-in top items */}
-              <div className="card">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-400" />
-                  <p className="card-title">Dine-in Top Items</p>
-                </div>
-                <p className="card-sub">Top 5 most ordered in dine-in</p>
-                {topDineinItems.length > 0 ? (
-                  <div className="space-y-3 mt-1">
-                    {topDineinItems.map((item, idx) => (
-                      <div key={item.itemName} className="flex items-center gap-3">
-                        <span className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                          style={{ background: ITEM_COLORS[idx] }}>
-                          {idx + 1}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between text-xs mb-1.5">
-                            <span className="font-semibold text-gray-800 truncate pr-2">{item.itemName}</span>
-                            <span className="font-bold shrink-0" style={{ color: ITEM_COLORS[idx] }}>{item.orders}</span>
-                          </div>
-                          <div className="prog-track">
-                            <div className="prog-fill"
-                              style={{ width: `${pct(item.orders, maxDineinItem)}%`, background: ITEM_COLORS[idx] }} />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="h-32 flex items-center justify-center text-sm text-gray-400">No data available</div>
-                )}
-              </div>
-
-              {/* Takeaway top items */}
-              <div className="card">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
-                  <p className="card-title">Takeaway Top Items</p>
-                </div>
-                <p className="card-sub">Top 5 most ordered in takeaway</p>
-                {topTakeawayItems.length > 0 ? (
-                  <div className="space-y-3 mt-1">
-                    {topTakeawayItems.map((item, idx) => (
-                      <div key={item.itemName} className="flex items-center gap-3">
-                        <span className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                          style={{ background: ITEM_COLORS[idx] }}>
-                          {idx + 1}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between text-xs mb-1.5">
-                            <span className="font-semibold text-gray-800 truncate pr-2">{item.itemName}</span>
-                            <span className="font-bold shrink-0" style={{ color: ITEM_COLORS[idx] }}>{item.orders}</span>
-                          </div>
-                          <div className="prog-track">
-                            <div className="prog-fill"
-                              style={{ width: `${pct(item.orders, maxTakeawayItem)}%`, background: ITEM_COLORS[idx] }} />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="h-32 flex items-center justify-center text-sm text-gray-400">No data available</div>
-                )}
-              </div>
-            </div>
-
-            {/* Radar chart (combined) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-
-              {/* 2-hour sales snapshot */}
-              <TwoHrSalesCard dineinSales={twoHrDineinSales} takeawaySales={twoHrTakeawaySales} salesDuration={salesDuration}
-                setSalesDuration={setSalesDuration} />
-                
-            </div>
-          </section>
-
+          </div>
         </div>
+
+        {error && (
+          <div className="mb-stack rounded-button-sm bg-state-occupied-bg border border-state-occupied/30 text-state-occupied text-ui px-4 py-2">{error}</div>
+        )}
+        {loading && <div className="mb-stack text-ui text-ink-muted">Loading dashboard…</div>}
+
+        {/* KPI row */}
+        <div className="ui-metrics">
+          <Kpi label="Orders placed" value={d.open.length} />
+          <Kpi label="Completed orders" value={d.completed.length} />
+          <Kpi label="Sales excluding GST" value={inr(d.salesExcl)} />
+          <Kpi label="GST" value={inr(d.gst)} />
+          <Kpi label="Estimated gross profit" value={inr(d.profit)} />
+          <Kpi label="Gross margin" value={`${d.margin.toFixed(1)}%`} />
+          <Kpi label="Invoices recorded" value={d.rangeInvoices.length} />
+          <Kpi label="Marked-paid invoices value" value={inr(d.paidInvoices.reduce((s, i) => s + num(i.total_amount), 0))} />
+          <Kpi label="Plates prepared" value={d.platesPrepared.toLocaleString('en-IN')} />
+          <Kpi label="Plates remaining" value={d.platesRemaining.toLocaleString('en-IN')} />
+          <Kpi label="Dine-in Occupancy Coverage" value={`${d.occupancy.toFixed(1)}%`} />
+          <Kpi label="Raw materials requiring purchase" value={lowStock.length} />
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-tiles mb-stack">
+          <Card title="Sales over time">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={d.salesOverTime} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="#eee8f5" vertical={false} />
+                  <XAxis dataKey="label" tick={axisTick} />
+                  <YAxis tick={axisTick} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => [inr(v), 'Sales excl. GST']} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: '#374151' }} />
+                  <Line type="monotone" dataKey="sales" name="Sales excl. GST" stroke={PURPLE_LIGHT}
+                    strokeWidth={3} dot={{ r: 3, fill: PURPLE_LIGHT }} activeDot={{ r: 5 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Sales by service type">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={d.services} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="barG" x1="0" y1="1" x2="0" y2="0">
+                      <stop offset="0%" stopColor="#9B62E1" />
+                      <stop offset="100%" stopColor="#7136B7" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="#eee8f5" vertical={false} />
+                  <XAxis dataKey="service" tick={axisTick} />
+                  <YAxis tick={axisTick} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => [inr(v), 'Sales incl. GST']} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: '#374151' }} />
+                  <Bar dataKey="sales" name="Sales incl. GST" fill="url(#barG)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Sales value breakdown" className="lg:col-span-2 xl:col-span-1">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={donutData} dataKey="value" nameKey="name" innerRadius="35%" outerRadius="70%"
+                    paddingAngle={2} stroke="#fff" strokeWidth={2}>
+                    <Cell fill={COST_COLOR} />
+                    <Cell fill={PROFIT_COLOR} />
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [inr(v), n]} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: '#374151' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </div>
+
+        {/* Tables row 1 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-tiles mb-stack">
+          <Card fixed title="Menu items driving sales" count={d.menuItems.length}>
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Menu item' },
+                { key: 'portions', label: 'Portions' },
+                { key: 'sales', label: 'Sales incl. GST', render: (r) => inr(r.sales) },
+              ]}
+              rows={d.menuItems}
+            />
+          </Card>
+
+          <Card fixed title="Service performance" count={d.services.length}>
+            <DataTable
+              columns={[
+                { key: 'service', label: 'Service type' },
+                { key: 'orders', label: 'Completed orders' },
+                { key: 'sales', label: 'Sales incl. GST', render: (r) => inr(r.sales) },
+              ]}
+              rows={d.services}
+            />
+          </Card>
+
+          <Card fixed title="Dining area occupancy" count={d.dining.length} className="lg:col-span-2 xl:col-span-1">
+            <DataTable
+              columns={[
+                { key: 'area', label: 'Dining area' },
+                { key: 'occupied', label: 'Occupied tables' },
+                { key: 'vacant', label: 'Vacant tables' },
+                { key: 'coverage', label: 'Coverage', render: (r) => `${r.coverage.toFixed(1)}%` },
+              ]}
+              rows={d.dining}
+            />
+          </Card>
+        </div>
+
+        {/* Tables row 2 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-tiles mb-stack">
+          <Card fixed title="Raw-material stock attention" count={lowStock.length}>
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Ingredient' },
+                { key: 'onHand', label: 'On hand' },
+                { key: 'unit', label: 'Unit' },
+                { key: 'cond', label: 'Stock condition', render: (r) => (r.onHand <= 0 ? 'Out of stock' : 'Purchase required') },
+              ]}
+              rows={lowStock}
+              empty={inventory === null
+                ? 'Stock data unavailable (check VITE_API_INVENTORY_SERVICE_URL)'
+                : 'All stock levels are healthy'}
+            />
+          </Card>
+
+          <Card fixed title="Employee sales performance" count={d.employees.length}>
+            <DataTable
+              columns={[
+                { key: 'name', label: 'Employee' },
+                { key: 'orders', label: 'Completed orders' },
+                { key: 'sales', label: 'Sales incl. GST', render: (r) => inr(r.sales) },
+              ]}
+              rows={d.employees}
+              empty="No employee data on orders"
+            />
+          </Card>
+
+          <Card fixed title="Items requiring preparation attention" count={d.prepItems.length} className="lg:col-span-2 xl:col-span-1">
+            <DataTable
+              minWidth={430}
+              columns={[
+                { key: 'name', label: 'Menu item' },
+                { key: 'plates', label: 'Plates remaining' },
+                { key: 'batch', label: 'Plates per batch', render: (r) => r.batch ?? '—' },
+                { key: 'waiting', label: 'Preparation', render: (r) => `${r.waiting} min waiting` },
+              ]}
+              rows={d.prepItems}
+              empty="Nothing waiting in the kitchen"
+            />
+          </Card>
+        </div>
+
+        {/* GST / profit table */}
+        <Card title="Sales, GST and estimated gross profit" count={4}>
+          <DataTable
+            columns={[
+              { key: 'm', label: 'Measure' },
+              { key: 'a', label: 'Amount', render: (r) => inr(r.a) },
+            ]}
+            rows={[
+              { m: 'Sales excluding GST', a: d.salesExcl },
+              { m: 'GST', a: d.gst },
+              { m: 'Estimated inventory cost', a: d.cost },
+              { m: 'Estimated gross profit', a: d.profit },
+            ]}
+          />
+        </Card>
       </div>
-    </>
+    </div>
   );
 };
 
