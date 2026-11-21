@@ -139,7 +139,7 @@ export default function BillingPage_Super_User({  token }) {
       field: 'id',
       minWidth: 120,
       cellRenderer: (params) => (
-        <div className="text-sm font-semibold text-text-primary">#{params.value}</div>
+        <div className="text-body-sm font-bold text-brand-dark">#{params.value}</div>
       ),
     },
     {
@@ -149,8 +149,8 @@ export default function BillingPage_Super_User({  token }) {
       valueGetter: (params) => tablesMap[params.data?.table_id]?.name || `Table ${params.data?.table_id}`,
       cellRenderer: (params) => (
         <div>
-          <div className="text-sm font-medium text-text-primary">{params.value}</div>
-          <div className="text-xs text-text-secondary">{params.data?.mode || "Dine-In"}</div>
+          <div className="text-body-sm font-semibold text-ink">{params.value}</div>
+          <div className="text-ui-sm text-ink-muted">{params.data?.mode || "Dine-In"}</div>
         </div>
       ),
     },
@@ -167,7 +167,7 @@ export default function BillingPage_Super_User({  token }) {
       valueGetter: (params) => Number(params.data?.total_price ?? 0),
       valueFormatter: (params) => `₹${(params.value || 0).toFixed(2)}`,
       cellRenderer: (params) => (
-        <div className="text-sm font-bold text-action-primary">₹{Number(params.value || 0).toFixed(2)}</div>
+        <div className="text-body-sm font-bold text-brand-dark">₹{Number(params.value || 0).toFixed(2)}</div>
       ),
     },
     {
@@ -181,9 +181,9 @@ export default function BillingPage_Super_User({  token }) {
         <div className="flex items-center justify-center w-full">
           <button
             onClick={() => handleSelectOrder(params.data)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-action-primary hover:bg-action-primary/90 text-text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+            className="ui-btn ui-btn-primary !h-7 gap-1.5"
           >
-            <Eye size={16} />
+            <Eye size={14} />
             View
           </button>
         </div>
@@ -192,41 +192,42 @@ export default function BillingPage_Super_User({  token }) {
   ];
 
   return (
-    <div className="min-h-screen bg-bg-primary p-4 md:p-6">
+    <div className="min-h-screen bg-canvas p-4 md:p-6">
       <div className="max-w-[1800px] mx-auto">
 
         {/* Header */}
-        <div className="bg-action-primary rounded-2xl shadow-xl px-6 py-5 mb-6">
+        <div className="ui-panel !p-4">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-text-white font-bold text-2xl shadow-md border border-white/30">
+              <div className="w-11 h-11 rounded-panel flex items-center justify-center flex-shrink-0
+                              bg-brand-soft text-brand-dark border border-brand-line text-page-title font-bold">
                 {clientId.charAt(0).toUpperCase()}
               </div>
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-text-white">{clientId.toUpperCase()}</h1>
-                <div className="text-lg font-bold text-text-white/80">{filteredOrders.length} orders found</div>
+                <h1 className="text-page-title text-brand-dark">{clientId.toUpperCase()}</h1>
+                <div className="text-ui font-semibold text-ink-muted">{filteredOrders.length} orders found</div>
               </div>
             </div>
-            <div className="flex-1">
+            <div className="flex-1 w-full md:w-auto">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={20} />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" size={14} />
                 <input
                   type="text"
                   placeholder="Search by table name or order ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-border-default rounded-lg bg-bg-primary text-text-primary placeholder-text-secondary focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
+                  className="ui-input"
                 />
               </div>
             </div>
-            <div className="md:w-64">
+            <div className="w-full md:w-64">
               <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={20} />
+                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" size={14} />
                 <input
                   type="date"
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-border-default rounded-lg bg-bg-primary text-text-primary focus:ring-2 focus:ring-action-primary focus:border-action-primary transition-all"
+                  className="ui-input"
                 />
               </div>
             </div>
@@ -236,17 +237,17 @@ export default function BillingPage_Super_User({  token }) {
         {/* Orders Table */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-16 h-16 border-4 border-action-primary/30 border-t-action-primary rounded-full animate-spin"></div>
-            <p className="text-text-secondary text-sm mt-4">Loading orders...</p>
+            <div className="h-11 w-11 border-4 border-brand-soft border-t-brand rounded-full animate-spin-slow"></div>
+            <p className="text-ink-muted text-ui mt-4">Loading orders...</p>
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center bg-bg-primary rounded-2xl shadow-lg border border-border-default">
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-surface rounded-panel shadow-panel border border-line border-t-panel border-t-line-panel">
             <div className="text-7xl mb-4">📭</div>
-            <p className="text-xl font-bold text-text-primary mb-2">No Orders Found</p>
-            <p className="text-text-secondary">Try adjusting your filters or search query</p>
+            <p className="text-panel-title text-brand-dark mb-1">No Orders Found</p>
+            <p className="ui-hint !mt-0">Try adjusting your filters or search query</p>
           </div>
         ) : (
-          <div className="bg-bg-primary rounded-xl shadow-lg border border-border-default overflow-hidden">
+          <div className="bg-surface rounded-panel shadow-panel border border-line border-t-panel border-t-line-panel overflow-hidden">
             <div className="overflow-x-auto">
               <AgGridTable
                 columnDefs={billingColumnDefs}
