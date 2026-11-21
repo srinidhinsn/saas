@@ -54,10 +54,12 @@ const LoginWrapper = ({ onLoginSuccess }) => {
 const NavigateAfterLogin = ({ authState }) => {
   const { clientId } = useParams();
   const finalClientId = clientId || authState.clientId || 'easyfood';
-  const specialRoute = screenRouteMap[authState.screenId];
+  let isSuperUser = false;
+  try { isSuperUser = jwtDecode(authState.token).realm === 'super_user'; } catch {}
+  const specialRoute = isSuperUser ? 'super-user-data' : screenRouteMap[authState.screenId];
   const visibleNav = getVisibleNav(authState.token);
   const firstAllowedTab = visibleNav[0] || 'home';
-  const route = specialRoute || firstAllowedTab;
+  const route = specialRoute || visibleNav[0] || 'home';
   return <Navigate to={`/saas/${finalClientId}/${route}`} replace />;
 };
 

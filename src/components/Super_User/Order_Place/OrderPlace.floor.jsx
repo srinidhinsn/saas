@@ -5,13 +5,23 @@ import { Check, Clock, Package, Trash2, Eye, Lock, Printer } from 'lucide-react'
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
+// clickable / viewable drive behaviour only — colours now come from the theme tokens
 const TABLE_STATUS_CONFIG = {
-    vacant: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-action-success' },
-    available: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-green-100 text-green-700' },
-    occupied: { clickable: false, bg: 'bg-action-primary', border: 'border-action-primary', badge: 'bg-red-100 text-action-primary', viewable: true },
-    served: { clickable: false, bg: 'bg-blue-50', border: 'border-blue-400', badge: 'bg-blue-100 text-blue-700', viewable: true },
-    reserved: { clickable: false, bg: 'bg-yellow-50', border: 'border-yellow-400', badge: 'bg-yellow-100 text-yellow-700' },
-    cancelled: { clickable: true, bg: 'bg-action-success', border: 'border-border-default', badge: 'bg-gray-100 text-gray-500' },
+    vacant: { clickable: true },
+    available: { clickable: true },
+    occupied: { clickable: false, viewable: true },
+    served: { clickable: false, viewable: true },
+    reserved: { clickable: false },
+    cancelled: { clickable: true },
+};
+
+// Order-status colours — same map as the Order floor / KDS (status-* tokens)
+const ORDER_STATUS_BAR = {
+    pending: { bar: 'border-t-status-pending', dot: 'bg-status-pending' },
+    preparing: { bar: 'border-t-status-preparing', dot: 'bg-status-preparing' },
+    ready: { bar: 'border-t-status-ready', dot: 'bg-status-ready' },
+    served: { bar: 'border-t-status-served', dot: 'bg-status-served' },
+    cancelled: { bar: 'border-t-line-strong', dot: 'bg-ink-faint' },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,105 +88,112 @@ export const TableReservation = ({
         return `${d} days ago`;
     };
 
-    const getOrderStatusStyle = (status) => {
-        const map = {
-            pending: 'bg-orange-100 text-orange-700',
-            preparing: 'bg-blue-100 text-blue-700',
-            ready: 'bg-green-100 text-green-700',
-            served: 'bg-purple-100 text-purple-700',
-            cancelled: 'bg-gray-100 text-gray-500',
-        };
-        return map[status] || 'bg-gray-100 text-gray-700';
-    };
+    const modeBtn = (active) => `ui-tab inline-flex items-center gap-1 ${active ? 'ui-tab-active' : ''}`;
+    const isSuperUser = screenIds?.includes('super_user_v1');
 
     return (
-        <div className="p-4 bg-bg-primary overflow-y-auto h-[calc(100vh-4rem)]">
+        <div className="ui-page !min-h-0 h-[calc(100vh-4rem)] overflow-y-auto">
 
             {/* ── Filter bar ── */}
-            {!screenIds?.includes('super_user_v1') && (
-                <div className="mb-3 sticky top-0 z-10 bg-bg-primary">
-                    <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-border-default bg-bg-tertiary">
-                        <div className="flex flex-wrap items-center gap-2 p-2 rounded-xl">
+            {!isSuperUser && (
+                <section className="ui-panel sticky top-0 z-10">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="ui-tabs" role="group" aria-label="Filter by section">
                             <button
+                                type="button"
+                                aria-pressed={selectedSections.length === 0 && selectedZones.length === 0}
                                 onClick={() => { setSelectedSections([]); setSelectedZones([]); }}
-                                className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                ${selectedSections.length === 0 && selectedZones.length === 0
-                                        ? 'bg-action-primary text-white'
-                                        : 'bg-white text-text-secondary hover:bg-gray-100'}`}
+                                className={`ui-tab ${selectedSections.length === 0 && selectedZones.length === 0 ? 'ui-tab-active' : ''}`}
                             >
                                 All
                             </button>
-                            <div className="w-px bg-border-default mx-1" />
                             {sectionsFromDB.map(sec => (
                                 <button
                                     key={sec}
+                                    type="button"
+                                    aria-pressed={selectedSections.includes(sec)}
                                     onClick={() => toggleFilter(sec, setSelectedSections)}
-                                    className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                  ${selectedSections.includes(sec)
-                                            ? 'bg-action-primary text-white'
-                                            : 'bg-white text-text-secondary hover:bg-gray-100'}`}
+                                    className={`ui-tab ${selectedSections.includes(sec) ? 'ui-tab-active' : ''}`}
                                 >
                                     {sec}
                                 </button>
                             ))}
-                            <div className="w-px bg-border-default mx-1" />
                             {/* {zonesFromDB.map(zone => (
-              <button
-                key={zone}
-                onClick={() => toggleFilter(zone, setSelectedZones)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition
-                  ${selectedZones.includes(zone)
-                    ? 'bg-action-primary text-white'
-                    : 'bg-white text-text-secondary hover:bg-gray-100'}`}
-              >
-                {zone}
-              </button>
-            ))} */}
+                                <button
+                                    key={zone}
+                                    type="button"
+                                    onClick={() => toggleFilter(zone, setSelectedZones)}
+                                    className={`ui-tab ${selectedZones.includes(zone) ? 'ui-tab-active' : ''}`}
+                                >
+                                    {zone}
+                                </button>
+                            ))} */}
+                        </div>
+
+                        {/* Status legend */}
+                        <div className="flex items-center gap-x-3 gap-y-1 text-micro text-ink-muted">
+                            {Object.entries(ORDER_STATUS_BAR).map(([status, s]) => (
+                                <span key={status} className="inline-flex items-center gap-1 capitalize">
+                                    <span className={`h-2 w-2 rounded-badge ${s.dot}`} />
+                                    {status}
+                                </span>
+                            ))}
+                            <span className="inline-flex items-center gap-1">
+                                <span className="h-2 w-2 rounded-badge bg-state-reserved" /> Draft
+                            </span>
                         </div>
 
                         {/* Dine-in / Takeaway toggle */}
-                        <div className="ml-auto flex bg-bg-primary border-2 rounded-full border-action-primary p-1 shadow-sm">
-                            <button
-                                onClick={onSelectDineIn}
-                                className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all
-                ${orderMode === 'dinein'
-                                        ? 'bg-action-primary text-text-white shadow'
-                                        : 'text-text-secondary hover:bg-gray-100'}`}
-                            >
+                        <div className="ui-tabs" role="group" aria-label="Order type">
+                            <button type="button" aria-pressed={orderMode === 'dinein'} onClick={onSelectDineIn} className={modeBtn(orderMode === 'dinein')}>
                                 Dine In
                             </button>
-                            <button
-                                onClick={onSelectTakeaway}
-                                className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all flex items-center gap-1
-                ${orderMode === 'takeaway'
-                                        ? 'bg-orange-500 text-white shadow'
-                                        : 'text-gray-600 hover:bg-gray-100'}`}
-                            >
+                            <button type="button" aria-pressed={orderMode === 'takeaway'} onClick={onSelectTakeaway} className={modeBtn(orderMode === 'takeaway')}>
                                 <Package size={12} /> Takeaway
                             </button>
                         </div>
                     </div>
-                </div>
+                </section>
             )}
-            {/* ── Table grid ── */}
+
+            {/* ── Zones → sections → table cards ── */}
             {orderMode === 'dinein' && visibleZones.map(zone => {
                 const sections = getSectionsByZone(zone);
+                const zoneTables = filteredTables.filter(t => getZone(t) === zone);
+                const isVac = t => ['vacant', 'available'].includes(t.status?.toLowerCase().trim());
+                const vac = zoneTables.filter(isVac).length;
+                const occ = zoneTables.filter(t => t.status?.toLowerCase() === 'occupied').length;
+
                 return (
-                    <div key={zone} className="mb-10">
-                        <h3 className="text-xl font-bold mb-4 text-gray-800">{zone}</h3>
-                        {sections.map(section => (
-                            <div key={section} className="mb-6">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="text-sm font-semibold px-3 py-1 rounded-full bg-gray-200">
-                                        {section}
-                                    </span>
-                                </div>
-                                <div className="grid gap-4 grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-5">
-                                    {filteredTables
-                                        .filter(t => getZone(t) === zone && getSection(t) === section)
-                                        .map(table => {
+                    <section key={zone} className="ui-panel">
+                        {/* Zone header */}
+                        <div className="flex items-center gap-2.5 pb-2.5 mb-3 border-b border-line-divider">
+                            <h3 className="text-panel-title text-brand-dark">{zone}</h3>
+                            <span className="text-micro font-bold px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line">
+                                {zoneTables.length} table{zoneTables.length !== 1 ? 's' : ''}
+                            </span>
+                            <div className="ml-auto hidden sm:flex gap-2.5 text-ui-sm text-ink-muted">
+                                <span><b className="text-ink-soft">{vac}</b> vacant</span>
+                                <span><b className="text-ink-soft">{occ}</b> occupied</span>
+                            </div>
+                        </div>
+
+                        {sections.map(section => {
+                            const sectionTables = zoneTables.filter(t => getSection(t) === section);
+                            return (
+                                <div key={section} className="mb-3.5 last:mb-0">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <h4 className="text-ui font-bold text-ink-soft">{section}</h4>
+                                        <span className="text-micro text-ink-muted">
+                                            {sectionTables.length} table{sectionTables.length !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-tiles gap-tiles">
+                                        {sectionTables.map(table => {
                                             const statusKey = table.status?.toLowerCase();
                                             const config = TABLE_STATUS_CONFIG[statusKey] || TABLE_STATUS_CONFIG.vacant;
+                                            const isVacant = statusKey === 'vacant' || statusKey === 'available';
                                             const orderInfo = tableOrders[table.id];
                                             const hasViewableOrder = (statusKey === 'occupied' || statusKey === 'served') && orderInfo;
                                             const tableHasDraft = draftTableIds.includes(table.id.toString());
@@ -188,6 +205,11 @@ export const TableReservation = ({
 
                                             const invoiceStatus = orderInfo?.invoice_status?.toLowerCase();
                                             const showConfirmPayment = hasViewableOrder && invoiceStatus === 'pending';
+                                            const orderStatus = orderInfo?.status?.toLowerCase();
+                                            const statusCfg = ORDER_STATUS_BAR[orderStatus];
+                                            const bar = hasViewableOrder
+                                                ? (statusCfg?.bar || 'border-t-line-strong')
+                                                : 'border-t-line-strong';
 
                                             const handleCardClick = () => {
                                                 if (config.clickable) onSelectTable(table);
@@ -197,121 +219,121 @@ export const TableReservation = ({
                                             return (
                                                 <div
                                                     key={table.id}
-                                                    className="rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition bg-white"
+                                                    className={`flex flex-col overflow-hidden ui-card ${bar}`}
                                                 >
+                                                    {/* Clickable area: header + body */}
                                                     <div
                                                         onClick={handleCardClick}
                                                         className={config.clickable || hasViewableOrder ? 'cursor-pointer' : ''}
                                                     >
-                                                        {/* Card header */}
-                                                        <div className="flex justify-between items-center px-3 py-2 bg-action-primary text-white">
-                                                            <span className="font-bold text-lg tracking-wide">{table.table_number}</span>
-                                                            {tableHasDraft && !hasViewableOrder && (
-                                                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-yellow-300 text-yellow-900">
-                                                                    DRAFT
-                                                                </span>
-                                                            )}
+                                                        {/* Header: table name + order id / draft */}
+                                                        <div className="flex items-center justify-between gap-2 p-2">
+                                                            <span className="text-body-sm font-bold text-brand-dark break-words">
+                                                                {table.table_number}
+                                                            </span>
+
                                                             {hasViewableOrder && (
-                                                                <>
-                                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${getOrderStatusStyle(orderInfo.status)}`}>
-                                                                        {orderInfo.status?.toUpperCase()}
+                                                                <span className="flex items-center gap-1.5">
+                                                                    <span className="inline-flex items-center gap-1 text-micro font-bold px-2 py-0.5 rounded-badge bg-brand-light text-brand-dark border border-brand-line capitalize">
+                                                                        <span className={`h-1.5 w-1.5 rounded-badge ${statusCfg?.dot || 'bg-line-strong'}`} />
+                                                                        {orderInfo.status}
                                                                     </span>
-                                                                    <span className="text-xl opacity-80 font-bold">
+                                                                    <span className="text-body-sm font-bold text-brand-dark">
                                                                         #{orderInfo.dinein_order_id || orderInfo.id}
                                                                     </span>
-                                                                </>
+                                                                </span>
+                                                            )}
+                                                            {tableHasDraft && !hasViewableOrder && (
+                                                                <span className="ui-chip bg-state-reserved-bg text-state-reserved">Draft</span>
                                                             )}
                                                         </div>
 
-                                                        {/* Card body */}
-                                                        <div
-                                                            className={`p-3 flex items-center justify-between gap-2
-                                ${statusKey === 'occupied' ? 'text-blue-600 bg-blue-50'
-                                                                    : statusKey === 'served' ? 'text-purple-600 bg-purple-50'
-                                                                        : statusKey === 'reserved' ? 'text-yellow-600 bg-yellow-50'
-                                                                            : 'text-green-600 bg-green-50'}`}
-                                                        >
-                                                            {statusKey === 'vacant' && <span className="text-2xl text-green-400">—</span>}
-                                                            {(statusKey === 'occupied' || statusKey === 'served') && <Eye size={22} />}
-                                                            {statusKey === 'reserved' && <Lock size={22} />}
-
-                                                            {hasViewableOrder && (
-                                                                <div className="flex flex-col items-center flex-1">
-                                                                    <span className="text-xs font-bold text-gray-700">
-                                                                        {orderCount} time ordered
-                                                                    </span>
-                                                                    {totalPrice && (
-                                                                        <span className="text-sm font-bold text-action-primary">{totalPrice}</span>
+                                                        {/* Body */}
+                                                        <div className="grid gap-0.5 px-3 pb-2.5 text-ui-sm text-ink-muted min-h-[1.75rem]">
+                                                            {hasViewableOrder ? (
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <span><b className="text-ink-soft">{orderCount} time ordered</b></span>
+                                                                    {elapsedTime && (
+                                                                        <span className="inline-flex items-center gap-1 text-micro font-bold text-ink-muted whitespace-nowrap">
+                                                                            <Clock size={12} className="text-brand" />
+                                                                            {elapsedTime}
+                                                                        </span>
                                                                     )}
                                                                 </div>
-                                                            )}
-
-                                                            {hasViewableOrder && (
-                                                                <div className="flex gap-2">
-                                                                    <button
-                                                                        onClick={e => { e.stopPropagation(); onPrintBill?.(orderInfo.id, table.id); }}
-                                                                        className="text-yellow-600 hover:scale-110 transition-transform"
-                                                                        title="Print Bill"
-                                                                    >
-                                                                        <Printer size={22} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={e => { e.stopPropagation(); onCancelOrder?.(orderInfo.id, table.id); }}
-                                                                        className="text-red-600 hover:scale-110 transition-transform"
-                                                                        title="Cancel Order"
-                                                                    >
-                                                                        <Trash2 size={22} />
-                                                                    </button>
-                                                                </div>
+                                                            ) : statusKey === 'reserved' ? (
+                                                                <span className="inline-flex items-center gap-1.5 text-ui-sm font-semibold text-state-reserved">
+                                                                    <Lock size={14} /> Reserved
+                                                                </span>
+                                                            ) : isVacant ? (
+                                                                <span className="text-heading-sm leading-none text-brand-soft">—</span>
+                                                            ) : (statusKey === 'occupied' || statusKey === 'served') ? (
+                                                                <Eye size={18} className="text-brand" />
+                                                            ) : (
+                                                                <span className="text-heading-sm leading-none text-brand-soft">—</span>
                                                             )}
                                                         </div>
-
-                                                        {/* Elapsed time */}
-                                                        {hasViewableOrder && elapsedTime && (
-                                                            <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100">
-                                                                <div className="flex items-center justify-center gap-1 text-xs font-semibold text-gray-600">
-                                                                    <Clock size={13} className="text-orange-500" />
-                                                                    <span>{elapsedTime}</span>
-                                                                </div>
-                                                            </div>
-                                                        )}
                                                     </div>
 
+                                                    {/* Action strip */}
                                                     {showConfirmPayment && (
                                                         <button
                                                             onClick={e => {
                                                                 e.stopPropagation();
                                                                 onConfirmPayment?.(orderInfo.id, table.id);
                                                             }}
-                                                            className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-1"
+                                                            className="flex items-center justify-center gap-1 w-full py-2 bg-brand text-text-white text-micro font-bold tracking-wide hover:bg-brand-dark transition-colors"
                                                         >
-                                                            <Check size={14} />
-                                                            Confirm Payment
+                                                            <Check size={13} />
+                                                            CONFIRM PAYMENT
                                                         </button>
                                                     )}
 
                                                     {hasViewableOrder && orderInfo.status === 'ready' && !showConfirmPayment && (
                                                         <button
                                                             onClick={e => { e.stopPropagation(); onMarkAsServed?.(orderInfo.id, table.id); }}
-                                                            className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
+                                                            className="w-full py-2 bg-brand text-text-white text-micro font-bold tracking-wide hover:bg-brand-dark transition-colors"
                                                         >
-                                                            Mark as Served
+                                                            MARK AS SERVED
                                                         </button>
+                                                    )}
+
+                                                    {/* Footer: print | total | cancel */}
+                                                    {hasViewableOrder && (
+                                                        <div className="grid grid-cols-3 mt-auto border-t border-line-soft text-micro font-bold tracking-wide">
+                                                            <button
+                                                                className="flex items-center justify-center gap-1 py-2 bg-canvas/40 text-brand-dark hover:bg-brand-light transition-colors"
+                                                                onClick={e => { e.stopPropagation(); onPrintBill?.(orderInfo.id, table.id); }}
+                                                                title="Print Bill"
+                                                            >
+                                                                <Printer size={12} />
+                                                            </button>
+                                                            <span className="flex items-center justify-center py-2 border-l border-line-soft text-ui font-bold text-brand-dark">
+                                                                {totalPrice}
+                                                            </span>
+                                                            <button
+                                                                className="flex items-center justify-center gap-1 py-2 bg-canvas/40 text-brand-dark border-l border-line-soft hover:bg-brand-soft transition-colors"
+                                                                onClick={e => { e.stopPropagation(); onCancelOrder?.(orderInfo.id, table.id); }}
+                                                                title="Cancel Order"
+                                                            >
+                                                                <Trash2 size={12} />
+                                                            </button>
+                                                        </div>
                                                     )}
                                                 </div>
                                             );
                                         })}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            );
+                        })}
+                    </section>
                 );
             })}
 
             {orderMode === 'takeaway' && (
-                <div className="text-center mt-10 text-gray-500 text-sm">
+                <section className="ui-panel text-center py-10 text-ui text-ink-muted">
                     Takeaway selected. Opening menu…
-                </div>
+                </section>
             )}
         </div>
     );

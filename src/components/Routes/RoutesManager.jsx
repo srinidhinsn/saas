@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
@@ -34,10 +34,15 @@ const RoutesManager = ({ token: appToken }) => {
   const [clientId, setClientId] = useState(localStorage.getItem("selected_client_id") || paramClientId);  
   const [token, setToken] = useState(appToken);
   const [role, setRole] = useState(null);
-  const [realm, setRealm] = useState();
   const [screenIds, setScreenIds] = useState([]);
-  const [userId, setUserId] = useState();
   const isSuperAdmin = localStorage.getItem('screen_id') === 'super_admin_v1';
+  const decoded = useMemo(() => {
+    try { return token ? jwtDecode(token) : null; } catch { return null; }
+  }, [token]);
+  
+  const realm = isSuperAdmin ? 'rental' : decoded?.realm;
+  const userId = decoded?.user_id;
+  const landing = realm === 'super_user' ? 'super-user-data' : 'home';
   useEffect(() => {
     setToken(appToken);
   }, [appToken]);
@@ -57,12 +62,9 @@ const RoutesManager = ({ token: appToken }) => {
 
     // Decode token
     try {
-      const decoded = jwtDecode(token);
       const userRole = decoded.roles && decoded.roles[0]; // pick first role
       const subscription = decoded.subscription || [];
       setRole(userRole);
-      setRealm(isSuperAdmin ? 'rental' : decoded.realm);
-      setUserId(decoded.user_id)
 
       // Fetch all screens for this role
       axios
@@ -92,14 +94,9 @@ const RoutesManager = ({ token: appToken }) => {
     {(realm ==='super_user' && <Super_User_Tenant clientId={paramClientId} token={token} />)}
    
     <Routes>
-      <Route
-        path="/"
-        element={<DashBoardPage clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
-      />
-      <Route
-        path="home"
-        element={<DashBoardPage clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
-      />
+      <Route path="/" element={<Navigate to={landing} replace />} />
+      <Route path="home" element={realm === 'super_user'  ? <Navigate to="super-user-data" replace />
+             : <DashBoardPage clientId={clientId} token={token} realm={realm} screenIds={screenIds} />} />
       <Route
         path="analytics"
         element={<AnalyticsPage clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
@@ -187,7 +184,7 @@ const RoutesManager = ({ token: appToken }) => {
         path="super-user-tenant"
         element={<Super_User_Tenant clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}
       />
-      <Route path="*" element={<Navigate to="home" replace />} />
+      <Route path="*" element={<Navigate to={landing} replace />} />
       <Route path='user-profile' element={<UserProfile token={token} clientId={clientId} realm={realm} screenIds={screenIds}/>} />
       <Route path='counter' element={<Counters token={token} clientId={clientId} />} />
     </Routes>

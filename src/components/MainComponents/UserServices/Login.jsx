@@ -59,7 +59,7 @@ export default function LoginPage({ onLoginSuccess ,clientId}) {
 
       const accessToken = data.data.access_token;
       const refreshToken = data.data.refresh_token;
-      const screen_id = data.screen_id || "default_user";
+      const screen_id = data.data?.screen_id || data.screen_id || "default_user";
       const client = data.data.client;
       
       if (onLoginSuccess) {

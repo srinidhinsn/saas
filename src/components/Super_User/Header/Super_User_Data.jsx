@@ -1,6 +1,5 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import axios from "axios";
-import { useTenant } from "../../../context/TenantContext";
 import * as XLSX from "xlsx";
 import Order_Place from "../../Super_User/Order_Place/Order_Place";
 
@@ -15,38 +14,40 @@ const Icon = ({ d, size = 16, className = "" }) => (
 );
 
 const IC = {
-  search:     "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
-  users:      "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
-  export:     "M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 11l5 5m0 0l5-5m-5 5V3",
+  search: "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
+  export: "M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 11l5 5m0 0l5-5m-5 5V3",
   arrowRight: "M5 12h14M12 5l7 7-7 7",
-  chevronD:   "M6 9l6 6 6-6",
-  store:      "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
+  store: "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
+  chevronLeft: "M15 18l-6-6 6-6",
+  chevronRight: "M9 6l6 6-6 6",
 };
 
-/* ─── Export ─────────────────────────────────────────────── */
+const SIDEBAR_W = 256;
+
+/* ─── Export (logic unchanged) ───────────────────────────── */
 const exportToExcel = (clients, realm, activeClientId) => {
   try {
+    const today = new Date().toLocaleDateString();
     const mainSheetData = [
       ["Realm", realm],
       ["Total Tenants", clients.length],
       ["Total Users", clients.reduce((sum, c) => sum + c.users.length, 0)],
-      ["Export Date", new Date().toLocaleDateString()],
+      ["Export Date", today],
       [],
       ["Tenant Name", "Realm", "User Count", "Status", "Users"],
     ];
     clients.forEach((client) => {
-      const status = activeClientId === client.id ? "Active" : "Inactive";
-      const userNames = client.users.map((u) => u.username).join(", ") || "—";
-      mainSheetData.push([client.name, client.realm, client.users.length, status, userNames]);
+      mainSheetData.push([
+        client.name, client.realm, client.users.length,
+        activeClientId === client.id ? "Active" : "Inactive",
+        client.users.map((u) => u.username).join(", ") || "—",
+      ]);
     });
     const ws = XLSX.utils.aoa_to_sheet(mainSheetData);
     ws["!cols"] = [{ wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 40 }];
 
     const usersSheetData = [
-      ["USERS DETAILED REPORT"],
-      ["Realm", realm],
-      ["Report Date", new Date().toLocaleDateString()],
-      [],
+      ["USERS DETAILED REPORT"], ["Realm", realm], ["Report Date", today], [],
       ["Tenant", "Username", "Email", "Role", "Status"],
     ];
     clients.forEach((client) => {
@@ -73,21 +74,11 @@ const exportToExcel = (clients, realm, activeClientId) => {
 };
 
 /* ─── Avatar ─────────────────────────────────────────────── */
-const Avatar = ({ name, size = "md" }) => {
+const Avatar = ({ name }) => {
   const initials = (name || "?").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-  const colors = [
-    "from-orange-400 to-red-500",
-    "from-blue-400 to-indigo-600",
-    "from-emerald-400 to-teal-600",
-    "from-purple-400 to-fuchsia-600",
-    "from-pink-400 to-rose-600",
-    "from-amber-400 to-orange-500",
-    "from-cyan-400 to-blue-500",
-  ];
-  const color = colors[name.charCodeAt(0) % colors.length];
-  const sz = size === "sm" ? "w-7 h-7 text-[10px]" : "w-8 h-8 text-xs";
   return (
-    <div className={`${sz} rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0 bg-gradient-to-br ${color} shadow-sm`}>
+    <div className="w-7 h-7 rounded-button-sm flex items-center justify-center flex-shrink-0
+                    bg-brand-soft text-brand-dark border border-brand-line text-micro font-bold">
       {initials}
     </div>
   );
@@ -102,8 +93,9 @@ const Toast = ({ message, onDone }) => {
   }, [message, onDone]);
   if (!message) return null;
   return (
-    <div className="fixed top-5 right-5 z-50 px-4 py-3 rounded-xl bg-white border border-emerald-200 shadow-xl text-emerald-800 text-sm font-semibold flex items-center gap-2.5 animate-in slide-in-from-top-3 duration-200">
-      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse flex-shrink-0" />
+    <div className="fixed top-5 right-5 z-[1400] flex items-center gap-item px-4 py-3 rounded-panel
+                    bg-brand-light border border-brand-line shadow-soft text-brand-dark text-ui font-bold">
+      <span className="w-dot h-dot rounded-full bg-brand" />
       {message}
     </div>
   );
@@ -111,42 +103,42 @@ const Toast = ({ message, onDone }) => {
 
 /* ─── Skeleton ───────────────────────────────────────────── */
 const SkeletonCard = () => (
-  <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg">
-    <div className="w-8 h-8 rounded-lg bg-gray-200 animate-pulse flex-shrink-0" />
+  <div className="flex items-center gap-item px-2.5 py-2">
+    <div className="w-7 h-7 rounded-button-sm bg-brand-soft animate-pulse flex-shrink-0" />
     <div className="flex-1 space-y-1.5">
-      <div className="h-3 bg-gray-200 rounded animate-pulse w-3/4" />
-      <div className="h-2.5 bg-gray-100 rounded animate-pulse w-1/2" />
+      <div className="h-2.5 rounded bg-brand-soft animate-pulse w-3/4" />
+      <div className="h-2 rounded bg-brand-light animate-pulse w-1/2" />
     </div>
   </div>
 );
 
 /* ═══════════════════════════════════════════════════════════
-   Main Component
+   Super_User_Data — tenant list (left) + POS (right)
 ═══════════════════════════════════════════════════════════ */
 const Super_User_Data = ({ clientId, token, screenIds }) => {
-  const [clients, setClients]           = useState([]);
-  const [loading, setLoading]           = useState(false);
-  const [exporting, setExporting]       = useState(false);
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [selectedRealm, setSelectedRealm] = useState("");
   const [activeClient, setActiveClient] = useState(null);
-  const [toastMsg, setToastMsg]         = useState("");
-  const [searchQuery, setSearchQuery]   = useState("");
-  const [currentPage, setCurrentPage]   = useState(1);
-  const [sidebarOpen, setSidebarOpen]   = useState(true);
+  const [toastMsg, setToastMsg] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const itemsPerPage = 15;
 
-  // ── Sync realm from TenantSwitcher ──
+  /* realm comes from the floating realm tabs (Super_User_Tenant) */
   useEffect(() => {
     const handleRealmChange = () => {
       const r = localStorage.getItem("selected_client_realm");
-      if (r) setSelectedRealm(r);
+      setSelectedRealm(r || "all");
     };
     handleRealmChange();
     window.addEventListener("storage", handleRealmChange);
     return () => window.removeEventListener("storage", handleRealmChange);
   }, []);
 
-  // ── Fetch clients for selected realm ──
+  /* clients of the selected realm */
   useEffect(() => {
     if (!selectedRealm) return;
     const load = async () => {
@@ -154,11 +146,31 @@ const Super_User_Data = ({ clientId, token, screenIds }) => {
         setLoading(true);
         setClients([]);
         setCurrentPage(1);
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realm?realm=${selectedRealm}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const list = res.data.data.clients;
+        const base = import.meta.env.VITE_API_USER_SERVICE_URL;
+        const headers = { Authorization: `Bearer ${token}` };
+        let list = [];
+
+        if (selectedRealm === "all") {
+          // every realm -> merge all clients
+          const rr = await axios.get(`${base}/${clientId}/users/realms?realm=realm`, { headers });
+          const allRealms = rr.data.data.realms || [];
+          const results = await Promise.all(
+            allRealms.map((r) =>
+              axios
+                .get(`${base}/${clientId}/users/realm?realm=${r}`, { headers })
+                .then((x) => x.data.data.clients || [])
+                .catch(() => [])
+            )
+          );
+          // de-duplicate by id
+          list = [...new Map(results.flat().map((c) => [c.id, c])).values()];
+        } else {
+          const res = await axios.get(
+            `${base}/${clientId}/users/realm?realm=${selectedRealm}`,
+            { headers }
+          );
+          list = res.data.data.clients || [];
+        }
         const full = await Promise.all(
           list.map(async (c) => {
             try {
@@ -182,10 +194,10 @@ const Super_User_Data = ({ clientId, token, screenIds }) => {
     load();
   }, [selectedRealm, clientId, token]);
 
-  // ── Sync active client from localStorage ──
+  /* active client from localStorage */
   useEffect(() => {
     const sync = () => {
-      const id   = localStorage.getItem("selected_client_id");
+      const id = localStorage.getItem("selected_client_id");
       const name = localStorage.getItem("selected_client_name");
       setActiveClient(id ? { id, name } : null);
     };
@@ -195,220 +207,209 @@ const Super_User_Data = ({ clientId, token, screenIds }) => {
   }, []);
 
   const handleEnter = useCallback((id, name) => {
-    localStorage.setItem("selected_client_id",   id);
+    localStorage.setItem("selected_client_id", id);
     localStorage.setItem("selected_client_name", name);
     window.dispatchEvent(new Event("storage"));
     setActiveClient({ id, name });
   }, []);
 
-  const handleExport = () => {
-    setExporting(true);
-    setTimeout(() => {
-      const ok = exportToExcel(filtered, selectedRealm, activeClient?.id);
-      setToastMsg(ok ? "📊 Excel downloaded!" : "❌ Export failed.");
-      setExporting(false);
-    }, 300);
-  };
-
-  // ── Filtering & Pagination ──
-  const filtered = clients.filter((c) => {
+  /* filtering & pagination */
+  const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return (
-      c.name.toLowerCase().includes(q) ||
-      c.users.some(
-        (u) =>
-          u.username.toLowerCase().includes(q) ||
-          (u.email || "").toLowerCase().includes(q)
-      )
+    return clients.filter(
+      (c) =>
+        (c.name || "").toLowerCase().includes(q) ||
+        c.users.some(
+          (u) =>
+            (u.username || "").toLowerCase().includes(q) ||
+            (u.email || "").toLowerCase().includes(q)
+        )
     );
-  });
+  }, [clients, searchQuery]);
 
-  const totalPages      = Math.ceil(filtered.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
   const paginatedClients = filtered.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
   const totalUsers = filtered.reduce((a, c) => a + c.users.length, 0);
 
-  // ── Build screenIds for Order_Place ──
-  // Pass through whatever screenIds came from RoutesManager,
-  // but always ensure super_user_v1 is included so POS opens in takeaway mode
+  const handleExport = () => {
+    setExporting(true);
+    setTimeout(() => {
+      const ok = exportToExcel(filtered, selectedRealm, activeClient?.id);
+      setToastMsg(ok ? "Excel file downloaded" : "Export failed. Please try again.");
+      setExporting(false);
+    }, 300);
+  };
+
+  /* POS must always open with super_user_v1 */
   const posScreenIds = screenIds?.includes("super_user_v1")
     ? screenIds
     : [...(screenIds || []), "super_user_v1"];
 
   return (
-    <div className="h-[calc(100vh-4rem)] bg-gray-100 flex overflow-hidden">
+    <div className="relative h-[calc(100vh-4rem)] bg-canvas font-inter text-ink flex overflow-hidden">
       <Toast message={toastMsg} onDone={() => setToastMsg("")} />
 
-      {/* ══════════ LEFT SIDEBAR ══════════ */}
-      <div
-        className={`
-          flex-shrink-0 flex flex-col bg-bg-primary border-r border-border-default
-          transition-all duration-300 ease-in-out overflow-hidden
-          ${sidebarOpen ? "w-64" : "w-0"}
-        `}
+      {/* ══════════ LEFT: tenant list ══════════ */}
+      <aside
+        className="flex-shrink-0 flex flex-col bg-surface border-r border-line
+                   transition-all duration-300 ease-in-out overflow-hidden"
+        style={{ width: sidebarOpen ? SIDEBAR_W : 0 }}
       >
-        {/* Header */}
-        <div className="px-3 py-3 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center justify-between mb-2.5">
-            <div>
-              <h2 className="text-sm font-bold text-gray-800 capitalize leading-tight">
-                {selectedRealm || "Tenants"}
-              </h2>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                {filtered.length} tenant{filtered.length !== 1 ? "s" : ""} · {totalUsers} user{totalUsers !== 1 ? "s" : ""}
-              </p>
-            </div>
-            {/* <button
-              onClick={handleExport}
-              disabled={exporting || filtered.length === 0}
-              title="Export to Excel"
-              className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-            >
-              <Icon d={IC.export} size={13} />
-            </button> */}
-          </div>
-
-          {/* Search */}
-          <div className="relative">
-            <Icon d={IC.search} size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search tenants..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 bg-gray-50"
-            />
-          </div>
-        </div>
-
-        {/* Client List */}
-        <div className="flex-1 overflow-y-auto py-1">
-          {loading ? (
-            <div className="space-y-0.5 px-1 pt-1">
-              {Array(8).fill(0).map((_, i) => <SkeletonCard key={i} />)}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-              <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center mb-3">
-                <Icon d={IC.store} size={20} className="text-gray-300" />
+        <div style={{ width: SIDEBAR_W }} className="flex flex-col h-full">
+          {/* Header */}
+          <div className="px-panel pt-3 pb-2 border-b border-line-soft flex-shrink-0">
+            <div className="flex items-start justify-between gap-item-sm">
+              <div className="min-w-0">
+                <h2 className="ui-panel-title !m-0 capitalize truncate">
+                  {selectedRealm || "Tenants"}
+                </h2>
+                <p className="text-micro text-ink-muted mt-0.5">
+                  {filtered.length} tenant{filtered.length !== 1 ? "s" : ""} · {totalUsers} user{totalUsers !== 1 ? "s" : ""}
+                </p>
               </div>
-              <p className="text-xs font-semibold text-gray-500">No tenants found</p>
-              <p className="text-[10px] text-gray-400 mt-1">Select a realm or clear search</p>
+              <button
+                type="button"
+                className="ui-btn ui-btn-config !h-7 !px-2"
+                onClick={handleExport}
+                disabled={exporting || loading || filtered.length === 0}
+                title="Export to Excel"
+              >
+                <Icon d={IC.export} size={13} />
+              </button>
             </div>
-          ) : (
-            <div className="px-1.5 space-y-0.5 pb-2">
-              {paginatedClients.map((client) => {
-                const isActive = activeClient?.id === client.id;
-                return (
-                  <button
-                    key={client.id}
-                    onClick={() => handleEnter(client.id, client.name)}
-                    className={`
-                      w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left
-                      transition-all duration-150 group
-                      ${isActive
-                        ? "bg-blue-50 border border-blue-200"
-                        : "hover:bg-gray-50 border border-transparent hover:border-gray-200"
-                      }
-                    `}
-                  >
-                    <Avatar name={client.name} size="sm" />
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-xs font-semibold truncate leading-tight ${isActive ? "text-blue-700" : "text-gray-800"}`}>
-                        {client.name}
-                      </p>
-                      <p className="text-[10px] text-gray-400 mt-0.5 truncate">
-                        {client.users.length} user{client.users.length !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                    {isActive ? (
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
-                    ) : (
-                      <Icon
-                        d={IC.arrowRight}
-                        size={12}
-                        className="text-gray-300 group-hover:text-gray-500 flex-shrink-0 transition-colors"
-                      />
-                    )}
-                  </button>
-                );
-              })}
+
+            <div className="relative mt-2">
+              <Icon d={IC.search} size={13}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search tenants"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                className="ui-input"
+              />
+            </div>
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto py-1">
+            {loading ? (
+              <div className="px-1.5 pt-1 space-y-0.5">
+                {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                <div className="w-10 h-10 rounded-full bg-brand-light border border-brand-line flex items-center justify-center mb-item">
+                  <Icon d={IC.store} size={18} className="text-brand" />
+                </div>
+                <p className="text-ui font-bold text-brand-dark">No tenants found</p>
+                <p className="ui-hint">Pick a realm or clear the search.</p>
+              </div>
+            ) : (
+              <div className="px-1.5 pb-2 space-y-0.5">
+                {paginatedClients.map((client) => {
+                  const isActive = activeClient?.id === client.id;
+                  return (
+                    <button
+                      key={client.id}
+                      type="button"
+                      onClick={() => handleEnter(client.id, client.name)}
+                      className={`w-full flex items-center gap-item px-2.5 py-2 rounded-button-sm text-left
+                                  border transition-colors duration-fast group
+                                  ${isActive
+                                    ? "bg-brand-light border-brand-line"
+                                    : "border-transparent hover:bg-brand-light"}`}
+                    >
+                      <Avatar name={client.name} />
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-ui font-bold truncate leading-tight ${isActive ? "text-brand-dark" : "text-ink"}`}>
+                          {client.name}
+                        </p>
+                        <p className="text-micro text-ink-muted mt-0.5 truncate">
+                          {selectedRealm === "all" && client.realm ? `${client.realm} · ` : ""}
+                          {client.users.length} user{client.users.length !== 1 ? "s" : ""}
+                        </p>
+                      </div>
+                      {isActive ? (
+                        <span className="w-dot h-dot rounded-full bg-state-vacant flex-shrink-0" />
+                      ) : (
+                        <Icon d={IC.arrowRight} size={12}
+                          className="text-ink-faint group-hover:text-brand flex-shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="px-panel py-2 border-t border-line-soft flex items-center justify-between flex-shrink-0">
+              <button type="button" className="ui-btn !h-7 !px-2"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1} aria-label="Previous page">
+                <Icon d={IC.chevronLeft} size={13} />
+              </button>
+              <span className="text-micro text-ink-muted font-semibold">
+                {currentPage} / {totalPages}
+              </span>
+              <button type="button" className="ui-btn !h-7 !px-2"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages} aria-label="Next page">
+                <Icon d={IC.chevronRight} size={13} />
+              </button>
             </div>
           )}
         </div>
+      </aside>
 
-        {/* Pagination — compact */}
-        {totalPages > 1 && (
-          <div className="px-3 py-2 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
-            <button
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="text-[10px] font-semibold text-gray-500 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-gray-100 transition"
-            >
-              ← Prev
-            </button>
-            <span className="text-[10px] text-gray-400 font-medium">
-              {currentPage} / {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="text-[10px] font-semibold text-gray-500 hover:text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed px-2 py-1 rounded hover:bg-gray-100 transition"
-            >
-              Next →
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* ══════════ TOGGLE BUTTON ══════════ */}
+      {/* ══════════ Sidebar toggle ══════════ */}
       <button
+        type="button"
         onClick={() => setSidebarOpen((v) => !v)}
-        className="absolute left-0 top-1/2 -translate-y-1/2 z-30 w-5 h-10 bg-white border border-gray-200 rounded-r-lg flex items-center justify-center shadow-sm hover:bg-gray-50 transition-all"
-        style={{ left: sidebarOpen ? "256px" : "0px", transition: "left 0.3s ease" }}
-        title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+        className="absolute top-1/2 -translate-y-1/2 z-30 w-5 h-10 bg-surface border border-line
+                   rounded-r-button-sm flex items-center justify-center shadow-panel
+                   text-ink-muted hover:text-brand hover:bg-brand-light"
+        style={{ left: sidebarOpen ? SIDEBAR_W : 0, transition: "left .3s ease" }}
+        title={sidebarOpen ? "Collapse tenant list" : "Expand tenant list"}
       >
-        <Icon
-          d={sidebarOpen ? "M15 18l-6-6 6-6" : "M9 6l6 6-6 6"}
-          size={11}
-          className="text-gray-400"
-        />
+        <Icon d={sidebarOpen ? IC.chevronLeft : IC.chevronRight} size={11} />
       </button>
 
       {/* ══════════ RIGHT: POS ══════════ */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-w-0 overflow-hidden">
         {activeClient?.id ? (
           <Order_Place
-            key={activeClient.id}          /* ← forces full remount on tenant switch */
-            clientId={activeClient.id}     /* ← selected tenant's client ID */
+            key={activeClient.id}              /* remount on tenant switch */
+            clientId={activeClient.id}
             token={token}
             onOrderUpdate={() => {}}
-            realm={selectedRealm}
-            screenIds={posScreenIds}       /* ← always includes super_user_v1 */
+            realm={clients.find((c) => c.id === activeClient.id)?.realm || (selectedRealm === "all" ? undefined : selectedRealm)}
+            screenIds={posScreenIds}
           />
         ) : (
-          <div className="h-full flex flex-col items-center justify-center gap-4 text-center px-8">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center shadow-sm">
-              <Icon d={IC.store} size={32} className="text-blue-400" />
-            </div>
-            <div>
-              <p className="text-base font-bold text-gray-700">No tenant selected</p>
-              <p className="text-sm text-gray-400 mt-1">
+          <div className="h-full flex items-center justify-center px-page-x">
+            <div className="ui-panel !mb-0 max-w-sm w-full text-center py-section">
+              <div className="w-12 h-12 mx-auto rounded-full bg-brand-light border border-brand-line flex items-center justify-center mb-item">
+                <Icon d={IC.store} size={22} className="text-brand" />
+              </div>
+              <h3 className="ui-panel-title !mb-1">No tenant selected</h3>
+              <p className="ui-hint !mt-0">
                 {selectedRealm
-                  ? `Pick a tenant from the ${selectedRealm} list to open the POS`
-                  : "Select a realm from the floater, then pick a tenant"}
+                  ? `Pick a tenant from the ${selectedRealm === "all" ? "" : selectedRealm + " "}list to open the POS.`
+                  : "Choose a realm at the top, then pick a tenant."}
               </p>
+              {!sidebarOpen && (
+                <button type="button" className="ui-btn ui-btn-primary mt-item"
+                  onClick={() => setSidebarOpen(true)}>
+                  Show tenant list
+                </button>
+              )}
             </div>
-            {!sidebarOpen && (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="mt-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition"
-              >
-                Show Tenant List
-              </button>
-            )}
           </div>
         )}
       </div>
