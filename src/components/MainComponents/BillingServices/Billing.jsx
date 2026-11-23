@@ -327,7 +327,7 @@ useEffect(() => {
   const billingColumnDefs = [
     {
       headerName: 'Order ID',
-      field: 'id',
+      field: 'dinein_order_id',
       minWidth: 120,
       cellRenderer: (params) => (
         <div className="text-body-sm font-bold text-brand-dark">#{params.value}</div>
