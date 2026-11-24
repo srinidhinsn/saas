@@ -121,6 +121,8 @@ export default function UserProfile({ clientId, token, realm, screenIds }) {
         profileForm, { headers: { Authorization: `Bearer ${token}` } }
       );
       setSavedSections(s => ({ ...s, personal: true }));
+      setSavedSections(s => ({ ...s, personal: true }));
+      window.dispatchEvent(new Event('user-profile-updated'));
     } catch (e) { console.log(e?.response?.data?.detail || "Failed to save"); }
     finally { setProfileLoading(false); }
   };

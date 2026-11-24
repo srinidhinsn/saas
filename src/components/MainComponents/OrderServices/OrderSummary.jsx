@@ -993,6 +993,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         order={viewOrder}
         onRequestDeleteItem={(item) => handleRequestDeleteItem(item, viewOrder?.id)}
         getOrderTotal={getOrderTotal}
+        invoiceGenerated={viewOrder ? hasInvoiceBeenGenerated(viewOrder, billingDocMap) : false}
       />
 
       {/* REQ: Cancel order — now requires reason (matches TakeOrder) */}
