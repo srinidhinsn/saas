@@ -105,6 +105,7 @@ export default function InvoiceModal({
   const [showPhonePeIframe, setShowPhonePeIframe] = useState(false);
   const [gateways, setGateways] = useState({ razorpay: false, phonepe: false });
   const [gatewaysLoaded, setGatewaysLoaded] = useState(false);
+  const [verifiedTotal, setVerifiedTotal] = useState(0);
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
   const allOrderItems = selectedOrder?.items || [];
@@ -144,6 +145,7 @@ export default function InvoiceModal({
   );
 
   const total = calculatedTotal;
+  const isFullyPaid = verifiedTotal > 0 && verifiedTotal + 0.01 >= total;
 
   const { paidAmount, dueAmount } = getPaidAndDue(paymentSplits);
 
@@ -299,32 +301,45 @@ export default function InvoiceModal({
         contact_phone: invoiceDraft?.contact_phone || prev.contact_phone || "",
         shipping_address: invoiceDraft?.shipping_address || prev.shipping_address || "",
       }));
-      const totalVal = Number(initialOrder.total_price ?? 0);
+      const invoiceTotal = Number(invoiceDraft?.total_amount ?? initialOrder.total_price ?? 0);
+let savedMethods = Array.isArray(invoiceDraft?.payment_method) ? invoiceDraft.payment_method : [];
 
-      if (Array.isArray(invoiceDraft?.payment_method) && invoiceDraft.payment_method.length > 0) {
-        if (invoiceDraft.payment_method.length === 1) {
-          setSplitPaymentEnabled(false);
-          setPaymentSplits(invoiceDraft.payment_method);
-          setMethod(invoiceDraft.payment_method[0].method || "Cash");
-          const paidAmount = Number(invoiceDraft.payment_method[0].amount || totalVal);
-          setBalanceAmount(Number((totalVal - paidAmount).toFixed(2)));
-        } else {
-          setSplitPaymentEnabled(true);
-          setPaymentSplits(
-            invoiceDraft.payment_method.map((split) => ({
-              method: split.method ?? "Cash",
-              amount: Number(split.amount ?? 0),
-            }))
-          );
-          const totalPaid = invoiceDraft.payment_method.reduce((sum, s) => sum + Number(s.amount || 0), 0);
-          setBalanceAmount(Number((totalVal - totalPaid).toFixed(2)));
-        }
-      } else {
-        setSplitPaymentEnabled(false);
-        setPaymentSplits([{ method: "Cash", amount: totalVal }]);
-        setMethod("Cash");
-        setBalanceAmount(0);
-      }
+// money Razorpay/PhonePe already confirmed
+const verifiedMethods = savedMethods.filter(p => p.verified_at);
+setVerifiedTotal(
+  Number(verifiedMethods.reduce((s, p) => s + Number(p.amount || 0), 0).toFixed(2))
+);
+
+// corrupted data (rows don't add up to the invoice total) -> keep verified rows only
+const savedSum = savedMethods.reduce((s, p) => s + Number(p.amount || 0), 0);
+if (savedMethods.length > 0 && Math.abs(savedSum - invoiceTotal) > 0.01) {
+  savedMethods = verifiedMethods;
+}
+
+if (savedMethods.length > 0) {
+  if (savedMethods.length === 1) {
+    setSplitPaymentEnabled(false);
+    setPaymentSplits(savedMethods);
+    setMethod(savedMethods[0].method || "Cash");
+    const paid = Number(savedMethods[0].amount || invoiceTotal);
+    setBalanceAmount(Number((invoiceTotal - paid).toFixed(2)));
+  } else {
+    setSplitPaymentEnabled(true);
+    setPaymentSplits(
+      savedMethods.map((split) => ({
+        method: split.method ?? "Cash",
+        amount: Number(split.amount ?? 0),
+      }))
+    );
+    const totalPaid = savedMethods.reduce((s, p) => s + Number(p.amount || 0), 0);
+    setBalanceAmount(Number((invoiceTotal - totalPaid).toFixed(2)));
+  }
+} else {
+  setSplitPaymentEnabled(false);
+  setPaymentSplits([{ method: "Cash", amount: invoiceTotal }]);
+  setMethod("Cash");
+  setBalanceAmount(0);
+}
 
       if (!gstManuallyEdited) {
         if (invoiceDraft?.tax_rate !== undefined && invoiceDraft?.tax_rate !== null) {
@@ -357,7 +372,7 @@ export default function InvoiceModal({
       setPaymentSplits([{ method, amount: total }]);
       setBalanceAmount(0);
     } else {
-      let splits = [...paymentSplits];
+      let splits = paymentSplits.map(s => ({ ...s }));
       if (splits.length > 0) {
         const used = splits
           .slice(0, splits.length - 1)
@@ -513,7 +528,7 @@ export default function InvoiceModal({
       return draftId;
     } catch (err) {
       console.error(err);
-      toast.error("Failed to save invoice");
+      toast.error(err?.response?.data?.detail || "Failed to save invoice");
       throw err;
     } finally {
       setSaving(false);
@@ -944,6 +959,7 @@ export default function InvoiceModal({
                         {["Pending", "Paid", "Partial", "Due"].map((statusOption) => (
                           <button
                             key={statusOption}
+                            disabled={isFullyPaid}
                             type="button"
                             className={`ui-toggle-btn ${paymentStatus === statusOption
                               ? "ui-toggle-btn-active"
@@ -970,6 +986,7 @@ export default function InvoiceModal({
                         type="checkbox"
                         className="h-4 w-4 accent-brand cursor-pointer"
                         checked={splitPaymentEnabled}
+                        disabled={isFullyPaid}
                         onChange={() => {
                           const newSplitEnabled = !splitPaymentEnabled;
                           setSplitPaymentEnabled(newSplitEnabled);
@@ -988,6 +1005,7 @@ export default function InvoiceModal({
                           <div key={idx} className="flex gap-2 items-center p-2 rounded-panel bg-canvas border border-line">
                             <select
                               value={split.method}
+                              disabled={isFullyPaid}
                               onChange={(e) => {
                                 const newSplits = [...paymentSplits];
                                 newSplits[idx].method = e.target.value;
@@ -1004,6 +1022,7 @@ export default function InvoiceModal({
                               step="0.01"
                               min="0"
                               value={split.amount}
+                              disabled={isFullyPaid}
                               onChange={(e) => updateSplitAmount(idx, e.target.value)}
                               onBlur={() => onSplitAmountBlur()}
                               className={`${FIELD_BASE} w-24`}
@@ -1012,7 +1031,7 @@ export default function InvoiceModal({
                               type="button"
                               onClick={() => removeSplitRow(idx)}
                               className="grid place-items-center h-7 w-7 rounded-button-sm text-brand-dark hover:bg-brand-soft disabled:opacity-40"
-                              disabled={paymentSplits.length === 1}
+                              disabled={paymentSplits.length === 1 || isFullyPaid}
                             >
                               <X size={16} />
                             </button>
@@ -1021,6 +1040,7 @@ export default function InvoiceModal({
                         <button
                           type="button"
                           onClick={addSplitRow}
+                          disabled={isFullyPaid}
                           className="ui-btn ui-btn-add w-full"
                         >
                           + Add Payment
@@ -1034,6 +1054,7 @@ export default function InvoiceModal({
     setMethod(e.target.value);
     setPaymentSplits([{ method: e.target.value, amount: total }]);
   }}
+  disabled={isFullyPaid}
   className={`${FIELD_BASE} flex-1`}
 >
   <option value="Cash">Cash</option>
@@ -1058,7 +1079,7 @@ export default function InvoiceModal({
                   <div className="flex gap-3">
                     <button
                       onClick={handlePaymentClick}
-                      disabled={saving}
+                      disabled={saving || isFullyPaid}
                       className="ui-btn ui-btn-add flex-1 h-11"
                     >
                       <Save size={18} />
