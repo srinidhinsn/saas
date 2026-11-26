@@ -638,3 +638,5 @@ WHERE id = 'invoice' AND client_id = 'saas';
 
 INSERT INTO category (id, client_id, name, description, sub_categories, slug, created_by, updated_by, created_at, updated_at) VALUES ('analytics', 'saas', 'Analytics', 'All access to Analytics in module', '{overview,filters,owner,operations,orders,services,menu,billing,sales,inventory,insights}', '_Realm_Restaurant_Analytics', NULL, NULL, '2025-09-19 02:27:03.632856', '2025-09-19 02:27:03.632856');
 INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1050, 'easyfood', 'analytics', 'admin', 'default_analytics', 'include', '{ALL}');
+ALTER TABLE client ADD COLUMN preferences JSONB;
+ALTER TABLE client ADD COLUMN sub_client_ids TEXT[];

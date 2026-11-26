@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Text, DateTime, func, ARRAY,String,TIMESTAMP,BigInteger
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 from database.base import Base
 from models.client_model import ClientModel, AddressModel
@@ -19,6 +19,8 @@ class Client(Base):
     updated_date_time = Column(DateTime, default=func.now(), onupdate=func.now())
     subscription = Column(ARRAY(String), nullable=True)
     gst_number = Column(Text, nullable=True)
+    preferences = Column(JSONB, nullable=True)
+    sub_client_ids = Column(ARRAY(Text), nullable=True)
 
 
     @staticmethod

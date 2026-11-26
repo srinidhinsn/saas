@@ -25,7 +25,7 @@ from services.auth_service import refresh_access_token
 from jose import jwt
 import uuid , os
 from sqlalchemy import func
-from models.client_model import AddressModel ,ClientModel
+from models.client_model import AddressModel ,ClientModel, ClientPreferences, ClientPreferencesUpdate
 from utils.services import add_master_value , get_master_values ,delete_master_value
 from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
@@ -434,6 +434,32 @@ async def find_or_create_customer(client_id: str, payload: dict, context: SaasCo
 async def search_customers(client_id: str, q: str = "", context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     result = await search_customers_service(q, db)
     return ResponseModel(screen_id=context.screen_id, data={"customers": result})
+
+# ================== CLIENT PREFERENCES ==================
+@router.get("/preferences")
+async def get_preferences(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    prefs = ClientPreferences(**(client.preferences or {}))
+    return ResponseModel(screen_id=context.screen_id, data=prefs.model_dump())
+
+
+@router.post("/preferences")
+async def update_preferences(client_id: str, body: ClientPreferencesUpdate, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    client = db.query(Client).filter(Client.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    merged = ClientPreferences(**(client.preferences or {})).model_dump()
+    for key, val in body.model_dump(exclude_none=True).items():
+        merged[key] = val
+
+    client.preferences = merged  # reassign so SQLAlchemy detects the JSONB change
+    db.commit()
+
+    return ResponseModel(screen_id=context.screen_id, message="Preferences saved", data=merged)
 
 # @router.post("/chat")
 # async def chat(client_id: str,req: ChatRequest,db: Session = Depends(get_db)):

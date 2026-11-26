@@ -1,5 +1,5 @@
 import logging
-import uuid
+import uuid, re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -49,7 +49,14 @@ class AnalyticsContext:
     user_names: Dict[str, str]
     unit_cost_cache: Dict[str, float] = field(default_factory=dict)
 
-
+def resolve_service(table) -> ServiceMode:
+    if not table:
+        return ServiceMode.dine_in
+    for raw in (table.table_type, table.name):
+        key = re.sub(r"[\s_\-]+", "", str(raw or "").lower())
+        if key in SERVICE_BY_TABLE_TYPE:
+            return SERVICE_BY_TABLE_TYPE[key]
+    return ServiceMode.dine_in
 # ---------------------------------------------------------------- generic loading
 def load_models(db: Session, entity, model: Type[BaseModel], client_id: str) -> list:
     """Load a client's rows through a Pydantic model; bad legacy rows are logged and skipped."""
@@ -111,7 +118,7 @@ def analyze_order(order: AnalyzedOrder, tables, user_names, auth: Optional[SaasC
         "created_dt": created, "created_on": created.date() if created else None,
         "updated_dt": to_naive(order.updated_at),
         "order_status": status, "status_label": status_label(status),
-        "service": SERVICE_BY_TABLE_TYPE.get(table_type, ServiceMode.dine_in),
+        "service": resolve_service(table),
         "area": (table.section if table and table.section else NOT_RECORDED),
         "table_name": (table.name if table and table.name else as_key(order.table_id) or UNKNOWN),
         "employee": resolve_employee(user_names, order.handler_id or order.created_by),
