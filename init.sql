@@ -640,3 +640,6 @@ INSERT INTO category (id, client_id, name, description, sub_categories, slug, cr
 INSERT INTO page_definition (id, client_id, module, role, screen_id, load_type, operations) OVERRIDING SYSTEM VALUE VALUES (1050, 'easyfood', 'analytics', 'admin', 'default_analytics', 'include', '{ALL}');
 ALTER TABLE client ADD COLUMN preferences JSONB;
 ALTER TABLE client ADD COLUMN sub_client_ids TEXT[];
+UPDATE category
+SET sub_categories = array_cat(sub_categories, ARRAY['preferences'])
+WHERE id = 'users' AND client_id = 'saas';
