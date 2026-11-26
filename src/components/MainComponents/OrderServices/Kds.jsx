@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
-import { useParams } from 'react-router-dom';
+import { useClientPreferences } from '../../utils/Preferences/useClientPreferences';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { FaCheckCircle, FaClock, FaHourglassHalf, FaConciergeBell } from 'react-icons/fa';
@@ -804,6 +804,13 @@ const KitchenDisplay = ({ clientId, token, realm }) => {
   const [orderFilter, setOrderFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [activeView, setActiveView] = useState(VIEWS.ORDER);
+  const { preferences, loaded: prefsLoaded } = useClientPreferences(clientId, token);
+  const defaultKdsView = preferences.kds.default_view;
+  const viewTouchedRef = useRef(false);
+  useEffect(() => {
+      if (!prefsLoaded || viewTouchedRef.current) return;
+      if (Object.values(VIEWS).includes(defaultKdsView)) setActiveView(defaultKdsView);
+    }, [prefsLoaded, defaultKdsView]);
   const [nowTick, setNowTick] = useState(Date.now());
   // ── Date filter ──────────────────────────────────────────────────────────
   // Defaults to today (live view). Selecting an earlier date switches the
@@ -1180,7 +1187,7 @@ const KitchenDisplay = ({ clientId, token, realm }) => {
             {VIEW_TABS.map(({ key, label, Icon }) => (
               <button
                 key={key}
-                onClick={() => setActiveView(key)}
+                onClick={() => { viewTouchedRef.current = true; setActiveView(key); }}
                 className={`ui-tab inline-flex items-center gap-2 ${activeView === key
                   ? 'ui-tab-active'
                   : ''

@@ -323,7 +323,16 @@ useEffect(() => {
       toast.error("Failed to refresh billing data");
     }
   };
-
+  const SERVICE_LABELS = {
+    dinein: 'Dine-In', takeaway: 'TakeAway', walkin: 'Walk-in', delivery: 'Delivery',
+  };
+  
+  const getServiceLabel = (order, table) => {
+    const raw = order?.mode || order?.order_type || order?.service_type
+             || table?.name || '';
+    const key = String(raw).toLowerCase().replace(/[\s_-]/g, '');
+    return SERVICE_LABELS[key] || raw || '—';
+  };
   const billingColumnDefs = [
     {
       headerName: 'Order ID',
@@ -341,7 +350,7 @@ useEffect(() => {
       cellRenderer: (params) => (
         <div>
           <div className="text-body-sm font-semibold text-ink">{params.value}</div>
-          <div className="text-ui-sm text-ink-muted">{params.data?.mode || "Dine-In"}</div>
+          <div className="text-ui-sm text-ink-muted">{getServiceLabel(params.data, tablesMap[params.data?.table_id])}</div>
         </div>
       ),
     },

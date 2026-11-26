@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { APP_ROOT } from '../config/pathConfig';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 import TakeOrder from '../MainComponents/OrderServices/TakeOrder';
 import OrderSummary from '../MainComponents/OrderServices/OrderSummary';
 import Kds from '../MainComponents/OrderServices/Kds';
-import TableManagement from '../MainComponents/TableServices/TableManagement';
+import TableManagement from '../MainComponents/TableServices/TableManagement_Table';
 import DashBoardPage from '../Constants/DashBoards/DashBoard';
 import MenuManagement from '../MainComponents/InventoryServices/MenuManagement';
 import BillingPage from '../MainComponents/BillingServices/Billing';
@@ -23,12 +24,13 @@ import Order_Place from '../Super_User/Order_Place/Order_Place';
 import Summary_Super_User from '../Super_User/Order_Place/Summary_Super_User';
 import BillingPage_Super_User from '../Super_User/Billing/Billing_Super_User';
 import KitchenDisplay_Super_User from '../Super_User/Order_Place/KitchenDisplay';
-import TableManagement_sub from '../MainComponents/TableServices/TableManagement_sub';
 import TenantSwitcher from '../Constants/TenanatFloater/TenantFloater';
 import CustomerChat from '../Constants/Chatbots/CustomerChat';
 import Super_User_Data from '../Super_User/Header/Super_User_Data';
 import Super_User_Tenant from '../Super_User/Header/Super_User_tenat';
 import AnalyticsPage from '../Constants/analytics/Analytics';
+import Preferences from '../Constants/Preferences/Preferences';
+import TableManagementSwitcher from '../MainComponents/TableServices/TableManagementSwitcher';
 const RoutesManager = ({ token: appToken }) => {
   const { clientId: paramClientId } = useParams();
   const [clientId, setClientId] = useState(localStorage.getItem("selected_client_id") || paramClientId);  
@@ -43,6 +45,8 @@ const RoutesManager = ({ token: appToken }) => {
   const realm = isSuperAdmin ? 'rental' : decoded?.realm;
   const userId = decoded?.user_id;
   const landing = realm === 'super_user' ? 'super-user-data' : 'home';
+  const base = `/${APP_ROOT}/${paramClientId}`;
+const landingPath = `${base}/${landing}`;
   useEffect(() => {
     setToken(appToken);
   }, [appToken]);
@@ -94,9 +98,10 @@ const RoutesManager = ({ token: appToken }) => {
     {(realm ==='super_user' && <Super_User_Tenant clientId={paramClientId} token={token} />)}
    
     <Routes>
-      <Route path="/" element={<Navigate to={landing} replace />} />
-      <Route path="home" element={realm === 'super_user'  ? <Navigate to="super-user-data" replace />
-             : <DashBoardPage clientId={clientId} token={token} realm={realm} screenIds={screenIds} />} />
+      <Route path="/" element={<Navigate to={landingPath} replace />} />
+      <Route path="home" element={realm === 'super_user'
+  ? <Navigate to={`${base}/super-user-data`} replace />
+  : <DashBoardPage clientId={clientId} token={token} realm={realm} screenIds={screenIds} />} />
       <Route
         path="analytics"
         element={<AnalyticsPage clientId={clientId} token={token} realm={realm} screenIds={screenIds} />}
@@ -168,10 +173,8 @@ const RoutesManager = ({ token: appToken }) => {
       <Route path="kds-super-user" element={
         <KitchenDisplay_Super_User clientId={clientId} token={token} realm={realm} screenIds={screenIds} />
       } />
-      <Route
-        path="sub-tables"
-        element={<TableManagement_sub clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}
-      />
+      <Route path="tables"
+             element={<TableManagementSwitcher clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}/>
          <Route
         path="tenant-switcher"
         element={<TenantSwitcher clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}
@@ -184,8 +187,9 @@ const RoutesManager = ({ token: appToken }) => {
         path="super-user-tenant"
         element={<Super_User_Tenant clientId={clientId} token={token} userId={userId} realm={realm} screenIds={screenIds} />}
       />
-      <Route path="*" element={<Navigate to={landing} replace />} />
+      <Route path="*" element={<Navigate to={landingPath} replace />} />
       <Route path='user-profile' element={<UserProfile token={token} clientId={clientId} realm={realm} screenIds={screenIds}/>} />
+      <Route path='preferences' element={<Preferences token={token} clientId={clientId} realm={realm} screenIds={screenIds}/>} />
       <Route path='counter' element={<Counters token={token} clientId={clientId} />} />
     </Routes>
     </>

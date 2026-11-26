@@ -28,7 +28,7 @@ export const navMap = {
 
   analytics: (clientId) => `/${APP_ROOT}/${clientId}/analytics`,
 
-  table: (clientId) => `/${APP_ROOT}/${clientId}/sub-tables`,
+  table: (clientId) => `/${APP_ROOT}/${clientId}/tables`,
 
   menu: (clientId) => `/${APP_ROOT}/${clientId}/menu`,
 
@@ -51,7 +51,7 @@ export const navMap = {
   documents: (clientId) => `/${APP_ROOT}/${clientId}/documents`,
 
   profile: (clientId) => `/${APP_ROOT}/${clientId}/user-profile`,
-
+  preferences: (clientId) => `/${APP_ROOT}/${clientId}/preferences`,
   counter: (clientId) => `/${APP_ROOT}/${clientId}/counter`,
 
 };
@@ -447,7 +447,10 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
                         My Profile
 
                       </button>
-
+                      <button type="button" onClick={() => handleNavigate('preferences')}
+                              className={`w-full px-4 py-3 text-left text-ui font-semibold transition-colors ${active === 'preferences'
+                                          ? 'bg-brand-light text-brand-dark': 'text-ink-soft hover:bg-brand-light hover:text-brand-dark'}`}>
+                              Preferences</button>
 
 
                       <div className="border-t border-line-soft" />

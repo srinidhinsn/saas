@@ -10,7 +10,7 @@ import TableConfigModal from "../../utils/Modals/TableConfigModal";
 import { menuCache } from '../../utils/Menu-utils/menuCache';
 import { IoSettingsOutline } from "react-icons/io5";
 
-const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
+const TableManagement_Card = ({ clientId, token, screenIds, userId, realm }) => {
 
     const [searchTerm, setSearchTerm] = useState("");
     const [tableRanges, setTableRanges] = useState([]);
@@ -1036,4 +1036,4 @@ const TableManagement = ({ clientId, token, screenIds, userId, realm }) => {
     );
 };
 
-export default TableManagement;
+export default TableManagement_Card;
