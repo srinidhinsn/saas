@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef  } from "react";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import Order_Place from "../../Super_User/Order_Place/Order_Place";
@@ -116,83 +116,82 @@ const SkeletonCard = () => (
    Super_User_Data — tenant list (left) + POS (right)
 ═══════════════════════════════════════════════════════════ */
 const Super_User_Data = ({ clientId, token, screenIds }) => {
-  const [clients, setClients] = useState([]);
+  const [allClients, setAllClients] = useState([]);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [selectedRealm, setSelectedRealm] = useState("");
+  const [selectedRealm, setSelectedRealm] = useState("all");
   const [activeClient, setActiveClient] = useState(null);
   const [toastMsg, setToastMsg] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const itemsPerPage = 15;
+  const tokenRef = useRef(token);
+  useEffect(() => { tokenRef.current = token; }, [token]);
+  
+  const clients = useMemo(
+    () =>
+      !selectedRealm || selectedRealm === "all"
+        ? allClients
+        : allClients.filter((c) => String(c.realm || "").toLowerCase() === String(selectedRealm).toLowerCase()),
+    [allClients, selectedRealm]
+  );
 
-  /* realm comes from the floating realm tabs (Super_User_Tenant) */
   useEffect(() => {
     const handleRealmChange = () => {
-      const r = localStorage.getItem("selected_client_realm");
-      setSelectedRealm(r || "all");
+      setSelectedRealm(localStorage.getItem("selected_client_realm") || "all");
     };
-    handleRealmChange();
     window.addEventListener("storage", handleRealmChange);
     return () => window.removeEventListener("storage", handleRealmChange);
   }, []);
 
-  /* clients of the selected realm */
-  useEffect(() => {
-    if (!selectedRealm) return;
-    const load = async () => {
-      try {
-        setLoading(true);
-        setClients([]);
-        setCurrentPage(1);
-        const base = import.meta.env.VITE_API_USER_SERVICE_URL;
-        const headers = { Authorization: `Bearer ${token}` };
-        let list = [];
+useEffect(() => {
+  let cancelled = false;
+  const load = async () => {
+    try {
+      setLoading(true);
+      const base = import.meta.env.VITE_API_USER_SERVICE_URL;
+      const headers = () => ({
+        Authorization: `Bearer ${localStorage.getItem("access_token") || tokenRef.current}`,
+      });
+      const failed = [];
 
-        if (selectedRealm === "all") {
-          // every realm -> merge all clients
-          const rr = await axios.get(`${base}/${clientId}/users/realms?realm=realm`, { headers });
-          const allRealms = rr.data.data.realms || [];
-          const results = await Promise.all(
-            allRealms.map((r) =>
-              axios
-                .get(`${base}/${clientId}/users/realm?realm=${r}`, { headers })
-                .then((x) => x.data.data.clients || [])
-                .catch(() => [])
-            )
-          );
-          // de-duplicate by id
-          list = [...new Map(results.flat().map((c) => [c.id, c])).values()];
-        } else {
-          const res = await axios.get(
-            `${base}/${clientId}/users/realm?realm=${selectedRealm}`,
-            { headers }
-          );
-          list = res.data.data.clients || [];
-        }
-        const full = await Promise.all(
-          list.map(async (c) => {
-            try {
-              const pr = await axios.get(
-                `${import.meta.env.VITE_API_USER_SERVICE_URL}/${c.id}/users/persons?client_id=${c.id}`,
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-              return { ...c, users: pr.data.data.persons || [] };
-            } catch {
-              return { ...c, users: [] };
-            }
-          })
-        );
-        setClients(full);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [selectedRealm, clientId, token]);
+      const rr = await axios.get(`${base}/${clientId}/users/realms?realm=realm`, { headers: headers() });
+      const realms = rr.data.data.realms || [];
+
+      const results = await Promise.all(
+        realms.map((r) =>
+          axios
+            .get(`${base}/${clientId}/users/realm?realm=${r}`, { headers: headers() })
+            .then((x) => (x.data.data.clients || []).map((c) => ({ ...c, realm: c.realm || r })))
+            .catch(() => { failed.push(r); return []; })
+        )
+      );
+      const list = [...new Map(results.flat().map((c) => [c.id, c])).values()];
+
+      const full = await Promise.all(
+        list.map((c) =>
+          axios
+            .get(`${base}/${c.id}/users/persons?client_id=${c.id}`, { headers: headers() })
+            .then((pr) => ({ ...c, users: pr.data.data.persons || [] }))
+            .catch(() => ({ ...c, users: [] }))
+        )
+      );
+
+      if (cancelled) return;
+      setAllClients(full);
+      setCurrentPage(1);
+      if (failed.length) setToastMsg(`Could not load realm: ${failed.join(", ")}`);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  };
+  load();
+  return () => { cancelled = true; };
+}, [clientId]);
+  useEffect(() => { setCurrentPage(1); }, [selectedRealm]);
 
   /* active client from localStorage */
   useEffect(() => {
@@ -203,13 +202,17 @@ const Super_User_Data = ({ clientId, token, screenIds }) => {
     };
     sync();
     window.addEventListener("storage", sync);
-    return () => window.removeEventListener("storage", sync);
+    window.addEventListener("selected-client-changed", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("selected-client-changed", sync);
+    };
   }, []);
 
   const handleEnter = useCallback((id, name) => {
     localStorage.setItem("selected_client_id", id);
     localStorage.setItem("selected_client_name", name);
-    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("selected-client-changed"));
     setActiveClient({ id, name });
   }, []);
 
@@ -388,7 +391,7 @@ const Super_User_Data = ({ clientId, token, screenIds }) => {
             clientId={activeClient.id}
             token={token}
             onOrderUpdate={() => {}}
-            realm={clients.find((c) => c.id === activeClient.id)?.realm || (selectedRealm === "all" ? undefined : selectedRealm)}
+            realm={allClients.find((c) => c.id === activeClient.id)?.realm || (selectedRealm === "all" ? undefined : selectedRealm)}
             screenIds={posScreenIds}
           />
         ) : (
