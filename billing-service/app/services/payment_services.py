@@ -14,6 +14,20 @@ from phonepe.sdk.pg.payments.v2.models.request.standard_checkout_pay_request imp
 from phonepe.sdk.pg.common.exceptions import PhonePeException
 TIMEZONE = os.getenv("TIMEZONE", "UTC")
 
+def _is_gateway(method) -> bool:
+    return str(method or "").lower().startswith(("razorpay", "phonepe"))
+
+def _covers_total(methods, total_amount) -> bool:
+    """Gateway rows count only if verified. Cash counts. Due never counts."""
+    paid = 0.0
+    for m in methods or []:
+        if not isinstance(m, dict) or m.get("method") == "Due":
+            continue
+        if _is_gateway(m.get("method")) and not m.get("verified_at"):
+            continue
+        paid += float(m.get("amount") or 0)
+    return paid + 0.01 >= float(total_amount or 0)
+
 def create_razorpay_order_service(client_id: str,amount: int,currency: str,receipt: str,notes: dict,) -> dict:
     razorpay_client = get_razorpay_client(client_id)
     try:
@@ -96,8 +110,10 @@ def verify_razorpay_payment_service(db: Session,client_id: str,document_id: int,
 
     invoice.payment_method = updated_methods
     flag_modified(invoice, "payment_method")
-    invoice.payment_status = "Paid"
-    invoice.approval_status = "Approved"
+    fully_paid = _covers_total(updated_methods, invoice.total_amount)
+    invoice.payment_status = "Paid" if fully_paid else "Partial"
+    if fully_paid:
+        invoice.approval_status = "Approved"
     invoice.status = "Issued"
     invoice.updated_at = datetime.now(ZoneInfo(TIMEZONE))
 
@@ -189,7 +205,7 @@ def verify_phonepe_payment_service(db: Session,client_id: str,document_id: int,m
         updated_methods.append(pm)
 
     if not matched:
-        updated_methods.append({
+        updated_methods.append({"amount": float(invoice.total_amount or 0),
             "method": "phonepe",
             "merchant_order_id": merchant_order_id,
             "phonepe_status": status_response.state,
@@ -198,8 +214,10 @@ def verify_phonepe_payment_service(db: Session,client_id: str,document_id: int,m
 
     invoice.payment_method = updated_methods
     flag_modified(invoice, "payment_method")
-    invoice.payment_status = "Paid"
-    invoice.approval_status = "Approved"
+    fully_paid = _covers_total(updated_methods, invoice.total_amount)
+    invoice.payment_status = "Paid" if fully_paid else "Partial"
+    if fully_paid:
+        invoice.approval_status = "Approved"
     invoice.status = "Issued"
     invoice.updated_at = datetime.now(ZoneInfo(TIMEZONE))
 
