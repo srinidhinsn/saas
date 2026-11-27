@@ -12,7 +12,7 @@ import { NAV_TABS } from './Navtabs';
 
 import logo from '../../../../public/logo.png';
 
-import { LayoutDashboard, ShoppingCart, Monitor, ChartNoAxesCombined, Receipt, Table2, Utensils, Boxes, Users, UserRound, MoreVertical  } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Monitor, ChartNoAxesCombined, Receipt, Table2, Utensils, Boxes, Users, UserRound, ChevronDown, Settings  } from 'lucide-react';
 
 
 
@@ -53,6 +53,8 @@ export const navMap = {
   profile: (clientId) => `/${APP_ROOT}/${clientId}/user-profile`,
   preferences: (clientId) => `/${APP_ROOT}/${clientId}/preferences`,
   counter: (clientId) => `/${APP_ROOT}/${clientId}/counter`,
+
+  preferences: (clientId) => `/${APP_ROOT}/${clientId}/preferences`,
 
 };
 
@@ -107,6 +109,8 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
   const [darkMode, setDarkMode] = useState(false);
 
   const [profileOpen, setProfileOpen] = useState(false);
+
+  const [fetchedName, setFetchedName] = useState('');
 
 
 
@@ -224,6 +228,16 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
 
 
+  const menuItem = (id) =>
+
+    `flex w-full items-center gap-2 px-4 py-3 text-left text-ui font-semibold transition-colors ${
+
+      active === id ? 'bg-brand-light text-brand-dark' : 'text-ink-soft hover:bg-brand-light hover:text-brand-dark'
+
+    }`;
+
+
+
   const handleNavigate = (id) => {
 
     const fn = navMap[id];
@@ -240,7 +254,7 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
 
 
-  const NavLink = ({ id, children }) => {
+  const NavLink = ({ id, children, mobile = false }) => {
 
     const isActive = active === id;
 
@@ -258,7 +272,7 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
           ui-tab
 
-          !px-2 !py-[2.5px] !text-base !leading-6
+          !px-2 !py-[2.5px] ${mobile ? '!text-base !leading-6' : '!text-sm !leading-5'}
 
           inline-flex items-center gap-1.5 whitespace-nowrap
 
@@ -270,7 +284,7 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
       >
 
-        {Icon && <Icon size={17} strokeWidth={1.9} className="shrink-0" />}
+        {Icon && <Icon size={mobile ? 17 : 15} strokeWidth={1.9} className="shrink-0" />}
 
         {children}
 
@@ -281,10 +295,34 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
   };
 
 
+  useEffect(() => {
+  const loadUserName = async () => {
+    const token = localStorage.getItem('access_token');
+    if (!clientId || !token) return;
+    try {
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/person-details`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const p = res.data?.data?.person;
+      // setFetchedName(p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : '');
+      setFetchedName(p?.first_name || '');
+    } catch {
+      setFetchedName('');
+    }
+  };
+  loadUserName();
+  // re-fetch when the profile page saves new details
+  window.addEventListener('user-profile-updated', loadUserName);
+  return () => window.removeEventListener('user-profile-updated', loadUserName);
+}, [clientId]);
+
 
   const clientData = JSON.parse(localStorage.getItem('client') || 'null');
 
   const displayLabel = clientData?.name || (clientId || 'APP').toUpperCase();
+
+  const userName = fetchedName || 'User';
 
 
 
@@ -346,7 +384,7 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
                 onClick={() => handleNavigate('home')}
 
-                className=" text-xs font-semibold tracking-tight text-brand-dark hover:text-brand transition-colors duration-200 truncate"
+                className=" text-lg font-semibold tracking-tight text-brand-dark hover:text-brand transition-colors duration-200 truncate"
 
                 title={displayLabel}
 
@@ -384,67 +422,66 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
             {/* Profile Menu */}
 
-            {isVisible('profile') && (
+            <div className="relative shrink-0">
 
-              <div className="relative shrink-0">
+              <button
 
-                <button
+                type="button"
 
-                  type="button"
+                onClick={() => setProfileOpen(prev => !prev)}
 
-                  onClick={() => setProfileOpen(prev => !prev)}
+                className={`ui-tab !px-2 !py-[2.5px] !text-sm !leading-5 inline-flex items-center gap-2 ${['profile', 'preferences'].includes(active) || profileOpen ? 'ui-tab-active' : ''}`}
 
-                  className={`ui-tab !px-2 !py-[2.5px] !text-base !leading-6 inline-flex items-center justify-center ${active === 'profile' || profileOpen ? 'ui-tab-active' : ''}`}
+                aria-haspopup="menu"
 
-                  aria-label="More options"
+                aria-expanded={profileOpen}
 
-                  aria-expanded={profileOpen}
+              >
 
-                >
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-light text-brand-dark">
 
-                  <MoreVertical size={20} strokeWidth={2} />
+                  <UserRound size={16} strokeWidth={2} />
 
-                </button>
+                </span>
 
+                <span className="max-w-[140px] truncate font-semibold">{userName}</span>
 
+                <ChevronDown size={16} className={`transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} />
 
-                {profileOpen && (
-
-                  <>
-
-                    <button
-
-                      type="button"
-
-                      className="fixed inset-0 z-40 cursor-default"
-
-                      onClick={() => setProfileOpen(false)}
-
-                      aria-label="Close menu"
-
-                    />
+              </button>
 
 
 
-                    <div className="absolute right-0 top-full mt-2 z-50 w-44 bg-surface border border-brand-line rounded-panel shadow-soft overflow-hidden">
+              {profileOpen && (
 
-                      <button
+                <>
 
-                        type="button"
+                  <button
 
-                        onClick={() => handleNavigate('profile')}
+                    type="button"
 
-                        className={`w-full px-4 py-3 text-left text-ui font-semibold transition-colors ${active === 'profile'
+                    className="fixed inset-0 z-40 cursor-default"
 
-                            ? 'bg-brand-light text-brand-dark'
+                    onClick={() => setProfileOpen(false)}
 
-                            : 'text-ink-soft hover:bg-brand-light hover:text-brand-dark'
+                    aria-label="Close menu"
 
-                          }`}
+                  />
 
-                      >
 
-                        My Profile
+
+                  <div role="menu" className="absolute right-0 top-full mt-2 z-50 w-48 bg-surface border border-brand-line rounded-panel shadow-soft overflow-hidden">
+
+                    {isVisible('profile') && (
+
+                      <button type="button" role="menuitem" onClick={() => handleNavigate('profile')} className={menuItem('profile')}>
+
+                        <UserRound size={16} /> Profile
+
+                      </button>
+
+                    )}
+
 
                       </button>
                       <button type="button" onClick={() => handleNavigate('preferences')}
@@ -452,40 +489,45 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
                                           ? 'bg-brand-light text-brand-dark': 'text-ink-soft hover:bg-brand-light hover:text-brand-dark'}`}>
                               Preferences</button>
 
+                      <Settings size={16} /> Preferences
 
-                      <div className="border-t border-line-soft" />
+                    </button>
 
 
 
-                      <button
+                    <div className="border-t border-line-soft" />
 
-                        type="button"
 
-                        onClick={() => {
 
-                          setProfileOpen(false);
+                    <button
 
-                          onLogout?.();
+                      type="button"
 
-                        }}
+                      role="menuitem"
 
-                        className="w-full px-4 py-3 text-left text-ui font-semibold text-action-danger hover:bg-brand-light transition-colors"
+                      onClick={() => {
 
-                      >
+                        setProfileOpen(false);
 
-                        Logout
+                        onLogout?.();
 
-                      </button>
+                      }}
 
-                    </div>
+                      className="w-full px-4 py-3 text-left text-ui font-semibold text-action-danger hover:bg-brand-light transition-colors"
 
-                  </>
+                    >
 
-                )}
+                      Logout
 
-              </div>
+                    </button>
 
-            )}
+                  </div>
+
+                </>
+
+              )}
+
+            </div>
 
           </div>
 
@@ -627,7 +669,7 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
               {mobileTabs.map(tab => (
 
-                <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
+                <NavLink key={tab.id} id={tab.id} mobile>{tab.label}</NavLink>
 
               ))}
 
@@ -640,6 +682,30 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
 
             <div className="flex flex-col space-y-1">
+
+              <div className="flex items-center gap-2 px-2 py-1 text-sm font-semibold text-brand-dark dark:text-text-primary-dark">
+
+                <UserRound size={17} strokeWidth={1.9} /> {userName}
+
+              </div>
+
+
+
+              <button
+
+                type="button"
+
+                onClick={() => handleNavigate('preferences')}
+
+                className="ui-tab !px-2 !py-[2.5px] !text-base !leading-6 inline-flex w-full items-center justify-start gap-1.5 text-left"
+
+              >
+
+                <Settings size={17} strokeWidth={1.9} /> Preferences
+
+              </button>
+
+
 
               <button
 

@@ -789,10 +789,10 @@ const OrderSummaryVisible = ({ clientId, token }) => {
       return <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-bg-tertiary text-text-secondary whitespace-nowrap">NOT BILLED</span>;
     }
     return (
-      <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-        key === 'paid' ? 'bg-action-success text-text-white'
-          : key === 'partial' ? 'bg-bulkActions-adding text-text-white'
-            : 'bg-action-danger text-text-white'
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-badge text-micro font-bold ${
+        key === 'paid' ? 'bg-state-vacant-bg text-state-vacant'
+          : key === 'partial' ? 'bg-state-reserved-bg text-state-reserved'
+            : 'bg-state-occupied-bg text-state-occupied'
       }`}>
         {doc.payment_status?.toUpperCase() ?? 'UNKNOWN'}
       </span>
@@ -993,6 +993,7 @@ const OrderSummaryVisible = ({ clientId, token }) => {
         order={viewOrder}
         onRequestDeleteItem={(item) => handleRequestDeleteItem(item, viewOrder?.id)}
         getOrderTotal={getOrderTotal}
+        invoiceGenerated={viewOrder ? hasInvoiceBeenGenerated(viewOrder, billingDocMap) : false}
       />
 
       {/* REQ: Cancel order — now requires reason (matches TakeOrder) */}

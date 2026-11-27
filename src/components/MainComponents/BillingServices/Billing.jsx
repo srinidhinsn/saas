@@ -493,6 +493,7 @@ useEffect(() => {
           order={viewOrder}
           onRequestDeleteItem={(item) => handleRequestDeleteItem(item, viewOrder?.id)}
           getOrderTotal={getOrderTotal}
+          invoiceGenerated={viewOrder ? hasInvoiceBeenGenerated(viewOrder, billingDocMap) : false}
         />
 
         <CancelOrderConfirmModal
