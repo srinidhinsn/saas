@@ -1,103 +1,92 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import axios from "axios";
-import { useTenant } from "../../../context/TenantContext";
 import * as XLSX from "xlsx";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
+import { useTenant } from "../../../context/TenantContext";
+
 /* ─── Icons ────────────────────────────────────────────── */
 const Icon = ({ d, size = 16, className = "" }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size}
-    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"
-    className={className} aria-hidden="true">
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.75}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
     <path d={d} />
   </svg>
 );
 
 const IC = {
   search: "M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z",
-  calendar: "M3 9l0 12a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2l0 -12a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2m9 -5l0 4m-5 -4v4",
-  filters: "M4 6h16M4 12h16M4 18h16",
-  chevronRight: "M9 6l6 6-6 6",
-  chevronLeft: "M15 18l-6-6 6-6",
-  menu: "M4 6h16M4 12h16M4 18h16",
   users: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
   export: "M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 11l5 5m0 0l5-5m-5 5V3",
   plus: "M12 5v14M5 12h14",
-  arrowRight: "M5 12h14M12 5l7 7-7 7",
-  x: "M18 6L6 18M6 6l12 12",
+  refresh: "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5",
+  grid: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
+  chevronLeft: "M15 18l-6-6 6-6",
+  chevronRight: "M9 6l6 6-6 6",
 };
 
-/* ─── Export Function ────────────────────────────────────── */
+/* ─── Export (unchanged logic) ──────────────────────────── */
 const exportToExcel = (clients, realm, activeClientId) => {
   try {
+    const today = new Date().toLocaleDateString();
     const mainSheetData = [
       ["Realm", realm],
       ["Total Tenants", clients.length],
       ["Total Users", clients.reduce((sum, c) => sum + c.users.length, 0)],
-      ["Export Date", new Date().toLocaleDateString()],
+      ["Export Date", today],
       [],
-      ["Tenant Name", "Realm", "User Count", "Status", "Users"]
+      ["Tenant Name", "Realm", "User Count", "Status", "Users"],
     ];
 
-    clients.forEach((client, idx) => {
-      const status = activeClientId === client.id ? "Active" : "Inactive";
-      const userNames = client.users.map(u => u.username).join(", ") || "—";
+    clients.forEach((client) => {
       mainSheetData.push([
         client.name,
         client.realm,
         client.users.length,
-        status,
-        userNames
+        activeClientId === client.id ? "Active" : "Inactive",
+        client.users.map((u) => u.username).join(", ") || "—",
       ]);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(mainSheetData);
-    ws["!cols"] = [
-      { wch: 25 },
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 40 }
-    ];
+    ws["!cols"] = [{ wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 40 }];
 
     const usersSheetData = [
       ["USERS DETAILED REPORT"],
       ["Realm", realm],
-      ["Report Date", new Date().toLocaleDateString()],
+      ["Report Date", today],
       [],
-      ["Tenant", "Username", "Email", "Role", "Status"]
+      ["Tenant", "Username", "Email", "Role", "Status"],
     ];
 
-    clients.forEach(client => {
-      if (client.users.length > 0) {
-        client.users.forEach(user => {
-          usersSheetData.push([
-            client.name,
-            user.username,
-            user.email || "—",
-            user.roles?.[0] || "user",
-            activeClientId === client.id ? "Tenant Active" : "Inactive"
-          ]);
-        });
-      }
+    clients.forEach((client) => {
+      client.users.forEach((user) => {
+        usersSheetData.push([
+          client.name,
+          user.username,
+          user.email || "—",
+          user.roles?.[0] || "user",
+          activeClientId === client.id ? "Tenant Active" : "Inactive",
+        ]);
+      });
     });
 
     const usersWs = XLSX.utils.aoa_to_sheet(usersSheetData);
-    usersWs["!cols"] = [
-      { wch: 25 },
-      { wch: 20 },
-      { wch: 25 },
-      { wch: 15 },
-      { wch: 15 }
-    ];
+    usersWs["!cols"] = [{ wch: 25 }, { wch: 20 }, { wch: 25 }, { wch: 15 }, { wch: 15 }];
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Tenants Summary");
     XLSX.utils.book_append_sheet(wb, usersWs, "Users Details");
-
-    const fileName = `Tenants_${realm}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-
+    XLSX.writeFile(wb, `Tenants_${realm}_${new Date().toISOString().split("T")[0]}.xlsx`);
     return true;
   } catch (error) {
     console.error("Export failed:", error);
@@ -105,20 +94,19 @@ const exportToExcel = (clients, realm, activeClientId) => {
   }
 };
 
-/* ─── Avatar ────────────────────────────────────────────── */
+/* ─── Avatar (brand tint, matches pills / filters) ──────── */
 const Avatar = ({ name }) => {
-  const initials = (name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-  const colors = [
-    "bg-gradient-to-br from-orange-400 to-red-500",
-    "bg-gradient-to-br from-blue-400 to-indigo-600",
-    "bg-gradient-to-br from-emerald-400 to-teal-600",
-    "bg-gradient-to-br from-purple-400 to-fuchsia-600",
-    "bg-gradient-to-br from-pink-400 to-rose-600",
-  ];
-  const colorClass = colors[name.charCodeAt(0) % colors.length];
-
+  const initials = (name || "?")
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
   return (
-    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${colorClass} shadow-sm`}>
+    <div
+      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0
+                 bg-brand-soft text-brand-dark border border-brand-line text-micro font-bold"
+    >
       {initials}
     </div>
   );
@@ -133,94 +121,50 @@ const Toast = ({ message, onDone }) => {
   }, [message, onDone]);
   if (!message) return null;
   return (
-    <div className="fixed top-6 right-6 z-50 animate-in slide-in-from-top-4 duration-300
-                    px-6 py-4 rounded-lg
-                    bg-gradient-to-r from-emerald-50 to-teal-50
-                    border border-emerald-200 shadow-lg
-                    text-emerald-900 text-sm font-semibold
-                    flex items-center gap-3">
-      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+    <div
+      className="fixed top-5 right-5 z-[1400] flex items-center gap-item
+                 px-4 py-3 rounded-panel bg-brand-light border border-brand-line
+                 shadow-soft text-brand-dark text-ui font-bold"
+    >
+      <span className="w-dot h-dot rounded-full bg-brand" />
       {message}
     </div>
   );
 };
 
-/* ─── Loading Skeleton ──────────────────────────────────── */
+/* ─── Skeleton row ──────────────────────────────────────── */
 const SkeletonRow = () => (
-  <tr className="border-b border-gray-100 hover:bg-gray-50">
-    <td className="px-6 py-4"><div className="w-5 h-5 bg-gray-200 rounded animate-pulse" /></td>
-    <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse" /><div className="space-y-2"><div className="w-24 h-4 bg-gray-200 rounded animate-pulse" /><div className="w-20 h-3 bg-gray-100 rounded animate-pulse" /></div></div></td>
-    <td className="px-6 py-4"><div className="w-20 h-4 bg-gray-200 rounded animate-pulse" /></td>
-    <td className="px-6 py-4"><div className="w-24 h-4 bg-gray-200 rounded animate-pulse" /></td>
-    <td className="px-6 py-4"><div className="w-20 h-4 bg-gray-200 rounded animate-pulse" /></td>
-    <td className="px-6 py-4"><div className="w-16 h-6 bg-blue-200 rounded animate-pulse" /></td>
+  <tr>
+    <td>
+      <div className="flex items-center gap-item">
+        <div className="w-8 h-8 rounded-full bg-brand-soft animate-pulse" />
+        <div className="space-y-1.5">
+          <div className="w-28 h-3 rounded bg-brand-soft animate-pulse" />
+          <div className="w-20 h-2.5 rounded bg-brand-light animate-pulse" />
+        </div>
+      </div>
+    </td>
+    <td><div className="w-16 h-3 rounded bg-brand-soft animate-pulse" /></td>
+    <td><div className="w-10 h-4 rounded-badge bg-brand-soft animate-pulse" /></td>
+    <td><div className="w-14 h-4 rounded-badge bg-brand-soft animate-pulse" /></td>
+    <td><div className="w-14 h-6 rounded-button-sm bg-brand-soft animate-pulse ml-auto" /></td>
   </tr>
 );
 
-/* ═══════════════════════════════════════════════════════════
-   Sidebar Navigation Component
-═══════════════════════════════════════════════════════════ */
-const Sidebar = ({ realms, selectedRealm, onSelectRealm, isOpen, onClose }) => {
-  return (
-    <>
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/30 z-30 lg:hidden"
-          onClick={onClose}
-        />
-      )}
+/* ─── KPI tile ──────────────────────────────────────────── */
+const Metric = ({ label, value, note }) => (
+  <div className="ui-metric">
+    <span className="ui-metric-label">{label}</span>
+    <span className="ui-metric-value">{value}</span>
+    {note && <span className="ui-metric-note">{note}</span>}
+  </div>
+);
 
-      {/* Sidebar */}
-      <div className={`
-        fixed lg:relative
-        top-0 left-0 bottom-0
-        w-64 bg-white border-r border-gray-200
-        overflow-y-auto z-40 lg:z-0
-        transition-transform duration-300 ease-out
-        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-6 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">Realms</h2>
-          <button
-            onClick={onClose}
-            className="lg:hidden p-1 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <Icon d={IC.x} size={20} className="text-gray-600" />
-          </button>
-        </div>
-
-        {/* Realms List */}
-        <div className="px-3 py-4 space-y-2">
-          {realms.map((realm) => (
-            <button
-              key={realm}
-              onClick={() => {
-                onSelectRealm(realm);
-                onClose();
-              }}
-              className={`
-                w-full text-left px-4 py-3 rounded-lg font-medium text-sm
-                transition-all duration-200 capitalize
-                flex items-center justify-between
-                ${selectedRealm === realm
-                  ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
-                  : "text-gray-700 hover:bg-gray-100"
-                }
-              `}
-            >
-              <span>{realm}</span>
-              {selectedRealm === realm && (
-                <Icon d={IC.chevronRight} size={18} />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-    </>
-  );
-};
+const STATUS_OPTIONS = [
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "inactive", label: "Inactive" },
+];
 
 /* ═══════════════════════════════════════════════════════════
    Main Dashboard Component
@@ -234,15 +178,17 @@ const Data = ({ clientId, token }) => {
   const [activeClient, setActiveClient] = useState(null);
   const [toastMsg, setToastMsg] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const itemsPerPage = 10;
 
-  const { switchTenant } = useTenant();
+  useTenant(); // kept so the tenant context stays mounted for this screen
   const nav = useNavigate();
+
   /* ── fetch realms ── */
   useEffect(() => {
-    const fetch = async () => {
+    const load = async () => {
       try {
         const res = await axios.get(
           `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realms?realm=realm`,
@@ -250,43 +196,50 @@ const Data = ({ clientId, token }) => {
         );
         const r = res.data.data.realms || [];
         setRealms(r);
-        if (r.length > 0) setSelectedRealm(r[0]);
-      } catch (e) { console.error(e); }
+        if (r.length > 0) setSelectedRealm((prev) => prev || r[0]);
+      } catch (e) {
+        console.error(e);
+      }
     };
-    fetch();
-  }, [clientId, token]);
-  function navigation(){
-    nav(`/saas/${clientId}/register`);
- }
-  /* ── fetch clients ── */
+    load();
+  }, [clientId, token, reloadKey]);
+
+  /* ── fetch clients of the selected realm ── */
   useEffect(() => {
     if (!selectedRealm) return;
-    const fetch = async () => {
+    const load = async () => {
       try {
-        setLoading(true); 
+        setLoading(true);
         setClients([]);
         setCurrentPage(1);
-        
+
         const res = await axios.get(
           `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/realm?realm=${selectedRealm}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         const list = res.data.data.clients;
-        const full = await Promise.all(list.map(async c => {
-          try {
-            const pr = await axios.get(
-              `${import.meta.env.VITE_API_USER_SERVICE_URL}/${c.id}/users/persons?client_id=${c.id}`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
-            return { ...c, users: pr.data.data.persons || [] };
-          } catch { return { ...c, users: [] }; }
-        }));
+        const full = await Promise.all(
+          list.map(async (c) => {
+            try {
+              const pr = await axios.get(
+                `${import.meta.env.VITE_API_USER_SERVICE_URL}/${c.id}/users/persons?client_id=${c.id}`,
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              return { ...c, users: pr.data.data.persons || [] };
+            } catch {
+              return { ...c, users: [] };
+            }
+          })
+        );
         setClients(full);
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     };
-    fetch();
-  }, [selectedRealm, clientId, token]);
+    load();
+  }, [selectedRealm, clientId, token, reloadKey]);
 
   /* ── sync active client ── */
   useEffect(() => {
@@ -305,255 +258,357 @@ const Data = ({ clientId, token }) => {
     localStorage.setItem("selected_client_name", name);
     window.dispatchEvent(new Event("storage"));
     setActiveClient({ id, name });
-    setToastMsg(`✨ Switched to ${name}`);
+    setToastMsg(`Switched to ${name}`);
   }, []);
 
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      setTimeout(() => {
-        const success = exportToExcel(filtered, selectedRealm, activeClient?.id);
-        if (success) {
-          setToastMsg(`📊 Excel file downloaded successfully!`);
-        } else {
-          setToastMsg(`❌ Export failed. Please try again.`);
-        }
-        setExporting(false);
-      }, 300);
-    } catch (error) {
-      console.error(error);
-      setToastMsg(`❌ Export error: ${error.message}`);
-      setExporting(false);
-    }
-  };
+  const navigation = () => nav(`/saas/${clientId}/register`);
 
-  /* ── Filtering & Pagination ── */
-  const filtered = clients.filter(c => {
+  /* ── Filtering & pagination ── */
+  const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return c.name.toLowerCase().includes(q)
-      || c.users.some(u => u.username.toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q));
-  });
+    return clients.filter((c) => {
+      const matchesSearch =
+        (c.name || "").toLowerCase().includes(q) ||
+        c.users.some(
+          (u) =>
+            (u.username || "").toLowerCase().includes(q) ||
+            (u.email || "").toLowerCase().includes(q)
+        );
+      const isActive = activeClient?.id === c.id;
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && isActive) ||
+        (statusFilter === "inactive" && !isActive);
+      return matchesSearch && matchesStatus;
+    });
+  }, [clients, searchQuery, statusFilter, activeClient]);
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
   const paginatedClients = filtered.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-
   const totalUsers = filtered.reduce((a, c) => a + c.users.length, 0);
+  const activeCount = filtered.filter((c) => activeClient?.id === c.id).length;
+
+  const handleExport = () => {
+    setExporting(true);
+    setTimeout(() => {
+      const ok = exportToExcel(filtered, selectedRealm, activeClient?.id);
+      setToastMsg(ok ? "Excel file downloaded" : "Export failed. Please try again.");
+      setExporting(false);
+    }, 300);
+  };
+
+  /* windowed page numbers (max 5 around current) */
+  const pageNumbers = useMemo(() => {
+    const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+    const end = Math.min(totalPages, start + 4);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }, [currentPage, totalPages]);
 
   /* ── render ── */
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-canvas font-inter text-ink">
       <Toast message={toastMsg} onDone={() => setToastMsg("")} />
 
-      {/* Sidebar */}
-      <Sidebar 
-        realms={realms}
-        selectedRealm={selectedRealm}
-        onSelectRealm={setSelectedRealm}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
+      {/* Title bar */}
+      <header className="bg-surface border-b border-line-soft">
+        <div className="max-w-page mx-auto px-page-x py-3 flex items-center justify-between gap-item flex-wrap">
+          <h1 className="text-[1.5rem] leading-tight font-bold text-brand-dark">
+            TEKHAWK Tenant Management
+          </h1>
+          <div className="flex items-center gap-item-sm">
+            <button
+              type="button"
+              className="ui-btn ui-btn-add"
+              onClick={navigation}
+            >
+              <Icon d={IC.plus} size={14} />
+              Register
+            </button>
+            <button
+              type="button"
+              className="ui-btn ui-btn-config"
+              onClick={handleExport}
+              disabled={exporting || loading || filtered.length === 0}
+            >
+              <Icon d={IC.export} size={14} />
+              {exporting ? "Exporting…" : "Export"}
+            </button>
+            <button
+              type="button"
+              className="ui-btn"
+              onClick={() => setReloadKey((k) => k + 1)}
+              disabled={loading}
+            >
+              <Icon d={IC.refresh} size={14} className={loading ? "animate-spin-slow" : ""} />
+              Refresh
+            </button>
+          </div>
+        </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Header */}
-        <div className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm">
-          <div className="px-6 py-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <Icon d={IC.menu} size={20} className="text-gray-700" />
-              </button>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 capitalize">{selectedRealm}</h1>
-                <p className="text-xs text-gray-500">
-                  {filtered.length} tenant{filtered.length !== 1 ? 's' : ''} • {totalUsers} user{totalUsers !== 1 ? 's' : ''}
-                </p>
-              </div>
-            </div>
+      {/* Filter row */}
+      <section className="bg-surface">
+        <div className="max-w-page mx-auto px-page-x py-3 grid gap-tiles grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="ui-filter">
+            <span className="ui-filter-label">Realm</span>
+            <select
+              className="ui-filter-control capitalize"
+              value={selectedRealm}
+              onChange={(e) => setSelectedRealm(e.target.value)}
+            >
+              {realms.map((r) => (
+                <option key={r} value={r} className="capitalize">{r}</option>
+              ))}
+            </select>
+          </label>
 
-            {/* Search & Export Bar */}
-            <div className="flex items-center gap-3 flex-1 max-w-md ml-auto">
-              <div className="flex-1 relative">
-                <Icon d={IC.search} size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                             placeholder-gray-500"
-                />
-              </div>
+          <label className="ui-filter">
+            <span className="ui-filter-label">Search</span>
+            <input
+              type="text"
+              className="ui-filter-control"
+              placeholder="Tenant, username or email"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+            />
+          </label>
 
-               <span
-                onClick={() => navigation()}
-                className="text-sm cursor-pointer transition-colors font-medium"
-                style={{ color: '#f97316' }}
-                onMouseOver={(e) => e.target.style.textDecoration = 'underline'}
-                onMouseOut={(e) => e.target.style.textDecoration = 'none'}
-              >
-                Register here...
-              </span> 
+          <label className="ui-filter">
+            <span className="ui-filter-label">Status</span>
+            <select
+              className="ui-filter-control"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s.key} value={s.key}>{s.label}</option>
+              ))}
+            </select>
+          </label>
+
+          <div className="ui-filter">
+            <span className="ui-filter-label">Active tenant</span>
+            <div className="ui-filter-control truncate">
+              {activeClient?.name || "None selected"}
             </div>
           </div>
         </div>
 
-        {/* Main Table Area */}
-        <div className="flex-1 overflow-auto p-6">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            {loading ? (
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+        {/* Realm tabs */}
+        <div className="max-w-page mx-auto border-t border-brand-tab-line">
+          <div className="ui-tabs !mb-0">
+            {realms.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setSelectedRealm(r)}
+                className={`ui-tab capitalize ${selectedRealm === r ? "ui-tab-active" : ""}`}
+              >
+                <Icon d={IC.grid} size={16} />
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Content */}
+      <main className="max-w-page mx-auto px-page-x pt-page-y pb-page-b">
+        {/* KPI band */}
+        <div className="ui-metrics !mt-0">
+          <Metric label="Tenants" value={loading ? "—" : filtered.length} />
+          <Metric label="Users" value={loading ? "—" : totalUsers} />
+          <Metric label="Active tenants" value={loading ? "—" : activeCount} />
+          <Metric
+            label="Inactive tenants"
+            value={loading ? "—" : filtered.length - activeCount}
+          />
+        </div>
+
+        {/* Tenants panel */}
+        <div className="ui-panel">
+          <div className="flex items-center justify-between gap-item flex-wrap">
+            <h3 className="ui-panel-title !mb-0 capitalize">
+              {selectedRealm ? `${selectedRealm} tenants` : "Tenants"}
+            </h3>
+            <div className="ui-toggle">
+              {STATUS_OPTIONS.map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  onClick={() => {
+                    setStatusFilter(s.key);
+                    setCurrentPage(1);
+                  }}
+                  className={`ui-toggle-btn ${statusFilter === s.key ? "ui-toggle-btn-active" : ""}`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="ui-table-wrap">
+              <table className="ui-table">
+                <thead>
                   <tr>
-                    <th className="px-6 py-4 text-left"><input type="checkbox" className="rounded" /></th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Tenant Info</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Realm</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Users</th>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                    <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700">Action</th>
+                    <th>Tenant</th>
+                    <th>Realm</th>
+                    <th>Users</th>
+                    <th>Status</th>
+                    <th className="text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {Array(8).fill(0).map((_, i) => <SkeletonRow key={i} />)}
+                  {Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} />)}
                 </tbody>
               </table>
-            ) : filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                  <Icon d={IC.users} size={32} className="text-gray-400" />
-                </div>
-                <p className="text-lg font-semibold text-gray-900">No tenants found</p>
-                <p className="text-sm text-gray-600">Try adjusting your search filters</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-section-lg text-center">
+              <div className="w-12 h-12 rounded-full bg-brand-light border border-brand-line flex items-center justify-center mb-item">
+                <Icon d={IC.users} size={22} className="text-brand" />
               </div>
-            ) : (
-              <>
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+              <p className="text-body-sm font-bold text-brand-dark">No tenants found</p>
+              <p className="ui-hint">Change the search or status filter to see more tenants.</p>
+            </div>
+          ) : (
+            <>
+              <div className="ui-table-wrap">
+                <table className="ui-table">
+                  <thead>
                     <tr>
-                      <th className="px-6 py-4 text-left"><input type="checkbox" className="rounded" /></th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Tenant Info</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Realm</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Users</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">Status</th>
-                      <th className="px-6 py-4 text-right text-sm font-semibold text-gray-700">Action</th>
+                      <th>Tenant</th>
+                      <th>Realm</th>
+                      <th>Users</th>
+                      <th>Status</th>
+                      <th className="text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {paginatedClients.map((client, idx) => (
-                      <tr key={client.id} className="hover:bg-gray-50 transition-colors animate-in fade-in duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
-                        <td className="px-6 py-4">
-                          <input type="checkbox" className="rounded" />
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <Avatar name={client.name} />
-                            <div>
-                              <p className="font-semibold text-gray-900">{client.name}</p>
-                              <p className="text-xs text-gray-500">{client.id}</p>
+                  <tbody>
+                    {paginatedClients.map((client) => {
+                      const isActive = activeClient?.id === client.id;
+                      return (
+                        <tr key={client.id}>
+                          <td className="!align-middle">
+                            <div className="flex items-center gap-item">
+                              <Avatar name={client.name} />
+                              <div className="min-w-0">
+                                <p className="font-bold text-ink text-ui leading-tight">{client.name}</p>
+                                <p className="text-micro text-ink-muted break-all">{client.id}</p>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="font-mono text-sm text-gray-700 font-bold">{client.realm}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-700 text-white">
-                            <Icon d={IC.users} size={14} />
-                            {client.users.length}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          {activeClient?.id === client.id ? (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-                              Active
+                          </td>
+                          <td className="!align-middle">
+                            <span className="font-semibold text-ink-soft">{client.realm}</span>
+                          </td>
+                          <td className="!align-middle">
+                            <span className="ui-pill inline-flex items-center gap-1.5">
+                              <Icon d={IC.users} size={12} />
+                              {client.users.length}
                             </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-700">
-                              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                              Inactive
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => handleEnter(client.id, client.name)}
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg
-                                     bg-gradient-to-r from-blue-600 to-indigo-600 text-white
-                                     font-semibold text-sm hover:shadow-lg
-                                     transition-all duration-200 active:scale-95"
-                          >
-                            Visit
-                            <Icon d={IC.arrowRight} size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="!align-middle">
+                            {isActive ? (
+                              <span className="ui-chip bg-state-vacant-bg text-state-vacant">Active</span>
+                            ) : (
+                              <span className="ui-chip bg-brand-pill text-ink-muted">Inactive</span>
+                            )}
+                          </td>
+                          <td className="!align-middle text-right">
+                            <button
+                              type="button"
+                              className="ui-btn ui-btn-primary !h-7"
+                              onClick={() => handleEnter(client.id, client.name)}
+                            >
+                              Visit
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
+              </div>
 
-                {/* Pagination */}
+              {/* Footer: row count + pagination */}
+              <div className="flex items-center justify-between gap-item flex-wrap mt-item">
+                <span className="ui-hint !m-0">
+                  Showing {(currentPage - 1) * itemsPerPage + 1}–
+                  {Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length} rows
+                </span>
+
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
-                    <button 
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      className="ui-btn !h-7 !px-2"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                      aria-label="Previous page"
                     >
-                      ← Previous
+                      <Icon d={IC.chevronLeft} size={14} />
                     </button>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
-                        const pageNum = i + 1;
-                        return (
-                          <button
-                            key={pageNum}
-                            onClick={() => setCurrentPage(pageNum)}
-                            className={`w-8 h-8 rounded-lg font-semibold text-sm transition-all duration-200 ${
-                              currentPage === pageNum
-                                ? "bg-blue-600 text-white"
-                                : "border border-gray-300 text-gray-700 hover:bg-gray-100"
-                            }`}
-                          >
-                            {pageNum}
-                          </button>
-                        );
-                      })}
-                      {totalPages > 5 && (
-                        <>
-                          <span className="text-gray-500">...</span>
-                          <button
-                            onClick={() => setCurrentPage(totalPages)}
-                            className="w-8 h-8 rounded-lg border border-gray-300 text-gray-700 font-semibold text-sm hover:bg-gray-100 transition-all duration-200"
-                          >
-                            {totalPages}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                    <button 
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+
+                    {pageNumbers[0] > 1 && (
+                      <>
+                        <button type="button" className="ui-btn !h-7 !px-2.5" onClick={() => setCurrentPage(1)}>1</button>
+                        {pageNumbers[0] > 2 && <span className="text-ink-muted text-ui px-1">…</span>}
+                      </>
+                    )}
+
+                    {pageNumbers.map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setCurrentPage(n)}
+                        className={`ui-btn !h-7 !px-2.5 ${currentPage === n ? "ui-btn-primary" : ""}`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+
+                    {pageNumbers[pageNumbers.length - 1] < totalPages && (
+                      <>
+                        {pageNumbers[pageNumbers.length - 1] < totalPages - 1 && (
+                          <span className="text-ink-muted text-ui px-1">…</span>
+                        )}
+                        <button
+                          type="button"
+                          className="ui-btn !h-7 !px-2.5"
+                          onClick={() => setCurrentPage(totalPages)}
+                        >
+                          {totalPages}
+                        </button>
+                      </>
+                    )}
+
+                    <button
+                      type="button"
+                      className="ui-btn !h-7 !px-2"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                      aria-label="Next page"
                     >
-                      Next →
+                      <Icon d={IC.chevronRight} size={14} />
                     </button>
                   </div>
                 )}
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 };

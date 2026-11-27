@@ -30,11 +30,13 @@ const PhonePeIframe = ({
   token,
   onPaymentSuccess,
   onPaymentFailure,
+  onClose,
 }) => {
   const [status, setStatus] = useState('creating');
   const hasStartedRef = useRef(false);
-
+  const cancelledRef = useRef(false);
   useEffect(() => {
+    cancelledRef.current = false;
     if (hasStartedRef.current) return;
     hasStartedRef.current = true;
 
@@ -53,6 +55,7 @@ const PhonePeIframe = ({
         );
 
         const { token_url, merchant_order_id } = createRes.data.data;
+        if (cancelledRef.current) return;
         setStatus('open');
 
         window.PhonePeCheckout.transact({
@@ -73,7 +76,14 @@ const PhonePeIframe = ({
                 { headers: { Authorization: `Bearer ${token}` } }
               );
               setStatus('done');
-              onPaymentSuccess && onPaymentSuccess(verifyRes.data.data);
+              const result = verifyRes.data?.data || {};
+              console.log('PhonePe verify response:', result);   // temporary, remove once you know the field name
+              const state = String(result.state || result.status || result.payment_status || '').toUpperCase();
+              if (!state || ['COMPLETED', 'SUCCESS', 'PAID'].includes(state)) {
+                        onPaymentSuccess && onPaymentSuccess(result);
+              } else {
+                        onPaymentFailure && onPaymentFailure({ error: `Payment not completed (${state})` });
+              }
             } catch (err) {
               setStatus('done');
               onPaymentFailure && onPaymentFailure({
@@ -84,19 +94,20 @@ const PhonePeIframe = ({
         });
       } catch (err) {
         setStatus('done');
-        toast.error(err.message || 'Failed to start PhonePe payment');
         onPaymentFailure && onPaymentFailure({ error: err.message });
       }
     };
 
     run();
+    return () => { cancelledRef.current = true; };
   }, []); // no cleanup needed — hasStartedRef already prevents re-entry
-
+  if (status === 'done') return null;
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[90] pointer-events-none">
       {status !== 'open' && (
         <div className="bg-white rounded-xl shadow-xl px-6 py-5 flex items-center gap-3 pointer-events-auto">
-          {status === 'creating' && (<><Loader2 className="animate-spin" size={20} /><span>Starting PhonePe checkout…</span></>)}
+          {status === 'creating' && (<><Loader2 className="animate-spin" size={20} /><span>Starting PhonePe checkout…</span>
+                                       <button type="button" className="ml-3 text-sm underline" onClick={() => onClose && onClose()}>Cancel</button></>)}
           {status === 'verifying' && (<><Loader2 className="animate-spin" size={20} /><span>Verifying payment…</span></>)}
         </div>
       )}

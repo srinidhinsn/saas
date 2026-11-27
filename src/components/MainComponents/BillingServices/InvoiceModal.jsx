@@ -59,11 +59,11 @@ function isDineInOrder(order, tablesMap) {
   if (order._fixedOrderMode) return order._fixedOrderMode === 'dinein';
   if (order.mode) {
     const m = order.mode.toLowerCase();
-    if (['takeaway', 'delivery', 'walkin', 'walk-in'].includes(m)) return false;
+    if (m === 'takeaway' || m === 'delivery') return false;
     if (m === 'dinein' || m === 'dine-in') return true;
   }
   const tableName = (tablesMap?.[order.table_id]?.name || '').toLowerCase();
-  return !['takeaway', 'delivery', 'walkin', 'walk-in'].some(type => tableName.includes(type));
+  return !tableName.includes('takeaway');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,6 +91,7 @@ export default function InvoiceModal({
   const [discountIsPercent, setDiscountIsPercent] = useState(true);
   const [method, setMethod] = useState("Cash");
   const [paymentStatus, setPaymentStatus] = useState("Pending");
+  const [savedPaymentStatus, setSavedPaymentStatus] = useState("Pending");
   const [splitPaymentEnabled, setSplitPaymentEnabled] = useState(false);
   const [paymentSplits, setPaymentSplits] = useState([{ method: "Cash", amount: 0 }]);
   const [balanceAmount, setBalanceAmount] = useState(0);
@@ -103,8 +104,11 @@ export default function InvoiceModal({
   const { clientDetails } = useClient();
   const clientGstNumber = clientDetails?.gst_number || "";
   const [showPhonePeIframe, setShowPhonePeIframe] = useState(false);
+  const [razorpayVerified, setRazorpayVerified] = useState(false);
+  const [phonepeVerified, setPhonepeVerified] = useState(false);
   const [gateways, setGateways] = useState({ razorpay: false, phonepe: false });
   const [gatewaysLoaded, setGatewaysLoaded] = useState(false);
+  const [verifiedTotal, setVerifiedTotal] = useState(0);
   const safeNum = (num) => (typeof num === "number" && !isNaN(num) ? num : 0);
 
   const allOrderItems = selectedOrder?.items || [];
@@ -144,8 +148,20 @@ export default function InvoiceModal({
   );
 
   const total = calculatedTotal;
+  const isFullyPaid =(verifiedTotal > 0 && verifiedTotal + 0.01 >= total) || savedPaymentStatus === "Paid";
 
   const { paidAmount, dueAmount } = getPaidAndDue(paymentSplits);
+  const razorpayAmount = Number(
+    paymentSplits
+      .filter(s => /razorpay/i.test(s.method))
+      .reduce((sum, s) => sum + Number(s.amount || 0), 0)
+      .toFixed(2)
+  );
+  const phonepeAmount = Number(
+    (splitPaymentEnabled ? paymentSplits.filter(s => /phonepe/i.test(s.method)).reduce((sum, s) => sum + Number(s.amount || 0), 0)
+                                         : (method === "phonepe" ? total : 0)).toFixed(2));
+                                         
+  const hasPhonePe = phonepeAmount > 0;
 
   // ─── Split payment helpers ─────────────────────────────────────────────────
 
@@ -292,6 +308,7 @@ export default function InvoiceModal({
       setStatus(invoiceDraft?.status ?? "Draft");
       setDocumentNumber(invoiceDraft?.document_number ?? "");
       setPaymentStatus(invoiceDraft?.payment_status ?? "Pending");
+      setSavedPaymentStatus(invoiceDraft?.payment_status ?? "Pending");
       setSelectedOrder(prev => ({
         ...prev,
         customer_id: invoiceDraft?.customer_id || prev.customer_id || "",
@@ -299,32 +316,47 @@ export default function InvoiceModal({
         contact_phone: invoiceDraft?.contact_phone || prev.contact_phone || "",
         shipping_address: invoiceDraft?.shipping_address || prev.shipping_address || "",
       }));
-      const totalVal = Number(initialOrder.total_price ?? 0);
+      const invoiceTotal = Number(invoiceDraft?.total_amount ?? initialOrder.total_price ?? 0);
+let savedMethods = Array.isArray(invoiceDraft?.payment_method) ? invoiceDraft.payment_method : [];
 
-      if (Array.isArray(invoiceDraft?.payment_method) && invoiceDraft.payment_method.length > 0) {
-        if (invoiceDraft.payment_method.length === 1) {
-          setSplitPaymentEnabled(false);
-          setPaymentSplits(invoiceDraft.payment_method);
-          setMethod(invoiceDraft.payment_method[0].method || "Cash");
-          const paidAmount = Number(invoiceDraft.payment_method[0].amount || totalVal);
-          setBalanceAmount(Number((totalVal - paidAmount).toFixed(2)));
-        } else {
-          setSplitPaymentEnabled(true);
-          setPaymentSplits(
-            invoiceDraft.payment_method.map((split) => ({
-              method: split.method ?? "Cash",
-              amount: Number(split.amount ?? 0),
-            }))
-          );
-          const totalPaid = invoiceDraft.payment_method.reduce((sum, s) => sum + Number(s.amount || 0), 0);
-          setBalanceAmount(Number((totalVal - totalPaid).toFixed(2)));
-        }
-      } else {
-        setSplitPaymentEnabled(false);
-        setPaymentSplits([{ method: "Cash", amount: totalVal }]);
-        setMethod("Cash");
-        setBalanceAmount(0);
-      }
+// money Razorpay/PhonePe already confirmed
+const verifiedMethods = savedMethods.filter(p => p.verified_at);
+setVerifiedTotal(
+  Number(verifiedMethods.reduce((s, p) => s + Number(p.amount || 0), 0).toFixed(2))
+);
+setRazorpayVerified(verifiedMethods.some(p => /razorpay/i.test(p.method)));
+setPhonepeVerified(verifiedMethods.some(p => /phonepe/i.test(p.method)));
+// corrupted data (rows don't add up to the invoice total) -> keep verified rows only
+const savedSum = savedMethods.reduce((s, p) => s + Number(p.amount || 0), 0);
+if (savedMethods.length > 0 && Math.abs(savedSum - invoiceTotal) > 0.01) {
+  savedMethods = verifiedMethods;
+}
+
+if (savedMethods.length > 0) {
+  if (savedMethods.length === 1) {
+    setSplitPaymentEnabled(false);
+    setPaymentSplits(savedMethods);
+    setMethod(savedMethods[0].method || "Cash");
+    const paid = Number(savedMethods[0].amount || invoiceTotal);
+    setBalanceAmount(Number((invoiceTotal - paid).toFixed(2)));
+  } else {
+    setSplitPaymentEnabled(true);
+    setPaymentSplits(
+      savedMethods.map((split) => ({
+        method: split.method ?? "Cash",
+        amount: Number(split.amount ?? 0),
+        ...(split.verified_at ? { verified_at: split.verified_at } : {}),
+      }))
+    );
+    const totalPaid = savedMethods.reduce((s, p) => s + Number(p.amount || 0), 0);
+    setBalanceAmount(Number((invoiceTotal - totalPaid).toFixed(2)));
+  }
+} else {
+  setSplitPaymentEnabled(false);
+  setPaymentSplits([{ method: "Cash", amount: invoiceTotal }]);
+  setMethod("Cash");
+  setBalanceAmount(0);
+}
 
       if (!gstManuallyEdited) {
         if (invoiceDraft?.tax_rate !== undefined && invoiceDraft?.tax_rate !== null) {
@@ -357,7 +389,7 @@ export default function InvoiceModal({
       setPaymentSplits([{ method, amount: total }]);
       setBalanceAmount(0);
     } else {
-      let splits = [...paymentSplits];
+      let splits = paymentSplits.map(s => ({ ...s }));
       if (splits.length > 0) {
         const used = splits
           .slice(0, splits.length - 1)
@@ -399,11 +431,19 @@ export default function InvoiceModal({
       paymentMethodArray = paymentSplits.map((p) => ({
         method: p.method,
         amount: Number(p.amount || 0),
+        ...(p.verified_at ? { verified_at: p.verified_at } : {}),
       }));
     } else {
-      paymentMethodArray = [{ method, amount: total }];
+      paymentMethodArray = [{
+        method,
+        amount: total,
+        ...(paymentSplits[0]?.verified_at ? { verified_at: paymentSplits[0].verified_at } : {}),
+      }];
     }
-
+    const usesGateway = paymentMethodArray.some(p => /razorpay|phonepe/i.test(p.method));
+    const gatewayRowsTotal = paymentMethodArray.filter(p => /razorpay|phonepe/i.test(p.method)).reduce((s, p) => s + Number(p.amount || 0), 0);
+    const gatewayVerified = verifiedTotal > 0 && verifiedTotal + 0.01 >= gatewayRowsTotal;
+    const statusToSave = usesGateway && !gatewayVerified && paymentStatus === "Paid" ? "Pending" : paymentStatus;
     setSaving(true);
     let resolvedCustomerId = selectedOrder.customer_id;
     if (selectedOrder.contact_phone || selectedOrder.contact_email || selectedOrder.customer_id) {
@@ -438,7 +478,7 @@ export default function InvoiceModal({
         discount_amount: calculatedDiscount,
         discount: discountIsPercent ? discount : calculatedDiscount,
         total_amount: calculatedTotal,
-        payment_status: paymentStatus,
+        payment_status: statusToSave,
         payment_method: paymentMethodArray,
         single_payment_amount: splitPaymentEnabled ? null : Number(paymentSplits[0]?.amount ?? total),
         customer_id: resolvedCustomerId ?? initialOrder.customer_id ?? undefined,
@@ -503,7 +543,7 @@ export default function InvoiceModal({
         `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
         {
           id: selectedOrder.id,
-          invoice_status: paymentStatus.toLowerCase(),
+          invoice_status: statusToSave.toLowerCase(),
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -513,7 +553,7 @@ export default function InvoiceModal({
       return draftId;
     } catch (err) {
       console.error(err);
-      toast.error("Failed to save invoice");
+      toast.error(err?.response?.data?.detail || "Failed to save invoice");
       throw err;
     } finally {
       setSaving(false);
@@ -557,6 +597,7 @@ export default function InvoiceModal({
       setInvoiceDraftId(updatedInvoice?.id || correctInvoiceDraftId);
       setDocumentNumber(updatedInvoice?.document_number || documentNumber);
       setPaymentStatus(updatedInvoice?.payment_status || paymentStatus);
+      setSavedPaymentStatus(updatedInvoice?.payment_status || paymentStatus);
       setStatus(updatedInvoice?.status || "Issued");
       onClose();
     } catch (err) {
@@ -566,7 +607,50 @@ export default function InvoiceModal({
       setSaving(false);
     }
   };
-
+  const refreshVerifiedState = async () => {
+    try {
+      const fresh = await fetchInvoiceDraft(selectedOrder.id);
+      const methods = Array.isArray(fresh?.payment_method) ? fresh.payment_method : [];
+      const verified = methods.filter(p => p.verified_at);
+      setVerifiedTotal(
+        Number(verified.reduce((s, p) => s + Number(p.amount || 0), 0).toFixed(2))
+      );
+      if (methods.length > 0 && methods.length === paymentSplits.length) {
+        setPaymentSplits(methods.map(m => ({
+          method: m.method,
+          amount: Number(m.amount || 0),
+          ...(m.verified_at ? { verified_at: m.verified_at } : {}),
+        })));
+      }
+    } catch (e) {
+      console.error("refreshVerifiedState failed:", e);
+    }
+  };
+  const finalizeOnlinePayment = async (successMessage) => {
+    await axios.post(
+      `${import.meta.env.VITE_API_BILLING_SERVICE_URL}/${clientId}/invoice/update_document`,
+      { id: invoiceDraftId, client_id: clientId, payment_status: "Paid", status: "Issued" },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    await axios.post(
+      `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
+      {
+        id: selectedOrder.id,
+        ...(isDineInOrder(selectedOrder, tablesMap) ? { status: "served" } : {}),
+        invoice_status: "paid",
+      },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
+    setPaymentStatus("Paid");
+    setSavedPaymentStatus("Paid");
+    setStatus("Issued");
+    setShowRazorpayModal(false);
+    setShowPhonePeIframe(false);
+    toast.success(successMessage);
+    if (onSave) onSave(invoiceDraftId);
+    onClose();
+  };
   // ─── handlePaymentClick ────────────────────────────────────────────────────
 
   const handlePaymentClick = async () => {
@@ -577,13 +661,14 @@ export default function InvoiceModal({
       return;
     }
     if (!draftId) return;
-    if (method === "phonepe" && !splitPaymentEnabled) {
-      setShowPhonePeIframe(true);
-      return;
-    }
+  
     const requiresRazorpay = needsRazorpay(splitPaymentEnabled, paymentSplits, method);
-    if (requiresRazorpay) {
+    if (requiresRazorpay && !razorpayVerified) {
       setShowRazorpayModal(true);
+    } else if (hasPhonePe && !phonepeVerified) {
+      setShowPhonePeIframe(true);
+    } else if (razorpayVerified || phonepeVerified) {
+      await finalizeOnlinePayment("Payment confirmed!");
     } else if (paymentStatus !== "Pending") {
       await handleConfirmPayment();
     }
@@ -705,7 +790,7 @@ export default function InvoiceModal({
                         className={`ml-2 text-micro px-2 py-0.5 rounded-badge font-bold
                           ${paymentStatus === 'Paid'
                             ? 'bg-state-vacant-bg text-state-vacant'
-                            : 'bg-state-occupied-bg text-state-occupied'}`}
+                            : 'bg-state-reserved-bg text-state-reserved'}`}
                       >
                         {paymentStatus}
                       </span>
@@ -944,6 +1029,7 @@ export default function InvoiceModal({
                         {["Pending", "Paid", "Partial", "Due"].map((statusOption) => (
                           <button
                             key={statusOption}
+                            disabled={isFullyPaid}
                             type="button"
                             className={`ui-toggle-btn ${paymentStatus === statusOption
                               ? "ui-toggle-btn-active"
@@ -970,6 +1056,7 @@ export default function InvoiceModal({
                         type="checkbox"
                         className="h-4 w-4 accent-brand cursor-pointer"
                         checked={splitPaymentEnabled}
+                        disabled={isFullyPaid}
                         onChange={() => {
                           const newSplitEnabled = !splitPaymentEnabled;
                           setSplitPaymentEnabled(newSplitEnabled);
@@ -988,6 +1075,7 @@ export default function InvoiceModal({
                           <div key={idx} className="flex gap-2 items-center p-2 rounded-panel bg-canvas border border-line">
                             <select
                               value={split.method}
+                              disabled={isFullyPaid}
                               onChange={(e) => {
                                 const newSplits = [...paymentSplits];
                                 newSplits[idx].method = e.target.value;
@@ -1004,6 +1092,7 @@ export default function InvoiceModal({
                               step="0.01"
                               min="0"
                               value={split.amount}
+                              disabled={isFullyPaid}
                               onChange={(e) => updateSplitAmount(idx, e.target.value)}
                               onBlur={() => onSplitAmountBlur()}
                               className={`${FIELD_BASE} w-24`}
@@ -1012,7 +1101,7 @@ export default function InvoiceModal({
                               type="button"
                               onClick={() => removeSplitRow(idx)}
                               className="grid place-items-center h-7 w-7 rounded-button-sm text-brand-dark hover:bg-brand-soft disabled:opacity-40"
-                              disabled={paymentSplits.length === 1}
+                              disabled={paymentSplits.length === 1 || isFullyPaid}
                             >
                               <X size={16} />
                             </button>
@@ -1021,6 +1110,7 @@ export default function InvoiceModal({
                         <button
                           type="button"
                           onClick={addSplitRow}
+                          disabled={isFullyPaid}
                           className="ui-btn ui-btn-add w-full"
                         >
                           + Add Payment
@@ -1034,6 +1124,7 @@ export default function InvoiceModal({
     setMethod(e.target.value);
     setPaymentSplits([{ method: e.target.value, amount: total }]);
   }}
+  disabled={isFullyPaid}
   className={`${FIELD_BASE} flex-1`}
 >
   <option value="Cash">Cash</option>
@@ -1058,7 +1149,7 @@ export default function InvoiceModal({
                   <div className="flex gap-3">
                     <button
                       onClick={handlePaymentClick}
-                      disabled={saving}
+                      disabled={saving || isFullyPaid}
                       className="ui-btn ui-btn-add flex-1 h-11"
                     >
                       <Save size={18} />
@@ -1092,7 +1183,7 @@ export default function InvoiceModal({
       {/* ── Razorpay modal ── */}
       {showRazorpayModal && (
         <RazorpayPayment
-          amount={total}
+          amount={splitPaymentEnabled ? razorpayAmount : total}
           orderId={invoiceDraftId}
           clientId={clientId}
           token={token}
@@ -1143,20 +1234,22 @@ export default function InvoiceModal({
                 );
               }
 
-              // Update order status
-              await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                { id: selectedOrder.id, status: "served", invoice_status: "paid" },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-
-              await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
-
-              setPaymentStatus("Paid");
+              setRazorpayVerified(true);
+              await refreshVerifiedState();
               setShowRazorpayModal(false);
-              toast.success("Payment verified successfully!");
-              if (onSave) onSave(invoiceDraftId);
-              onClose();
+              
+              if (hasPhonePe && !phonepeVerified) {
+                toast.info("Razorpay part verified. Now complete the PhonePe payment.");
+                setShowPhonePeIframe(true);
+                return;
+              }
+              
+              try {
+                await finalizeOnlinePayment("Payment verified successfully!");
+              } catch (err) {
+                console.error("Post-payment update failed:", err.response?.data || err.message);
+                toast.error("Payment verified. Press Save again to finish updating the order.");
+              }
             } catch (err) {
               console.error("VERIFY ERROR:", err.response?.data || err.message);
               toast.error("Verification failed: " + (err.response?.data?.detail || err.message));
@@ -1165,43 +1258,44 @@ export default function InvoiceModal({
           onPaymentFailure={(error) => {
             console.error('Payment failed:', error);
             setShowRazorpayModal(false);
-            toast.error('Payment failed. Please try again.');
+            if (error?.completed_payments?.length) {
+              const ids = error.completed_payments.map(p => p.razorpay_payment_id).join(', ');
+              toast.warn(
+                `Part of the payment was already charged (${ids}). Do not charge that part again. Note these IDs to reconcile.`,
+                { autoClose: false }
+              );
+            } else {
+              toast.error('Payment failed. Please try again.');
+            }
           }}
           onClose={() => setShowRazorpayModal(false)}
         />
       )}
       {showPhonePeIframe && (
-        <PhonePeIframe
-          amount={total}
-          documentId={invoiceDraftId}
-          clientId={clientId}
-          token={token}
-          onPaymentSuccess={async (data) => {
-            try {
-              await axios.post(
-                `${import.meta.env.VITE_API_ORDER_SERVICE_URL}/${clientId}/dinein/update`,
-                { id: selectedOrder.id, status: "served", invoice_status: "paid" },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-              await freeTable({ clientId, token, tableId: selectedOrder.table_id, tablesMap });
-              setPaymentStatus("Paid");
-              setStatus("Issued");
-              setShowPhonePeIframe(false);
-              toast.success("PhonePe payment verified!");
-              if (onSave) onSave(invoiceDraftId);
-              onClose();
-            } catch (err) {
-              console.error("Post-payment update failed:", err.response?.data || err.message);
-              toast.error("Payment verified but order update failed");
-            }
-          }}
-          onPaymentFailure={(error) => {
-            console.error('PhonePe payment failed:', error);
-            setShowPhonePeIframe(false);
-            toast.error(error.error || 'Payment failed. Please try again.');
-          }}
-        />
-      )}
+  <PhonePeIframe
+    amount={phonepeAmount}
+    documentId={invoiceDraftId}
+    clientId={clientId}
+    token={token}
+    onPaymentSuccess={async () => {
+      setPhonepeVerified(true);
+      await refreshVerifiedState();
+      try {
+        await finalizeOnlinePayment("PhonePe payment verified!");
+      } catch (err) {
+        setShowPhonePeIframe(false);
+        console.error("Post-payment update failed:", err.response?.data || err.message);
+        toast.error("Payment verified. Press Save again to finish updating the order.");
+      }
+    }}
+    onPaymentFailure={(error) => {
+      console.error('PhonePe payment failed:', error);
+      setShowPhonePeIframe(false);
+      toast.error(error.error || 'Payment failed. Please try again.');
+    }}
+    onClose={() => setShowPhonePeIframe(false)}
+  />
+)}
     </div>
   );
 }

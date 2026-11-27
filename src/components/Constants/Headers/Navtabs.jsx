@@ -11,4 +11,5 @@ export const NAV_TABS = [
   { id: 'kds',       label: 'KDS',        screen_id: 'default_kds' },
   { id: 'counter',   label: 'Counter',    screen_id: 'default_counter' },
   { id: 'profile',   label: 'Profile',    screen_id: 'default_profile' },
+  { id: 'preferences',   label: 'Preferences',    screen_id: 'default_preferences' },
 ];

@@ -12,7 +12,7 @@ import { NAV_TABS } from './Navtabs';
 
 import logo from '../../../../public/logo.png';
 
-import { LayoutDashboard, ShoppingCart, Monitor, ChartNoAxesCombined, Receipt, Table2, Utensils, Boxes, Users, UserRound, ChevronDown, Settings  } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, Monitor, ChartNoAxesCombined, Receipt, Table2, Utensils, Boxes, Users, UserRound, MoreVertical  } from 'lucide-react';
 
 
 
@@ -28,7 +28,7 @@ export const navMap = {
 
   analytics: (clientId) => `/${APP_ROOT}/${clientId}/analytics`,
 
-  table: (clientId) => `/${APP_ROOT}/${clientId}/sub-tables`,
+  table: (clientId) => `/${APP_ROOT}/${clientId}/tables`,
 
   menu: (clientId) => `/${APP_ROOT}/${clientId}/menu`,
 
@@ -51,10 +51,8 @@ export const navMap = {
   documents: (clientId) => `/${APP_ROOT}/${clientId}/documents`,
 
   profile: (clientId) => `/${APP_ROOT}/${clientId}/user-profile`,
-
-  counter: (clientId) => `/${APP_ROOT}/${clientId}/counter`,
-
   preferences: (clientId) => `/${APP_ROOT}/${clientId}/preferences`,
+  counter: (clientId) => `/${APP_ROOT}/${clientId}/counter`,
 
 };
 
@@ -83,6 +81,8 @@ const NAV_ICONS = {
   users: Users,
 
   profile: UserRound,
+  
+  preferences: Monitor
 
 };
 
@@ -92,7 +92,7 @@ const LEFT_NAV_ORDER = ['home', 'analytics', 'order', 'kds', 'summary', 'billing
 
 const RIGHT_NAV_ORDER = ['table', 'menu', 'inventory', 'counter', 'users'];
 
-const MOBILE_NAV_ORDER = ['home','analytics', 'order', 'kds', 'summary', 'billing', 'table', 'menu', 'inventory', 'users', 'profile'];
+const MOBILE_NAV_ORDER = ['home','analytics', 'order', 'kds', 'summary', 'billing', 'table', 'menu', 'inventory', 'users', 'profile','preferences'];
 
 
 
@@ -109,8 +109,6 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
   const [darkMode, setDarkMode] = useState(false);
 
   const [profileOpen, setProfileOpen] = useState(false);
-
-  const [fetchedName, setFetchedName] = useState('');
 
 
 
@@ -228,16 +226,6 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
 
 
-  const menuItem = (id) =>
-
-    `flex w-full items-center gap-2 px-4 py-3 text-left text-ui font-semibold transition-colors ${
-
-      active === id ? 'bg-brand-light text-brand-dark' : 'text-ink-soft hover:bg-brand-light hover:text-brand-dark'
-
-    }`;
-
-
-
   const handleNavigate = (id) => {
 
     const fn = navMap[id];
@@ -254,7 +242,7 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
 
 
-  const NavLink = ({ id, children, mobile = false }) => {
+  const NavLink = ({ id, children }) => {
 
     const isActive = active === id;
 
@@ -272,7 +260,7 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
           ui-tab
 
-          !px-2 !py-[2.5px] ${mobile ? '!text-base !leading-6' : '!text-sm !leading-5'}
+          !px-2 !py-[2.5px] !text-base !leading-6
 
           inline-flex items-center gap-1.5 whitespace-nowrap
 
@@ -284,7 +272,7 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
       >
 
-        {Icon && <Icon size={mobile ? 17 : 15} strokeWidth={1.9} className="shrink-0" />}
+        {Icon && <Icon size={17} strokeWidth={1.9} className="shrink-0" />}
 
         {children}
 
@@ -295,34 +283,10 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
   };
 
 
-  useEffect(() => {
-  const loadUserName = async () => {
-    const token = localStorage.getItem('access_token');
-    if (!clientId || !token) return;
-    try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_USER_SERVICE_URL}/${clientId}/users/person-details`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      const p = res.data?.data?.person;
-      // setFetchedName(p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : '');
-      setFetchedName(p?.first_name || '');
-    } catch {
-      setFetchedName('');
-    }
-  };
-  loadUserName();
-  // re-fetch when the profile page saves new details
-  window.addEventListener('user-profile-updated', loadUserName);
-  return () => window.removeEventListener('user-profile-updated', loadUserName);
-}, [clientId]);
-
 
   const clientData = JSON.parse(localStorage.getItem('client') || 'null');
 
   const displayLabel = clientData?.name || (clientId || 'APP').toUpperCase();
-
-  const userName = fetchedName || 'User';
 
 
 
@@ -384,7 +348,7 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
                 onClick={() => handleNavigate('home')}
 
-                className=" text-lg font-semibold tracking-tight text-brand-dark hover:text-brand transition-colors duration-200 truncate"
+                className=" text-xs font-semibold tracking-tight text-brand-dark hover:text-brand transition-colors duration-200 truncate"
 
                 title={displayLabel}
 
@@ -422,109 +386,108 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
             {/* Profile Menu */}
 
-            <div className="relative shrink-0">
+            {isVisible('profile') && (
 
-              <button
+              <div className="relative shrink-0">
 
-                type="button"
+                <button
 
-                onClick={() => setProfileOpen(prev => !prev)}
+                  type="button"
 
-                className={`ui-tab !px-2 !py-[2.5px] !text-sm !leading-5 inline-flex items-center gap-2 ${['profile', 'preferences'].includes(active) || profileOpen ? 'ui-tab-active' : ''}`}
+                  onClick={() => setProfileOpen(prev => !prev)}
 
-                aria-haspopup="menu"
+                  className={`ui-tab !px-2 !py-[2.5px] !text-base !leading-6 inline-flex items-center justify-center ${active === 'profile' || profileOpen ? 'ui-tab-active' : ''}`}
 
-                aria-expanded={profileOpen}
+                  aria-label="More options"
 
-              >
+                  aria-expanded={profileOpen}
 
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-light text-brand-dark">
+                >
 
-                  <UserRound size={16} strokeWidth={2} />
+                  <MoreVertical size={20} strokeWidth={2} />
 
-                </span>
-
-                <span className="max-w-[140px] truncate font-semibold">{userName}</span>
-
-                <ChevronDown size={16} className={`transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} />
-
-              </button>
+                </button>
 
 
 
-              {profileOpen && (
+                {profileOpen && (
 
-                <>
-
-                  <button
-
-                    type="button"
-
-                    className="fixed inset-0 z-40 cursor-default"
-
-                    onClick={() => setProfileOpen(false)}
-
-                    aria-label="Close menu"
-
-                  />
-
-
-
-                  <div role="menu" className="absolute right-0 top-full mt-2 z-50 w-48 bg-surface border border-brand-line rounded-panel shadow-soft overflow-hidden">
-
-                    {isVisible('profile') && (
-
-                      <button type="button" role="menuitem" onClick={() => handleNavigate('profile')} className={menuItem('profile')}>
-
-                        <UserRound size={16} /> Profile
-
-                      </button>
-
-                    )}
-
-
-
-                    <button type="button" role="menuitem" onClick={() => handleNavigate('preferences')} className={menuItem('preferences')}>
-
-                      <Settings size={16} /> Preferences
-
-                    </button>
-
-
-
-                    <div className="border-t border-line-soft" />
-
-
+                  <>
 
                     <button
 
                       type="button"
 
-                      role="menuitem"
+                      className="fixed inset-0 z-40 cursor-default"
 
-                      onClick={() => {
+                      onClick={() => setProfileOpen(false)}
 
-                        setProfileOpen(false);
+                      aria-label="Close menu"
 
-                        onLogout?.();
+                    />
 
-                      }}
 
-                      className="w-full px-4 py-3 text-left text-ui font-semibold text-action-danger hover:bg-brand-light transition-colors"
 
-                    >
+                    <div className="absolute right-0 top-full mt-2 z-50 w-44 bg-surface border border-brand-line rounded-panel shadow-soft overflow-hidden">
 
-                      Logout
+                      <button
 
-                    </button>
+                        type="button"
 
-                  </div>
+                        onClick={() => handleNavigate('profile')}
 
-                </>
+                        className={`w-full px-4 py-3 text-left text-ui font-semibold transition-colors ${active === 'profile'
 
-              )}
+                            ? 'bg-brand-light text-brand-dark'
 
-            </div>
+                            : 'text-ink-soft hover:bg-brand-light hover:text-brand-dark'
+
+                          }`}
+
+                      >
+
+                        My Profile
+
+                      </button>
+                      <button type="button" onClick={() => handleNavigate('preferences')}
+                              className={`w-full px-4 py-3 text-left text-ui font-semibold transition-colors ${active === 'preferences'
+                                          ? 'bg-brand-light text-brand-dark': 'text-ink-soft hover:bg-brand-light hover:text-brand-dark'}`}>
+                              Preferences</button>
+
+
+                      <div className="border-t border-line-soft" />
+
+
+
+                      <button
+
+                        type="button"
+
+                        onClick={() => {
+
+                          setProfileOpen(false);
+
+                          onLogout?.();
+
+                        }}
+
+                        className="w-full px-4 py-3 text-left text-ui font-semibold text-action-danger hover:bg-brand-light transition-colors"
+
+                      >
+
+                        Logout
+
+                      </button>
+
+                    </div>
+
+                  </>
+
+                )}
+
+              </div>
+
+            )}
 
           </div>
 
@@ -666,7 +629,7 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
               {mobileTabs.map(tab => (
 
-                <NavLink key={tab.id} id={tab.id} mobile>{tab.label}</NavLink>
+                <NavLink key={tab.id} id={tab.id}>{tab.label}</NavLink>
 
               ))}
 
@@ -679,30 +642,6 @@ const HeaderShared = ({ onLogout, subscription = [] }) => {
 
 
             <div className="flex flex-col space-y-1">
-
-              <div className="flex items-center gap-2 px-2 py-1 text-sm font-semibold text-brand-dark dark:text-text-primary-dark">
-
-                <UserRound size={17} strokeWidth={1.9} /> {userName}
-
-              </div>
-
-
-
-              <button
-
-                type="button"
-
-                onClick={() => handleNavigate('preferences')}
-
-                className="ui-tab !px-2 !py-[2.5px] !text-base !leading-6 inline-flex w-full items-center justify-start gap-1.5 text-left"
-
-              >
-
-                <Settings size={17} strokeWidth={1.9} /> Preferences
-
-              </button>
-
-
 
               <button
 
