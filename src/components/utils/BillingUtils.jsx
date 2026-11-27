@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { deduplicateOrderItems } from '../utils/Menu-utils/menuUtils';
-import { X, Trash2, Printer, Eye, Lock } from "lucide-react";export const DLG_SHELL =
+import { X, Trash2, Printer, Eye } from "lucide-react";export const DLG_SHELL =
   "flex flex-col w-full max-h-[calc(100dvh-1.5rem)] overflow-hidden bg-surface border border-line " +
   "border-t-panel border-t-line-panel rounded-modal-lg shadow-modal-lg text-ink animate-scale-in";
 export const DLG_HEAD =
@@ -39,10 +39,10 @@ export const needsRazorpay = (splitPaymentEnabled, paymentSplits, method) =>
   splitPaymentEnabled
     ? paymentSplits.some(s => isRazorpayMethod(s.method))
     : isRazorpayMethod(method);
-export const filterPaymentMethods = (gateways = {}) =>
+    export const filterPaymentMethods = (gateways = {}, { allowPhonePe = true } = {}) =>
       PAYMENT_METHODS.filter(m => {
         if (isRazorpayMethod(m.value)) return !!gateways.razorpay;
-        if (isPhonePeMethod(m.value)) return !!gateways.phonepe;
+        if (isPhonePeMethod(m.value)) return allowPhonePe && !!gateways.phonepe;
         return true;
       });
 // Sum of all amounts across split rows
@@ -343,10 +343,8 @@ export const getTableName = (tableId, tablesMap = {}) => {
 };
 
 export const getInitialOrderMode = (order, tablesMap = {}) => {
-  const tableName = getTableName(order.table_id, tablesMap).toLowerCase().replace(/[^a-z]/g, '');
-  if (tableName.includes('takeaway')) return 'takeaway';
-  if (tableName.includes('walkin')) return 'walkin';
-  if (tableName.includes('delivery')) return 'delivery';
+  const tableName = getTableName(order.table_id, tablesMap);
+  if (tableName.toLowerCase().includes('takeaway')) return 'takeaway';
   return 'dinein';
 };
 
@@ -528,7 +526,7 @@ export const OldItemDeleteModal = ({ isOpen, onClose, item, onRemoveOne, onRemov
 // parent's onRequestDeleteItem callback).
 // ─────────────────────────────────────────────────────────────────────────────
  
-export const OrderItemsViewModal = ({ isOpen, onClose, order, onRequestDeleteItem, getOrderTotal, invoiceGenerated = false }) => {
+export const OrderItemsViewModal = ({ isOpen, onClose, order, onRequestDeleteItem, getOrderTotal }) => {
   if (!isOpen || !order) return null;
  
   const getItemStatusStyle = (status) => {
@@ -569,13 +567,6 @@ export const OrderItemsViewModal = ({ isOpen, onClose, order, onRequestDeleteIte
             <button onClick={onClose} className={DLG_CLOSE} aria-label="Close"><X size={16} /></button>
           </div>
         </div>
-
-        {invoiceGenerated && (
-          <div className="px-modal py-2 bg-brand-tint border-b border-brand-line flex items-center gap-2 text-ui font-semibold text-brand-dark shrink-0">
-            <Lock size={13} />
-            Invoice generated — items are locked and can no longer be deleted.
-          </div>
-        )}
  
         <div className="flex-1 overflow-y-auto px-modal pb-card">
           <table className="ui-table text-ui">
@@ -606,14 +597,7 @@ export const OrderItemsViewModal = ({ isOpen, onClose, order, onRequestDeleteIte
                       <span className={`text-micro font-bold px-2.5 py-1 rounded-badge capitalize ${getItemStatusStyle(item.status)}`}>{item.status || 'pending'}</span>
                     </td>
                     <td className="text-center">
-                      {invoiceGenerated ? (
-                        <span
-                          className="inline-flex p-1.5 rounded-button-sm bg-[#eef0f3] text-[#a3acb8] cursor-not-allowed"
-                          title="Invoice generated — item is locked"
-                        >
-                          <Lock size={14} />
-                        </span>
-                      ) : onRequestDeleteItem && (
+                      {onRequestDeleteItem && (
                         <button
                           onClick={() => onRequestDeleteItem(item)}
                           className="p-1.5 rounded-button-sm bg-brand-light text-brand-dark hover:bg-brand-soft transition-colors"
@@ -649,7 +633,7 @@ export const OrderItemsViewModal = ({ isOpen, onClose, order, onRequestDeleteIte
 // ─────────────────────────────────────────────────────────────────────────────
  
 
-export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed, invoiceGenerated = false }) => {
+export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed }) => {
   if (!order) return null;
   const status = order.status?.toLowerCase();
 
@@ -680,22 +664,13 @@ export const OrderRowActions = ({ order, onView, onPrint, onCancel, onMarkServed
         </button>
       )}
 
-      {invoiceGenerated ? (
-        <span
-          className="p-1.5 rounded-button-sm bg-[#eef0f3] text-[#a3acb8] cursor-not-allowed inline-flex"
-          title="Invoice generated — order can no longer be cancelled"
-        >
-          <Lock size={15} />
-        </span>
-      ) : (
-        <button
-          onClick={() => onCancel(order)}
-          className="p-1.5 rounded-button-sm bg-[#f8eded] text-[#b65b5b] hover:bg-[#f1dede] hover:text-[#984444] transition-colors"
-          title="Cancel order"
-        >
-          <Trash2 size={15} />
-        </button>
-      )}
+      <button
+        onClick={() => onCancel(order)}
+        className="p-1.5 rounded-button-sm bg-[#f8eded] text-[#b65b5b] hover:bg-[#f1dede] hover:text-[#984444] transition-colors"
+        title="Cancel order"
+      >
+        <Trash2 size={15} />
+      </button>
     </div>
   );
 };
