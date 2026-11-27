@@ -11,32 +11,24 @@ from datetime import datetime, timedelta
 import os, zlib
 from entity.billing_entity import BillingDocumentEntity
 from zoneinfo import ZoneInfo
+from sqlalchemy import BigInteger, cast
+from utils.numbering import get_config, render, seq_pattern,period_bounds
 TIMEZONE = os.getenv("TIMEZONE", "UTC")
 
 def _next_invoice_number(db: Session, client_id: str) -> str:
-    """INV-YYYY-000001, sequence restarts every day, per client."""
     now_local = datetime.now(ZoneInfo(TIMEZONE)).replace(tzinfo=None)
-    day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-    day_end = day_start + timedelta(days=1)
+    fmt, reset = get_config("invoice", client_id)
+    ps, pe = period_bounds(reset, now_local)
 
-    # Serialize concurrent issues for the same client + day (released on commit/rollback)
-    lock_key = zlib.crc32(f"{client_id}:{day_start.date()}".encode())
+    lock_key = zlib.crc32(f"invoice:{client_id}".encode())
     db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": lock_key})
 
-    # Invoices already numbered today for this client (inactive ones included on purpose,
-    # so a soft-deleted invoice never frees up its number)
-    issued_today = (
-        db.query(func.count(BillingDocumentEntity.id))
-        .filter(
-            BillingDocumentEntity.client_id == client_id,
-            BillingDocumentEntity.document_number.isnot(None),
-            BillingDocumentEntity.invoice_date >= day_start,
-            BillingDocumentEntity.invoice_date < day_end,
-        )
-        .scalar()
-    ) or 0
-
-    return f"INV-{now_local.year}-{issued_today + 1:06d}"
+    pat = seq_pattern(fmt, now_local)
+    last = (db.query(func.max(cast(func.substring(BillingDocumentEntity.document_number, pat), BigInteger)))
+              .filter(BillingDocumentEntity.client_id == client_id,BillingDocumentEntity.document_number.op("~")(pat),
+                      BillingDocumentEntity.invoice_date >= ps,BillingDocumentEntity.invoice_date < pe,)
+              .scalar()) or 0
+    return render(fmt, now_local, last + 1)
 
 # ---------------------------------- support functions ----------------------------------
 # Get Items by Document ID
