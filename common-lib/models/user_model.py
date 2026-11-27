@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Literal, Any
 from uuid import UUID
 from datetime import date
 
@@ -33,7 +33,7 @@ class UserModel(PersonModel):
     roles: Optional[List[str]] = []
     grants: Optional[List[str]] = []
     hashed_password: Optional[str] = None
-
+    preferences: Optional[dict[str, Any]] = None
     class Config:
         from_attributes  = True
 
@@ -53,3 +53,17 @@ class DelegatedAccessRequest(BaseModel):
     requester_id: str   # waiter user_id
     admin_username: str
     admin_password: str
+
+class KdsPreferences(BaseModel):
+    default_view: Literal["order", "item", "counter"] = "order"
+
+class TableManagementPreferences(BaseModel):
+    default_view: Literal["floor", "list"] = "floor"
+
+class UserPreferences(BaseModel):
+    kds: KdsPreferences = KdsPreferences()
+    table_management: TableManagementPreferences = TableManagementPreferences()
+
+class UserPreferencesUpdate(BaseModel):
+    kds: Optional[KdsPreferences] = None
+    table_management: Optional[TableManagementPreferences] = None

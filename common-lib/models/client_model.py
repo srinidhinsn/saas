@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Literal, Any
+from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
@@ -12,7 +12,6 @@ class ClientModel(BaseModel):
     logo: Optional[str] = None
     subscription: list[str] | None = None
     gst_number: Optional[str] = None
-    preferences: Optional[dict[str, Any]] = None
     sub_client_ids: list[str] | None = None
 
 class AddressModel(BaseModel):
@@ -28,17 +27,3 @@ class AddressModel(BaseModel):
     contact_number : Optional[str]=None
     created_at:    Optional[datetime] = None
     updated_at:    Optional[datetime] = None
-
-class KdsPreferences(BaseModel):
-    default_view: Literal["order", "item", "counter"] = "order"
-
-class TableManagementPreferences(BaseModel):
-    default_view: Literal["floor", "list"] = "floor"
-
-class ClientPreferences(BaseModel):
-    kds: KdsPreferences = KdsPreferences()
-    table_management: TableManagementPreferences = TableManagementPreferences()
-
-class ClientPreferencesUpdate(BaseModel):
-    kds: Optional[KdsPreferences] = None
-    table_management: Optional[TableManagementPreferences] = None    

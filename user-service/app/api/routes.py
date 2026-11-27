@@ -6,7 +6,7 @@ from entity.client_entity import Client, Address
 from entity.inventory_entity import InventoryEntity
 from utils.auth import hash_password, verify_password, create_access_token, verify_token, SECRET_KEY, ALGORITHM , create_refresh_token
 from models.saas_context import SaasContext
-from models.user_model import UserModel, ResetpasswordRequest, LoginRequest, PersonModel
+from models.user_model import UserModel, ResetpasswordRequest, LoginRequest, PersonModel, UserPreferences, UserPreferencesUpdate
 from models.response_model import ResponseModel
 from models.user_model import DelegatedAccessRequest
 from sqlalchemy import and_, cast
@@ -25,7 +25,7 @@ from services.auth_service import refresh_access_token
 from jose import jwt
 import uuid , os
 from sqlalchemy import func
-from models.client_model import AddressModel ,ClientModel, ClientPreferences, ClientPreferencesUpdate
+from models.client_model import AddressModel ,ClientModel
 from utils.services import add_master_value , get_master_values ,delete_master_value
 from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
@@ -438,25 +438,25 @@ async def search_customers(client_id: str, q: str = "", context: SaasContext = D
 # ================== CLIENT PREFERENCES ==================
 @router.get("/preferences")
 async def get_preferences(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    client = db.query(Client).filter(Client.id == client_id).first()
-    if not client:
+    user = db.query(User).filter(User.client_id == client_id).first()
+    if not user:
         raise HTTPException(status_code=404, detail="Client not found")
 
-    prefs = ClientPreferences(**(client.preferences or {}))
+    prefs = UserPreferences(**(user.preferences or {}))
     return ResponseModel(screen_id=context.screen_id, data=prefs.model_dump())
 
 
 @router.post("/preferences")
-async def update_preferences(client_id: str, body: ClientPreferencesUpdate, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
-    client = db.query(Client).filter(Client.id == client_id).first()
-    if not client:
+async def update_preferences(client_id: str, body: UserPreferencesUpdate, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.client_id == client_id).first()
+    if not user:
         raise HTTPException(status_code=404, detail="Client not found")
 
-    merged = ClientPreferences(**(client.preferences or {})).model_dump()
+    merged = UserPreferences(**(user.preferences or {})).model_dump()
     for key, val in body.model_dump(exclude_none=True).items():
         merged[key] = val
 
-    client.preferences = merged  # reassign so SQLAlchemy detects the JSONB change
+    user.preferences = merged  # reassign so SQLAlchemy detects the JSONB change
     db.commit()
 
     return ResponseModel(screen_id=context.screen_id, message="Preferences saved", data=merged)
