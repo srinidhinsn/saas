@@ -17,6 +17,7 @@ import os,re
 from datetime import datetime, timedelta, time
 from zoneinfo import ZoneInfo
 from sqlalchemy import text, or_
+from utils.numbering import get_config, render, seq_pattern,period_bounds
 
 TIMEZONE   = os.getenv("TIMEZONE", "UTC")
 DEFAULT_RESET_HOUR = int(os.getenv("ORDER_NUMBER_RESET_HOUR", "0"))
@@ -40,15 +41,20 @@ def _day_bounds(dt=None, client_id=None):
     start = datetime.combine((dt - timedelta(hours=h)).date(), time.min) + timedelta(hours=h)
     return start, start + timedelta(days=1)
 
-def next_order_number(db, client_id: str) -> int:
+def next_order_number(db, client_id: str) -> str:
     db.execute(text("SELECT 1 FROM client WHERE id = :c FOR UPDATE"), {"c": client_id})
-    s, e = _day_bounds(client_id=client_id)
-    return db.execute(text("""
-    SELECT COALESCE(MAX(
-             CASE WHEN dinein_order_id ~ '^[0-9]+(-[0-9]+)?$'
-                  THEN split_part(dinein_order_id,'-',1)::bigint END), 0) + 1
-    FROM dinein_order WHERE client_id = :c AND created_at >= :s AND created_at < :e """), {"c": client_id, "s": s, "e": e}).scalar_one()
-
+    s, _ = _day_bounds(client_id=client_id)
+    fmt, reset = get_config("order", client_id)
+    ps, pe = period_bounds(reset, s)
+    pat = seq_pattern(fmt, s, allow_sub_orders=True)
+    last = db.execute(text("""
+        SELECT COALESCE(MAX(substring(dinein_order_id from :pat)::bigint), 0)
+        FROM dinein_order
+        WHERE client_id = :c
+          AND created_at >= :ps AND created_at < :pe
+          AND dinein_order_id ~ :pat
+    """), {"c": client_id, "pat": pat, "ps": ps, "pe": pe}).scalar_one()
+    return render(fmt, s, last + 1)
 def group_filters(order):
     root = _root_dinein_id(order.dinein_order_id or str(order.id))
     s, e = _day_bounds(order.created_at, order.client_id)

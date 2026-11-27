@@ -113,8 +113,9 @@ class PlanStatus(str, Enum):
 
 # ---------------------------------------------------------------- lookups
 SERVICE_BY_TABLE_TYPE = {
-    "walk-in": ServiceMode.walk_in, "walkin": ServiceMode.walk_in, "walk in": ServiceMode.walk_in,
-    "takeaway": ServiceMode.takeaway, "delivery": ServiceMode.delivery,
+    "walkin": ServiceMode.walk_in,
+    "takeaway": ServiceMode.takeaway, "takeout": ServiceMode.takeaway,
+    "delivery": ServiceMode.delivery, "homedelivery": ServiceMode.delivery,
 }
 ORDER_TYPE_BY_SERVICE = {
     ServiceMode.dine_in: OrderType.dine_in, ServiceMode.walk_in: OrderType.walk_in,

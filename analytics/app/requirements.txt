@@ -13,3 +13,6 @@ python-dotenv
 saas_common_lib_473815
 tzdata
 psycopg[binary]
+razorpay==2.0.0
+phonepe-pg-sdk-python 
+requests>=2.31.0

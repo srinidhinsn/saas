@@ -12,6 +12,7 @@ class ClientModel(BaseModel):
     logo: Optional[str] = None
     subscription: list[str] | None = None
     gst_number: Optional[str] = None
+    sub_client_ids: list[str] | None = None
 
 class AddressModel(BaseModel):
     id: Optional[int] = None

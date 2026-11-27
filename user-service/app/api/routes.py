@@ -6,7 +6,7 @@ from entity.client_entity import Client, Address
 from entity.inventory_entity import InventoryEntity
 from utils.auth import hash_password, verify_password, create_access_token, verify_token, SECRET_KEY, ALGORITHM , create_refresh_token
 from models.saas_context import SaasContext
-from models.user_model import UserModel, ResetpasswordRequest, LoginRequest, PersonModel
+from models.user_model import UserModel, ResetpasswordRequest, LoginRequest, PersonModel, UserPreferences, UserPreferencesUpdate
 from models.response_model import ResponseModel
 from models.user_model import DelegatedAccessRequest
 from sqlalchemy import and_, cast
@@ -434,6 +434,32 @@ async def find_or_create_customer(client_id: str, payload: dict, context: SaasCo
 async def search_customers(client_id: str, q: str = "", context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
     result = await search_customers_service(q, db)
     return ResponseModel(screen_id=context.screen_id, data={"customers": result})
+
+# ================== CLIENT PREFERENCES ==================
+@router.get("/preferences")
+async def get_preferences(client_id: str, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.client_id == client_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    prefs = UserPreferences(**(user.preferences or {}))
+    return ResponseModel(screen_id=context.screen_id, data=prefs.model_dump())
+
+
+@router.post("/preferences")
+async def update_preferences(client_id: str, body: UserPreferencesUpdate, context: SaasContext = Depends(verify_token), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.client_id == client_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    merged = UserPreferences(**(user.preferences or {})).model_dump()
+    for key, val in body.model_dump(exclude_none=True).items():
+        merged[key] = val
+
+    user.preferences = merged  # reassign so SQLAlchemy detects the JSONB change
+    db.commit()
+
+    return ResponseModel(screen_id=context.screen_id, message="Preferences saved", data=merged)
 
 # @router.post("/chat")
 # async def chat(client_id: str,req: ChatRequest,db: Session = Depends(get_db)):

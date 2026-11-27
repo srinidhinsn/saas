@@ -1,6 +1,6 @@
 import config.settings
 from fastapi import FastAPI,Request
-from .api import routes
+from api import routes
 import logging
 import os
 import logging.config

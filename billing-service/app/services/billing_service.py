@@ -11,32 +11,24 @@ from datetime import datetime, timedelta
 import os, zlib
 from entity.billing_entity import BillingDocumentEntity
 from zoneinfo import ZoneInfo
+from sqlalchemy import BigInteger, cast
+from utils.numbering import get_config, render, seq_pattern,period_bounds
 TIMEZONE = os.getenv("TIMEZONE", "UTC")
 
 def _next_invoice_number(db: Session, client_id: str) -> str:
-    """INV-YYYY-000001, sequence restarts every day, per client."""
     now_local = datetime.now(ZoneInfo(TIMEZONE)).replace(tzinfo=None)
-    day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
-    day_end = day_start + timedelta(days=1)
+    fmt, reset = get_config("invoice", client_id)
+    ps, pe = period_bounds(reset, now_local)
 
-    # Serialize concurrent issues for the same client + day (released on commit/rollback)
-    lock_key = zlib.crc32(f"{client_id}:{day_start.date()}".encode())
+    lock_key = zlib.crc32(f"invoice:{client_id}".encode())
     db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": lock_key})
 
-    # Invoices already numbered today for this client (inactive ones included on purpose,
-    # so a soft-deleted invoice never frees up its number)
-    issued_today = (
-        db.query(func.count(BillingDocumentEntity.id))
-        .filter(
-            BillingDocumentEntity.client_id == client_id,
-            BillingDocumentEntity.document_number.isnot(None),
-            BillingDocumentEntity.invoice_date >= day_start,
-            BillingDocumentEntity.invoice_date < day_end,
-        )
-        .scalar()
-    ) or 0
-
-    return f"INV-{now_local.year}-{issued_today + 1:06d}"
+    pat = seq_pattern(fmt, now_local)
+    last = (db.query(func.max(cast(func.substring(BillingDocumentEntity.document_number, pat), BigInteger)))
+              .filter(BillingDocumentEntity.client_id == client_id,BillingDocumentEntity.document_number.op("~")(pat),
+                      BillingDocumentEntity.invoice_date >= ps,BillingDocumentEntity.invoice_date < pe,)
+              .scalar()) or 0
+    return render(fmt, now_local, last + 1)
 
 # ---------------------------------- support functions ----------------------------------
 # Get Items by Document ID
@@ -49,19 +41,29 @@ def get_billing_document_items(document_id: int, client_id: str, db: Session) ->
     return BillingDocumentItemEntity.copyToModels(items)
 
 def _merge_payment_methods(existing_list, incoming_list):
-    """Append new payment entries; replace an entry with the same method+status if it's an update."""
-    existing_list = list(existing_list or [])
-    incoming_list = incoming_list or []
-    for new_entry in incoming_list:
-        matched = False
-        for i, old_entry in enumerate(existing_list):
-            if isinstance(old_entry, dict) and old_entry.get("method") == new_entry.get("method") and not old_entry.get("verified_at"):
-                existing_list[i] = {**old_entry, **new_entry}
-                matched = True
-                break
-        if not matched:
-            existing_list.append(new_entry)
-    return existing_list
+    existing = [e for e in (existing_list or []) if isinstance(e, dict)]
+    verified = [e for e in existing if e.get("verified_at")]
+    result, used = [], set()
+
+    for new in incoming_list or []:
+        idx = next((i for i, v in enumerate(verified)
+                    if i not in used and v.get("method") == new.get("method")), None)
+        if idx is not None:
+            used.add(idx)
+            result.append(verified[idx])
+        else:
+            result.append(new)
+
+    result += [v for i, v in enumerate(verified) if i not in used]
+    return result
+
+def _validate_payment_total(methods, total_amount):
+    if not methods or total_amount is None:
+        return
+    s = round(sum(float(m.get("amount") or 0) for m in methods if isinstance(m, dict)), 2)
+    if abs(s - float(total_amount)) > 0.01:
+        raise HTTPException(status_code=400,detail=f"Payment split ({s}) does not match total ({float(total_amount)})")
+    
 # ---------------------------------- endpoint functions ----------------------------------
 
 # 1. /create_document
@@ -105,7 +107,7 @@ def create_document_service(doc: BillingDocument, db: Session) -> BillingDocumen
                 document_data["document_version"] = 1
             target = BillingDocumentEntity(**document_data)
             db.add(target)
-
+        _validate_payment_total(target.payment_method, target.total_amount)
         db.commit()
         db.refresh(target)
         return BillingDocumentEntity.copyToModel(target)
@@ -150,6 +152,7 @@ def update_document_service(updates: BillingDocument, client_id: str, db: Sessio
         setattr(db_doc, key, value)
     if incoming_payment_methods is not None:
         db_doc.payment_method = _merge_payment_methods(db_doc.payment_method, incoming_payment_methods)
+        _validate_payment_total(db_doc.payment_method, db_doc.total_amount)
     db.commit()
     db.refresh(db_doc)
     return BillingDocumentEntity.copyToModel(db_doc)

@@ -2,7 +2,7 @@ import uuid
 from database.postgres import Base
 from sqlalchemy import Column , Integer, String, ARRAY, UUID, event, Date,TIMESTAMP,func,DateTime,BigInteger
 from models.user_model import UserModel, PageDefinitionModel,PersonModel
-
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 class Person(Base):
@@ -43,6 +43,7 @@ class User(Base):
     client_id = Column(String, nullable=False)
     roles = Column(ARRAY(String), default=[])
     grants = Column(ARRAY(String), default=[])
+    preferences = Column(JSONB, nullable=True)
 
 
     def generate_uuid(username: str, client_id: str) -> uuid.UUID:
