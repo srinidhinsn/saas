@@ -9,7 +9,7 @@ const logo = '/logo.png'
    EDIT THESE: your contact details and your demo videos
    ===================================================================== */
 const contactInfo = {
-  email: 'hello@tekhawk.com',          // placeholder: put your real email
+  email: 'prajwalbb3@gmail.com',          // the inbox that receives website emails
   phone: '+91 00000 00000',            // placeholder: the number shown on the page
   phoneLink: '+910000000000',          // same number, digits only (used by the Call button)
   hours: 'Mon – Sat, 9:00 AM – 6:00 PM IST',
@@ -28,6 +28,15 @@ const contactTabs = [
   { id: 'phone', label: 'Call us' },
 ]
 
+// Header navigation links (used by both the desktop nav and the mobile menu)
+const navLinks = [
+  { href: '#products', label: 'Products' },
+  { href: '#support', label: 'Support' },
+  { href: '#contact', label: 'Contact' },
+  { href: '#why', label: 'Why Us' },
+  { href: '#about', label: 'About Us' },
+]
+
 // Shared class strings (standardized theme: ui-* components + tokens from tailwind.config.js)
 const EYEBROW = 'text-ui font-bold uppercase tracking-[.2em] text-brand'
 const LABEL = 'block mb-1 text-micro font-bold uppercase tracking-wide text-ink-muted'
@@ -41,6 +50,7 @@ export default function Application() {
   const [progress, setProgress] = useState(0)
   const [tab, setTab] = useState('enquiry')
   const [showClientModal, setShowClientModal] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   // Smooth anchor scrolling (only while this page is mounted, and only if motion is allowed)
   useEffect(() => {
@@ -80,6 +90,20 @@ export default function Application() {
     return () => observer.disconnect()
   }, [])
 
+  // Mobile menu: close with Escape, or when the screen grows to desktop size
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e) => e.key === 'Escape' && setMenuOpen(false)
+    const mq = window.matchMedia('(min-width: 768px)')
+    const onChange = (e) => e.matches && setMenuOpen(false)
+    window.addEventListener('keydown', onKey)
+    mq.addEventListener('change', onChange)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      mq.removeEventListener('change', onChange)
+    }
+  }, [menuOpen])
+
   // Enquiry form (connect to your backend later)
   const handleEnquiry = (e) => {
     e.preventDefault()
@@ -108,17 +132,32 @@ export default function Application() {
           </a>
 
           <nav className="hidden items-center gap-1 md:flex">
-            <a className="ui-tab" href="#products">Products</a>
-            <a className="ui-tab" href="#support">Support</a>
-            <a className="ui-tab" href="#contact">Contact</a>
-            <a className="ui-tab" href="#why">Why Us</a>
-            <a className="ui-tab" href="#about">About Us</a>
+            {navLinks.map((l) => (
+              <a key={l.href} className="ui-tab" href={l.href}>{l.label}</a>
+            ))}
           </nav>
 
           <div className="flex items-center gap-3">
             {/* Login opens the Client ID popup */}
             <button type="button" onClick={() => setShowClientModal(true)} className="ui-btn px-4">
               Login
+            </button>
+            {/* Mobile menu button (visible below the md breakpoint) */}
+            <button
+              type="button"
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-menu"
+              onClick={() => setMenuOpen((o) => !o)}
+              className="ui-btn px-3 md:hidden"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                {menuOpen ? (
+                  <path d="M6 6l12 12M18 6L6 18" />
+                ) : (
+                  <path d="M4 7h16M4 12h16M4 17h16" />
+                )}
+              </svg>
             </button>
             <div className="relative hidden sm:block">
               <a href="#demo" className="ui-btn ui-btn-add animate-press px-4 motion-reduce:animate-none">Request Demo</a>
@@ -129,6 +168,35 @@ export default function Application() {
                 <path d="M5 3l14 7-6 2-2 6z" className="fill-ink stroke-surface" strokeWidth="1.5" strokeLinejoin="round" />
               </svg>
             </div>
+          </div>
+        </div>
+        {/* mobile menu panel (slides down below the header bar) */}
+        <div
+          id="mobile-menu"
+          className={`grid transition-[grid-template-rows,visibility] duration-300 ease-out motion-reduce:transition-none md:hidden ${
+            menuOpen ? 'visible grid-rows-[1fr]' : 'invisible grid-rows-[0fr]'
+          }`}
+        >
+          <div className="overflow-hidden">
+            <nav className="flex flex-col gap-1 border-t border-line px-6 py-3">
+              {navLinks.map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  onClick={() => setMenuOpen(false)}
+                  className="ui-tab justify-start py-3 text-base"
+                >
+                  {l.label}
+                </a>
+              ))}
+              <a
+                href="#demo"
+                onClick={() => setMenuOpen(false)}
+                className="ui-btn ui-btn-add mt-2 h-11 sm:hidden"
+              >
+                Request Demo
+              </a>
+            </nav>
           </div>
         </div>
         {/* scroll progress line */}

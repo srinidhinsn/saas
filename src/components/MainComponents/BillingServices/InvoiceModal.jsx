@@ -59,11 +59,11 @@ function isDineInOrder(order, tablesMap) {
   if (order._fixedOrderMode) return order._fixedOrderMode === 'dinein';
   if (order.mode) {
     const m = order.mode.toLowerCase();
-    if (m === 'takeaway' || m === 'delivery') return false;
+    if (['takeaway', 'delivery', 'walkin', 'walk-in'].includes(m)) return false;
     if (m === 'dinein' || m === 'dine-in') return true;
   }
   const tableName = (tablesMap?.[order.table_id]?.name || '').toLowerCase();
-  return !tableName.includes('takeaway');
+  return !['takeaway', 'delivery', 'walkin', 'walk-in'].some(type => tableName.includes(type));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

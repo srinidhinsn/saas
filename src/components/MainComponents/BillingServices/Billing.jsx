@@ -341,7 +341,6 @@ useEffect(() => {
       cellRenderer: (params) => (
         <div>
           <div className="text-body-sm font-semibold text-ink">{params.value}</div>
-          <div className="text-ui-sm text-ink-muted">{params.data?.mode || "Dine-In"}</div>
         </div>
       ),
     },
@@ -484,6 +483,7 @@ useEffect(() => {
           order={viewOrder}
           onRequestDeleteItem={(item) => handleRequestDeleteItem(item, viewOrder?.id)}
           getOrderTotal={getOrderTotal}
+          invoiceGenerated={viewOrder ? hasInvoiceBeenGenerated(viewOrder, billingDocMap) : false}
         />
 
         <CancelOrderConfirmModal
